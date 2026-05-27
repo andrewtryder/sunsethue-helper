@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sunsethue Helper - Daily Sunrise/Sunset Quality Notifier</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌅</text></svg>">
+</head>
+<body>
+
+  <!-- 1. Authentication View -->
+  <div id="auth-container" class="glass-panel login-panel">
+    <div class="auth-header">
+      <h1>🌅 <span class="gradient-text">Sunsethue</span> Helper</h1>
+      <p>Sign in to manage your daily forecast notifications</p>
+    </div>
+
+    <div id="auth-error-banner" class="notification-banner error"></div>
+
+    <form id="login-form">
+      <div class="form-group">
+        <label for="login-email">Email Address</label>
+        <input type="email" id="login-email" class="form-input" placeholder="owner@example.com" required>
+      </div>
+      
+      <div class="form-group">
+        <label for="login-password">Password</label>
+        <input type="password" id="login-password" class="form-input" placeholder="••••••••" required>
+      </div>
+
+      <button type="submit" class="btn" id="login-btn">
+        <span>Sign In</span>
+      </button>
+    </form>
+  </div>
+
+  <!-- 2. Main Dashboard View -->
+  <div id="app-container" class="glass-panel hidden">
+    <header class="dashboard-header">
+      <div class="dashboard-logo">
+        <h1>🌅 <span class="gradient-text">Sunsethue</span> Helper</h1>
+      </div>
+      <div class="user-badge">
+        <span class="user-email" id="display-user-email">owner@example.com</span>
+        <button id="logout-btn" class="logout-btn">Log Out</button>
+      </div>
+    </header>
+
+    <div id="db-success-banner" class="notification-banner"></div>
+    <div id="db-error-banner" class="notification-banner error"></div>
+
+    <!-- Tabs Navigation -->
+    <div class="tabs-navigation">
+      <button class="tab-btn active" data-tab="main">📊 Main Forecast</button>
+      <button class="tab-btn" data-tab="locations">📍 Manage Locations</button>
+      <button class="tab-btn" data-tab="logs">📋 Execution Logs</button>
+    </div>
+
+    <!-- Tab Contents -->
+    <div class="tab-content">
+      
+      <!-- 1. Main Forecast Pane -->
+      <div id="pane-main" class="tab-pane active">
+        <div class="pane-header">
+          <h2>Forecast Dashboard (Previous Run Cache)</h2>
+          <span class="location-counter" id="dashboard-last-updated">Last Run: N/A</span>
+        </div>
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.5rem; line-height: 1.4;">
+          This displays the sunrise and sunset forecasts cached in the database during the last run. The email reports send this exact data.
+        </p>
+        
+        <div class="table-responsive">
+          <table class="forecast-table">
+            <thead>
+              <tr>
+                <th style="width: 40%;">Location</th>
+                <th style="width: 30%;">Next Sunrise</th>
+                <th style="width: 30%;">Next Sunset</th>
+              </tr>
+            </thead>
+            <tbody id="forecast-table-body">
+              <tr>
+                <td colspan="3" style="text-align: center; color: var(--text-muted); padding: 2rem; font-style: italic;">
+                  No forecast data cached yet. Click "Send Test Email Now" to trigger a run.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Quick Actions inside Main Tab -->
+        <div class="widget-card" style="margin-top: 2rem; max-width: 550px;">
+          <h3>Manual Run</h3>
+          <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem; line-height: 1.4;">
+            Send an instant test email report for all active locations to your email inbox (<strong>owner@example.com</strong>). This will also query the Sunsethue API and refresh the cached values in the database.
+          </p>
+          <button id="trigger-test-btn" class="btn btn-secondary" style="width: auto; display: inline-flex; padding: 0.8rem 1.5rem;">
+            <span>Send Test Email Now</span>
+          </button>
+          <div id="trigger-status" class="action-status hidden" style="margin-top: 0.75rem;">
+            <span class="spinner"></span>
+            <span id="trigger-status-text">Sending email...</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. Locations Pane -->
+      <div id="pane-locations" class="tab-pane">
+        <div class="dashboard-grid">
+          <!-- Left Column: Locations List -->
+          <section class="locations-section">
+            <div class="section-header">
+              <h2>Monitored Locations</h2>
+              <span class="location-counter" id="locations-count-badge">0 / 10 Locations</span>
+            </div>
+
+            <div class="locations-container" id="locations-list-container">
+              <!-- Dynamically populated card list -->
+              <div class="empty-state" id="empty-state-view">
+                <p>No locations added yet.</p>
+                <p>Use the form on the right to add up to 10 coordinates.</p>
+              </div>
+            </div>
+          </section>
+
+          <!-- Right Column: Add/Edit Widget -->
+          <aside class="sidebar-panel">
+            <div class="widget-card">
+              <h3 id="form-title">Add Location</h3>
+              <form id="location-form">
+                <input type="hidden" id="edit-location-id">
+                
+                <div class="form-group">
+                  <label for="search-address">Search Address / City</label>
+                  <div style="position: relative; display: flex; gap: 0.5rem; width: 100%;">
+                    <input type="text" id="search-address" class="form-input" placeholder="e.g. Venice Beach, CA" style="flex: 1;" autocomplete="off">
+                    <button type="button" id="search-address-btn" class="btn btn-secondary" style="width: auto; padding: 0.5rem 1rem;" title="Search Coordinates">🔍</button>
+                    <div id="search-suggestions" class="suggestions-dropdown hidden"></div>
+                  </div>
+                </div>
+                
+                <div style="margin-bottom: 1.25rem; text-align: right;">
+                  <button type="button" id="use-current-location-btn" class="logout-btn" style="text-decoration: none; font-size: 0.8rem; color: var(--accent-secondary); font-weight: 500;">📍 Use Current Location</button>
+                </div>
+
+                <div class="form-group">
+                  <label for="location-name">Location Name</label>
+                  <input type="text" id="location-name" class="form-input" placeholder="e.g. Home, Venice Beach, Mount Rainier" required>
+                </div>
+
+                <div class="row-inputs">
+                  <div class="form-group">
+                    <label for="location-lat">Latitude</label>
+                    <input type="number" step="any" id="location-lat" class="form-input" placeholder="e.g. 34.0522" required min="-90" max="90">
+                  </div>
+                  <div class="form-group">
+                    <label for="location-lng">Longitude</label>
+                    <input type="number" step="any" id="location-lng" class="form-input" placeholder="e.g. -118.2437" required min="-180" max="180">
+                  </div>
+                </div>
+
+                <div style="display: flex; gap: 0.75rem; margin-top: 0.5rem;">
+                  <button type="button" id="cancel-edit-btn" class="btn btn-secondary hidden">Cancel</button>
+                  <button type="submit" id="save-location-btn" class="btn">Save Location</button>
+                </div>
+              </form>
+            </div>
+          </aside>
+        </div>
+      </div>
+
+      <!-- 3. Logs Pane -->
+      <div id="pane-logs" class="tab-pane">
+        <div class="pane-header">
+          <h2>📋 Execution Logs</h2>
+          <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.5rem; line-height: 1.4;">
+            View the status and results of the last 20 automated or manual forecast runs.
+          </p>
+        </div>
+        <div class="logs-tab-container" id="logs-list-container">
+          <div class="empty-state">No execution logs found yet.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

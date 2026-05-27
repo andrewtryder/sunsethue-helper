@@ -30,7 +30,8 @@ const logsListContainer = document.getElementById("logs-list-container");
 const locationsListContainer = document.getElementById("locations-list-container");
 const emptyStateView = document.getElementById("empty-state-view");
 const locationsCountBadge = document.getElementById("locations-count-badge");
-const forecastTableBody = document.getElementById("forecast-table-body");
+const forecastCardsContainer = document.getElementById("forecast-cards-container");
+const forecastEmptyState = document.getElementById("forecast-empty-state");
 const dashboardLastUpdated = document.getElementById("dashboard-last-updated");
 
 const authErrorBanner = document.getElementById("auth-error-banner");
@@ -99,6 +100,7 @@ function setupAuthListeners() {
       displayUserEmail.textContent = user.email;
       authContainer.classList.add("hidden");
       appContainer.classList.remove("hidden");
+      document.body.classList.add("app-visible");
       hideBanner(authErrorBanner);
       
       setupFirestoreListeners();
@@ -106,6 +108,7 @@ function setupAuthListeners() {
       // Logged out
       authContainer.classList.remove("hidden");
       appContainer.classList.add("hidden");
+      document.body.classList.remove("app-visible");
       locationsList = [];
       if (firestoreUnsubscribe) firestoreUnsubscribe();
       if (firestoreLogsUnsubscribe) firestoreLogsUnsubscribe();
@@ -188,20 +191,21 @@ function setupFirestoreListeners() {
 // 3. Render Locations Card List
 function getForecastBadgeHtml(quality, text) {
   if (quality === undefined || quality === null) {
-    return `<span style="font-weight: 500; color: var(--text-muted);">N/A</span>`;
+    return `<span class="badge badge-muted">N/A</span>`;
   }
   const percentage = Math.round(quality * 100);
-  let color = "var(--text-muted)";
-  if (percentage >= 60) color = "var(--accent-color)";
-  else if (percentage >= 30) color = "var(--accent-secondary)";
-  
-  return `<span style="font-weight: 600; color: ${color};">${percentage}% (${text})</span>`;
+  if (percentage >= 60) {
+    return `<span class="badge badge-great">${percentage}% (${text || 'Great'})</span>`;
+  } else if (percentage >= 30) {
+    return `<span class="badge badge-fair">${percentage}% (${text || 'Fair'})</span>`;
+  }
+  return `<span class="badge badge-muted">${percentage}% (${text || 'Low'})</span>`;
 }
 
 function renderLocations() {
   try {
     console.log("renderLocations called. locationsList:", locationsList);
-    locationsCountBadge.textContent = `${locationsList.length} / 10 Locations`;
+    locationsCountBadge.textContent = `${locationsList.length} / 10`;
     locationsListContainer.innerHTML = "";
     
     if (locationsList.length === 0) {
@@ -216,56 +220,38 @@ function renderLocations() {
     locationsList.forEach((location) => {
       const card = document.createElement("div");
       card.className = "location-card";
-      card.style.alignItems = "flex-start";
       
-      // Get colors for badges
       const sunriseBadge = getForecastBadgeHtml(location.latestSunriseQuality, location.latestSunriseText);
       const sunsetBadge = getForecastBadgeHtml(location.latestSunsetQuality, location.latestSunsetText);
       
-      // Display times formatted to ET
       const sunriseTimeText = location.latestSunriseTime 
         ? new Date(location.latestSunriseTime).toLocaleTimeString("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" })
-        : "";
+        : "—";
       const sunsetTimeText = location.latestSunsetTime 
         ? new Date(location.latestSunsetTime).toLocaleTimeString("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" })
-        : "";
+        : "—";
 
-      const lastUpdatedText = location.lastForecastUpdate
-        ? "Updated: " + new Date(location.lastForecastUpdate).toLocaleTimeString("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" })
-        : "";
-      
       let errorSection = "";
       if (location.forecastError) {
-        errorSection = `<div style="color: var(--error-color); font-size: 0.8rem; margin-top: 0.5rem; font-style: italic;">⚠️ Error: ${escapeHtml(location.forecastError)}</div>`;
+        errorSection = `<div class="forecast-error-text" style="margin-top:6px;">⚠️ ${escapeHtml(location.forecastError)}</div>`;
       }
 
       card.innerHTML = `
-        <div class="location-info" style="flex: 1;">
+        <div class="location-info" style="flex:1;">
           <h3>${escapeHtml(location.name)}</h3>
-          <div class="location-coords">Lat: ${(location.latitude || 0).toFixed(4)}, Lng: ${(location.longitude || 0).toFixed(4)}</div>
-          
-          <!-- Live Forecast Indicators -->
-          <div style="display: flex; gap: 0.75rem; margin-top: 0.75rem; flex-wrap: wrap;">
-            <div style="font-size: 0.8rem; background: rgba(255,255,255,0.02); border: 1px solid var(--glass-border); padding: 0.35rem 0.6rem; border-radius: 8px; display: flex; align-items: center; gap: 0.4rem;">
-              <span>🌅 Rise:</span>
-              ${sunriseBadge}
-              ${sunriseTimeText ? `<span style="font-size: 0.75rem; color: var(--text-muted); font-family: monospace;">(${sunriseTimeText})</span>` : ""}
-            </div>
-            <div style="font-size: 0.8rem; background: rgba(255,255,255,0.02); border: 1px solid var(--glass-border); padding: 0.35rem 0.6rem; border-radius: 8px; display: flex; align-items: center; gap: 0.4rem;">
-              <span>🌇 Set:</span>
-              ${sunsetBadge}
-              ${sunsetTimeText ? `<span style="font-size: 0.75rem; color: var(--text-muted); font-family: monospace;">(${sunsetTimeText})</span>` : ""}
-            </div>
+          <div class="location-coords">${(location.latitude || 0).toFixed(4)}° N / ${Math.abs(location.longitude || 0).toFixed(4)}° W</div>
+          <div class="location-badges">
+            <span class="location-badge-chip"><span class="material-symbols-outlined" style="font-size:14px;font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 20;">wb_twilight</span> ${sunriseTimeText} ${sunriseBadge}</span>
+            <span class="location-badge-chip"><span class="material-symbols-outlined" style="font-size:14px;font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 20;">wb_sunny</span> ${sunsetTimeText} ${sunsetBadge}</span>
           </div>
           ${errorSection}
-          ${lastUpdatedText ? `<div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 0.4rem; font-style: italic;">${lastUpdatedText}</div>` : ""}
         </div>
         <div class="location-actions">
-          <button class="icon-btn edit-btn" data-id="${location.id}" title="Edit Location">
-            ✏️
+          <button class="btn-icon edit-btn" data-id="${location.id}" title="Edit">
+            <span class="material-symbols-outlined" style="font-size:18px;">edit</span>
           </button>
-          <button class="icon-btn icon-btn-danger delete-btn" data-id="${location.id}" title="Delete Location">
-            🗑️
+          <button class="btn-icon btn-icon-danger delete-btn" data-id="${location.id}" title="Delete">
+            <span class="material-symbols-outlined" style="font-size:18px;">delete</span>
           </button>
         </div>
       `;
@@ -288,7 +274,7 @@ function renderLocations() {
       });
     });
 
-    // Render Forecast Dashboard Table
+    // Render Forecast Dashboard Cards
     renderForecastDashboard();
   } catch (error) {
     console.error("Error in renderLocations:", error);
@@ -296,102 +282,99 @@ function renderLocations() {
   }
 }
 
-// 3.1 Render Forecast Dashboard (Email Preview Layout)
-function getDashboardTableBadgeHtml(quality, text) {
-  if (quality === undefined || quality === null) {
-    return `<span class="badge badge-muted">N/A</span>`;
-  }
-  const percentage = Math.round(quality * 100);
-  if (percentage >= 60) {
-    return `<span class="badge badge-spectacular">${percentage}% (${text || 'Spectacular'})</span>`;
-  } else if (percentage >= 30) {
-    return `<span class="badge badge-good">${percentage}% (${text || 'Good'})</span>`;
-  } else {
-    return `<span class="badge badge-muted">${percentage}% (${text || 'Muted'})</span>`;
-  }
-}
-
+// 3.1 Render Forecast Dashboard (Card Layout)
 function renderForecastDashboard() {
   try {
     console.log("renderForecastDashboard called. locationsList:", locationsList);
-    if (!forecastTableBody) return;
+    if (!forecastCardsContainer) return;
     
+    // Remove old location cards (keep the empty-state node)
+    Array.from(forecastCardsContainer.children).forEach(child => {
+      if (child !== forecastEmptyState) child.remove();
+    });
+
     if (locationsList.length === 0) {
-      forecastTableBody.innerHTML = `
-        <tr>
-          <td colspan="3" style="text-align: center; color: var(--text-muted); padding: 2rem; font-style: italic;">
-            No locations added yet. Add a location to see its forecast.
-          </td>
-        </tr>
-      `;
+      if (forecastEmptyState) forecastEmptyState.classList.remove("hidden");
       if (dashboardLastUpdated) dashboardLastUpdated.textContent = "Last Run: N/A";
       return;
     }
     
+    if (forecastEmptyState) forecastEmptyState.classList.add("hidden");
     let maxTimestamp = 0;
-    forecastTableBody.innerHTML = "";
     
     locationsList.forEach((location) => {
-      const row = document.createElement("tr");
-      
       const hasForecast = location.latestSunriseTime !== undefined && location.latestSunriseTime !== null;
       if (location.lastForecastUpdate && location.lastForecastUpdate > maxTimestamp) {
         maxTimestamp = location.lastForecastUpdate;
       }
       
-      const sunriseBadge = getDashboardTableBadgeHtml(location.latestSunriseQuality, location.latestSunriseText);
-      const sunsetBadge = getDashboardTableBadgeHtml(location.latestSunsetQuality, location.latestSunsetText);
+      const sunriseBadge = getForecastBadgeHtml(location.latestSunriseQuality, location.latestSunriseText);
+      const sunsetBadge  = getForecastBadgeHtml(location.latestSunsetQuality,  location.latestSunsetText);
       
       const sunriseTimeText = location.latestSunriseTime 
         ? new Date(location.latestSunriseTime).toLocaleTimeString("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" })
-        : "";
-        
+        : null;
       const sunsetTimeText = location.latestSunsetTime 
         ? new Date(location.latestSunsetTime).toLocaleTimeString("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" })
-        : "";
-        
+        : null;
       const sunriseDateText = location.latestSunriseTime
-        ? new Date(location.latestSunriseTime).toLocaleDateString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric" })
-        : "";
-        
+        ? new Date(location.latestSunriseTime).toLocaleDateString("en-US", { timeZone: "America/New_York", weekday: "short", month: "short", day: "numeric" })
+        : null;
       const sunsetDateText = location.latestSunsetTime
-        ? new Date(location.latestSunsetTime).toLocaleDateString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric" })
-        : "";
-        
-      let sunriseCol = "";
-      let sunsetCol = "";
+        ? new Date(location.latestSunsetTime).toLocaleDateString("en-US", { timeZone: "America/New_York", weekday: "short", month: "short", day: "numeric" })
+        : null;
       
+      const lat  = (location.latitude  || 0).toFixed(2);
+      const lng  = Math.abs(location.longitude || 0).toFixed(2);
+      const lngDir = (location.longitude || 0) < 0 ? "W" : "E";
+
+      let sunriseRowHtml;
+      let sunsetRowHtml;
+
       if (location.forecastError) {
-        const errSpan = `<span style="color: var(--error-color); font-style: italic; font-size: 0.8rem;">⚠️ Error: ${escapeHtml(location.forecastError)}</span>`;
-        sunriseCol = errSpan;
-        sunsetCol = errSpan;
+        const errHtml = `<span class="forecast-error-text">⚠️ ${escapeHtml(location.forecastError)}</span>`;
+        sunriseRowHtml = errHtml;
+        sunsetRowHtml  = errHtml;
       } else if (!hasForecast) {
-        const pendingSpan = `<span style="color: var(--text-muted); font-style: italic; font-size: 0.8rem;">No forecast cached</span>`;
-        sunriseCol = pendingSpan;
-        sunsetCol = pendingSpan;
+        sunriseRowHtml = `<span class="forecast-no-data">No forecast cached yet</span>`;
+        sunsetRowHtml  = `<span class="forecast-no-data">No forecast cached yet</span>`;
       } else {
-        sunriseCol = `
-          <div style="font-weight: 600; font-size: 0.95rem;">${sunriseTimeText}</div>
-          <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.4rem;">${sunriseDateText}</div>
-          <div>${sunriseBadge}</div>
+        sunriseRowHtml = `
+          <div class="forecast-time">${sunriseTimeText}</div>
+          <div class="forecast-label">Next Sunrise${sunriseDateText ? ', ' + sunriseDateText : ''}</div>
         `;
-        sunsetCol = `
-          <div style="font-weight: 600; font-size: 0.95rem;">${sunsetTimeText}</div>
-          <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.4rem;">${sunsetDateText}</div>
-          <div>${sunsetBadge}</div>
+        sunsetRowHtml = `
+          <div class="forecast-time">${sunsetTimeText}</div>
+          <div class="forecast-label">Next Sunset${sunsetDateText ? ', ' + sunsetDateText : ''}</div>
         `;
       }
-      
-      row.innerHTML = `
-        <td style="font-weight: 600;">
-          <span style="font-family: 'Outfit', sans-serif; font-size: 1rem; color: var(--text-primary);">${escapeHtml(location.name)}</span>
-          <div class="forecast-table-coords">Lat: ${(location.latitude || 0).toFixed(4)}, Lng: ${(location.longitude || 0).toFixed(4)}</div>
-        </td>
-        <td>${sunriseCol}</td>
-        <td>${sunsetCol}</td>
+
+      const card = document.createElement("div");
+      card.className = "location-forecast-card";
+      card.innerHTML = `
+        <div>
+          <h2 class="forecast-card-title">${escapeHtml(location.name)}</h2>
+          <p class="forecast-card-coords">${lat}° N / ${lng}° ${lngDir}</p>
+        </div>
+        <div class="forecast-rows">
+          <div class="forecast-row">
+            <div class="forecast-row-left">
+              <span class="material-symbols-outlined forecast-icon">wb_twilight</span>
+              <div>${sunriseRowHtml}</div>
+            </div>
+            ${hasForecast && !location.forecastError ? sunriseBadge : ''}
+          </div>
+          <div class="forecast-row">
+            <div class="forecast-row-left">
+              <span class="material-symbols-outlined forecast-icon">wb_sunny</span>
+              <div>${sunsetRowHtml}</div>
+            </div>
+            ${hasForecast && !location.forecastError ? sunsetBadge : ''}
+          </div>
+        </div>
       `;
       
-      forecastTableBody.appendChild(row);
+      forecastCardsContainer.appendChild(card);
     });
     
     if (dashboardLastUpdated) {
@@ -401,21 +384,15 @@ function renderForecastDashboard() {
           dateStyle: "medium",
           timeStyle: "short"
         });
-        dashboardLastUpdated.textContent = `Last Run: ${timeStr}`;
+        dashboardLastUpdated.textContent = `Last Run: ${timeStr} ET`;
       } else {
         dashboardLastUpdated.textContent = "Last Run: Never";
       }
     }
   } catch (error) {
     console.error("Error in renderForecastDashboard:", error);
-    if (forecastTableBody) {
-      forecastTableBody.innerHTML = `
-        <tr>
-          <td colspan="3" style="text-align: center; color: var(--error-color); padding: 2rem; font-style: italic;">
-            ⚠️ Render Error: ${escapeHtml(error.message)}
-          </td>
-        </tr>
-      `;
+    if (forecastCardsContainer) {
+      forecastCardsContainer.innerHTML = `<div class="empty-state"><p>⚠️ Render Error: ${escapeHtml(error.message)}</p></div>`;
     }
   }
 }
@@ -841,20 +818,29 @@ function renderLogs(logs) {
   });
 }
 
-// Tab Switching logic
-const tabButtons = document.querySelectorAll(".tab-btn");
+// Tab Switching logic — covers desktop nav, mobile segment nav, and bottom nav
+const allNavButtons = document.querySelectorAll(".nav-tab, .bottom-nav-item");
 const tabPanes = document.querySelectorAll(".tab-pane");
 
-tabButtons.forEach(btn => {
+function switchTab(targetTab) {
+  // Update all nav buttons across all surfaces
+  allNavButtons.forEach(b => {
+    if (b.getAttribute("data-tab") === targetTab) {
+      b.classList.add("active");
+    } else {
+      b.classList.remove("active");
+    }
+  });
+  // Show/hide panes
+  tabPanes.forEach(p => p.classList.remove("active"));
+  const activePane = document.getElementById(`pane-${targetTab}`);
+  if (activePane) activePane.classList.add("active");
+}
+
+allNavButtons.forEach(btn => {
   btn.addEventListener("click", () => {
     const targetTab = btn.getAttribute("data-tab");
-    
-    tabButtons.forEach(b => b.classList.remove("active"));
-    tabPanes.forEach(p => p.classList.remove("active"));
-    
-    btn.classList.add("active");
-    const activePane = document.getElementById(`pane-${targetTab}`);
-    if (activePane) activePane.classList.add("active");
+    if (targetTab) switchTab(targetTab);
   });
 });
 

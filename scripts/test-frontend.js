@@ -24,35 +24,48 @@ test("Frontend File Structure & Integrity Checks", () => {
   const htmlContent = fs.readFileSync(htmlPath, "utf8");
   
   const requiredIds = [
+    // Auth view
     "auth-container",
-    "app-container",
     "login-form",
     "login-email",
     "login-password",
+    // App view
+    "app-container",
     "display-user-email",
     "logout-btn",
+    // Auth banners
+    "auth-error-banner",
+    // App banners
+    "db-success-banner",
+    "db-error-banner",
+    // Location form
     "location-form",
     "edit-location-id",
     "location-name",
     "location-lat",
     "location-lng",
+    // Search
     "search-address",
     "search-address-btn",
     "search-suggestions",
     "use-current-location-btn",
+    // Manual trigger
     "trigger-test-btn",
     "trigger-status",
     "trigger-status-text",
+    // Tab panes
     "pane-main",
     "pane-locations",
     "pane-logs",
-    "forecast-table-body",
+    // Dashboard
+    "forecast-cards-container",
     "dashboard-last-updated",
+    // Locations list
     "locations-list-container",
     "empty-state-view",
     "locations-count-badge",
-    "db-success-banner",
-    "db-error-banner"
+    // Logs
+    "logs-list-container",
   ];
 
   requiredIds.forEach(id => {
@@ -62,14 +75,15 @@ test("Frontend File Structure & Integrity Checks", () => {
     );
   });
 
-  // 4. Verify CSS classes for tabs are defined
+  // 4. Verify CSS design system tokens and key selectors are defined
   const cssContent = fs.readFileSync(cssPath, "utf8");
   const requiredCssSelectors = [
-    ".tabs-navigation",
-    ".tab-btn",
-    ".tab-btn.active",
     ".tab-pane",
-    ".tab-pane.active"
+    ".tab-pane.active",
+    ".nav-tab",
+    ".nav-tab.active",
+    ".glass-elevated",
+    ".badge",
   ];
 
   requiredCssSelectors.forEach(selector => {

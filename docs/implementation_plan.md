@@ -1,88 +1,53 @@
-# Sunsethue Helper Implementation Plan: Git & GitHub Actions CI/CD
+# Sunsethue Helper Implementation Plan: Local Git Hooks & Frontend Testing
 
-We will set up local Git tracking for the repository and configure **GitHub Actions** to automatically deploy the web app (Hosting and Cloud Functions) to Firebase whenever you push changes to the `main` branch.
-
----
-
-## 1. Local Git Initialization
-We will run the following commands to initialize and prepare the repository:
-1. Initialize local repository: `git init`
-2. Change the default branch name to main: `git checkout -b main`
-3. Stage all files (verifying that `.gitignore` correctly excludes `.env` and node modules): `git add .`
-4. Commit the initial workspace state: `git commit -m "Initial commit: Sunsethue Helper full stack"`
+We will add a lightweight frontend test suite (verifying critical HTML structures, CSS files, and JS assets) and set up a local Git `pre-commit` hook. This hook will prevent you from committing code if either the frontend checks or the backend unit tests fail. We will also integrate these checks into your GitHub Actions CI pipeline.
 
 ---
 
-## 2. GitHub Actions Deployment Workflow
+## 1. Frontend Test Script
 
-We will create a GitHub Action file at `.github/workflows/firebase-deploy.yml` that triggers on push to the `main` branch.
+We will create a zero-dependency, fast Node.js script at `scripts/test-frontend.js` using the native Node.js test runner.
 
-### [NEW] [.github/workflows/firebase-deploy.yml](file:///Users/atr/code/sunsethue-helper/.github/workflows/firebase-deploy.yml)
-
-The workflow will perform the following steps:
-1.  **Check out repository** using `actions/checkout@v4`.
-2.  **Set up Node.js 22** using `actions/setup-node@v4` (to match our upgraded function runtime environment).
-3.  **Install dependencies**:
-    - Install functions dependencies: `npm ci --prefix functions`
-4.  **Run backend unit tests**:
-    - Run the native node test runner: `npm test --prefix functions`
-5.  **Deploy to Firebase** using the official Firebase GitHub Action (`w9jds/firebase-action@v2.2.0`) targeting both `hosting` and `functions` using your stored GitHub Secret token.
-
-```yaml
-name: Deploy to Firebase on Push
-
-on:
-  push:
-    branches:
-      - main
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Repo
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: Install Functions Dependencies
-        run: npm ci --prefix functions
-
-      - name: Run Backend Unit Tests
-        run: npm test --prefix functions
-
-      - name: Deploy to Firebase
-        uses: w9jds/firebase-action@v2.2.0
-        with:
-          args: deploy
-        env:
-          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
-```
+### [NEW] [test-frontend.js](file:///Users/atr/code/sunsethue-helper/scripts/test-frontend.js)
+This script will:
+*   Load and parse `public/index.html` to verify all required UI selectors and IDs exist (e.g. `auth-container`, `app-container`, `forecast-table-body`, `logs-list-container`, `pane-main`, `pane-locations`, `pane-logs`).
+*   Confirm that `public/style.css` exists, compiles, and contains the required tab styles.
+*   Confirm that `public/app.js` contains the dynamic script assets.
+*   Ensure that all asset files are present and not empty.
 
 ---
 
-## 3. User Actions Required (GitHub Configuration)
+## 2. Git Pre-Commit Hook & Installer
 
-To complete the link between your computer, GitHub, and Firebase, you will need to perform the following steps on GitHub:
+We will create a pre-commit script that runs automatically whenever you execute `git commit`.
 
-1.  **Create a New GitHub Repository**:
-    - Go to [GitHub New Repository](https://github.com/new).
-    - Name it (e.g. `sunsethue-helper`) and keep it **Private** (recommended since your code contains custom logic).
-    - Do NOT initialize with a README, gitignore, or license.
-2.  **Link and Push Your Code**:
-    - After we configure git locally, you can run the following commands in your host terminal to push the code (replacing with your repository URL):
-      ```bash
-      git remote add origin https://github.com/YOUR_GITHUB_USERNAME/sunsethue-helper.git
-      git push -u origin main
-      ```
-3.  **Add Firebase Credentials to GitHub Secrets**:
-    - Go to your repository page on GitHub.
-    - Click **Settings > Secrets and variables > Actions**.
-    - Click **New repository secret**.
-    - Name the secret: `FIREBASE_TOKEN`
-    - Paste your Firebase CI token in the value field:
-      `1//05PWPykLs62vECgYIARAAGAUSNwF-L9Ir-zVfTF0zeblBhHWLtk7ODDmPxfWHzDzIDeEGv_o9rA9VM-e52_LW5dcyXQxjGNja6wo`
-    - Click **Add secret**.
+### [NEW] [pre-commit.sh](file:///Users/atr/code/sunsethue-helper/scripts/pre-commit.sh)
+A shell script that:
+1. Runs the frontend test: `node scripts/test-frontend.js`
+2. Runs the backend unit tests: `npm test --prefix functions`
+3. Aborts the commit (exits with code 1) if any test fails, giving you instant local feedback.
+
+### [NEW] [setup-git-hooks.sh](file:///Users/atr/code/sunsethue-helper/scripts/setup-git-hooks.sh)
+An installer script that:
+- Copies `scripts/pre-commit.sh` into your local `.git/hooks/pre-commit`.
+- Makes the hook executable (`chmod +x .git/hooks/pre-commit`).
+
+---
+
+## 3. GitHub Actions CI Integration
+
+We will modify `.github/workflows/firebase-deploy.yml` to include the frontend test suite.
+
+### [MODIFY] [.github/workflows/firebase-deploy.yml](file:///Users/atr/code/sunsethue-helper/.github/workflows/firebase-deploy.yml)
+- Add a new step to run the frontend test: `node scripts/test-frontend.js` before executing the backend tests and deployments.
+
+---
+
+## 4. Verification Plan
+
+### Local Verification
+1. Run `node scripts/setup-git-hooks.sh` to install the pre-commit hook.
+2. Run `node scripts/test-frontend.js` directly to verify it passes.
+3. Run `npm test --prefix functions` directly to verify it passes.
+4. Make a temporary syntax error (e.g. rename an ID in `public/index.html` or break a backend test) and try to run `git commit`. Verify that the commit is blocked with a clear test failure output.
+5. Fix the error, commit, and push. Verify that the GitHub Actions run succeeds.

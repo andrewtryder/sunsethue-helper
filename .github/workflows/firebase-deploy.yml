@@ -17,6 +17,9 @@ jobs:
         with:
           node-version: 22
 
+      - name: Run Frontend Structural Tests
+        run: node scripts/test-frontend.js
+
       - name: Install Functions Dependencies
         run: npm ci --prefix functions
 

@@ -1,68 +1,88 @@
-# Sunsethue Helper Implementation Plan: Tabbed UI & API Credit Analysis
+# Sunsethue Helper Implementation Plan: Git & GitHub Actions CI/CD
 
-We will redesign the web application to use a tabbed layout dividing the interface into three clean sections: **Main (Forecast Dashboard)**, **Locations (CRUD Management)**, and **Logs (Execution History)**. We will also confirm the backend scheduler logic and answer your API credit usage question.
-
----
-
-## 1. Sunsethue API Credit Calculation
-
-Here is the credit calculation based on the Sunsethue API specifications:
-*   **Daily Runs**: 2 scheduled runs (6:00 AM & 6:00 PM Eastern).
-*   **Monitored Locations**: 10 active locations.
-*   **Query Range**: `days=2` (retrieves forecast events for today and tomorrow).
-*   **Events Per Query**: A 2-day range typically returns 4 events per location (2 sunrises + 2 sunsets).
-*   **Credit Cost per Event**: 5 credits (with full ray-tracing model data enabled, which is required for quality scores).
-*   **Calculation**:
-    *   *Per Location Query*: 4 events × 5 credits = 20 credits.
-    *   *Per Run (10 Locations)*: 10 locations × 20 credits = 200 credits.
-    *   *Per Day (2 Runs)*: 2 runs × 200 credits = **400 credits/day**.
-*   **Quota Impact**: Since Sunsethue's free tier provides **1,000 credits/day**, your daily consumption of 400 credits is well within the free limits (40% utilization) and will be **100% free**.
+We will set up local Git tracking for the repository and configure **GitHub Actions** to automatically deploy the web app (Hosting and Cloud Functions) to Firebase whenever you push changes to the `main` branch.
 
 ---
 
-## 2. Scheduler & Caching Behavior
-
-The backend Cloud Functions (`scheduledReportAM` and `scheduledReportPM`) are already aligned with your requested logic:
-1. They run automatically twice daily at **6:00 AM** and **6:00 PM** Eastern Time.
-2. They query the API, store/cache the results directly in each location's document in Firestore (`latestSunriseQuality`, etc.), and then immediately send the email report.
-3. The frontend displays the cached values from Firestore.
-4. As you noted, if you add or modify a location, it will display "No forecast cached" or the previous cache until the next scheduled 12-hour run (or until you manually click "Send Test Email Now" to force a run). This data lag is normal and acceptable. No changes to the backend codebase are needed.
-
----
-
-## 3. Proposed Changes (Tabbed UI Redesign)
-
-We will modify the frontend to transition from the current grid/modal design to a tabbed navigation system.
-
-### [MODIFY] [index.html](file:///Users/atr/code/sunsethue-helper/public/index.html)
-- Add a new tab navigation header (`.tabs-navigation`) with buttons for **Main Forecast**, **Manage Locations**, and **Execution Logs**.
-- Restructure the page into three tab panels (`.tab-pane`):
-  1.  **Main Forecast Tab**: Contains the forecast summary table showing all locations' cached scores, manual trigger buttons, and the last updated timestamp.
-  2.  **Manage Locations Tab**: Contains the 2-column grid allowing location edits/deletions and the geocoding add form.
-  3.  **Execution Logs Tab**: Renders the history list of execution runs (formerly in the logs modal) as a full-screen scrollable layout.
-- Remove the "View Execution Logs" button and the obsolete Modal DOM markup.
-
-### [MODIFY] [style.css](file:///Users/atr/code/sunsethue-helper/public/style.css)
-- Add class styling for the tab navigation container (`.tabs-navigation`) and tab buttons (`.tab-btn`).
-- Add active states and hover effects using CSS variables and glassmorphic designs.
-- Style the tab panel wrapper (`.tab-pane`) to control visibility with animations.
-- Set up a clean, full-width scrollable container for the Logs tab (`.logs-tab-container`).
-
-### [MODIFY] [app.js](file:///Users/atr/code/sunsethue-helper/public/app.js)
-- Remove references and event listeners for the obsolete logs modal.
-- Add tab switching event listeners that toggle active classes on the buttons and panes.
-- Retain the Firestore snapshots for `locations` and `runs` to update their respective tabs in real-time.
+## 1. Local Git Initialization
+We will run the following commands to initialize and prepare the repository:
+1. Initialize local repository: `git init`
+2. Change the default branch name to main: `git checkout -b main`
+3. Stage all files (verifying that `.gitignore` correctly excludes `.env` and node modules): `git add .`
+4. Commit the initial workspace state: `git commit -m "Initial commit: Sunsethue Helper full stack"`
 
 ---
 
-## 4. Verification Plan
+## 2. GitHub Actions Deployment Workflow
 
-### Manual Verification
-1. Open the updated web application and sign in with `atr000@gmail.com`.
-2. Confirm the three tabs are visible at the top and styled beautifully.
-3. Test clicking between the tabs:
-   - **Main Forecast** should show the comparison table, last run time, and "Send Test Email Now" trigger.
-   - **Manage Locations** should show the form and the edit/delete options.
-   - **Execution Logs** should show the list of runs in full width.
-4. Add a location in the *Manage Locations* tab, then click *Main Forecast* to verify it appears in the comparison table with a "No forecast cached" status.
-5. Click **Send Test Email Now** on the Main tab to run a manual trigger, and verify that the table updates with fresh forecast scores and the logs tab updates with a new run entry in real-time.
+We will create a GitHub Action file at `.github/workflows/firebase-deploy.yml` that triggers on push to the `main` branch.
+
+### [NEW] [.github/workflows/firebase-deploy.yml](file:///Users/atr/code/sunsethue-helper/.github/workflows/firebase-deploy.yml)
+
+The workflow will perform the following steps:
+1.  **Check out repository** using `actions/checkout@v4`.
+2.  **Set up Node.js 22** using `actions/setup-node@v4` (to match our upgraded function runtime environment).
+3.  **Install dependencies**:
+    - Install functions dependencies: `npm ci --prefix functions`
+4.  **Run backend unit tests**:
+    - Run the native node test runner: `npm test --prefix functions`
+5.  **Deploy to Firebase** using the official Firebase GitHub Action (`w9jds/firebase-action@v2.2.0`) targeting both `hosting` and `functions` using your stored GitHub Secret token.
+
+```yaml
+name: Deploy to Firebase on Push
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Functions Dependencies
+        run: npm ci --prefix functions
+
+      - name: Run Backend Unit Tests
+        run: npm test --prefix functions
+
+      - name: Deploy to Firebase
+        uses: w9jds/firebase-action@v2.2.0
+        with:
+          args: deploy
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+```
+
+---
+
+## 3. User Actions Required (GitHub Configuration)
+
+To complete the link between your computer, GitHub, and Firebase, you will need to perform the following steps on GitHub:
+
+1.  **Create a New GitHub Repository**:
+    - Go to [GitHub New Repository](https://github.com/new).
+    - Name it (e.g. `sunsethue-helper`) and keep it **Private** (recommended since your code contains custom logic).
+    - Do NOT initialize with a README, gitignore, or license.
+2.  **Link and Push Your Code**:
+    - After we configure git locally, you can run the following commands in your host terminal to push the code (replacing with your repository URL):
+      ```bash
+      git remote add origin https://github.com/YOUR_GITHUB_USERNAME/sunsethue-helper.git
+      git push -u origin main
+      ```
+3.  **Add Firebase Credentials to GitHub Secrets**:
+    - Go to your repository page on GitHub.
+    - Click **Settings > Secrets and variables > Actions**.
+    - Click **New repository secret**.
+    - Name the secret: `FIREBASE_TOKEN`
+    - Paste your Firebase CI token in the value field:
+      `1//05PWPykLs62vECgYIARAAGAUSNwF-L9Ir-zVfTF0zeblBhHWLtk7ODDmPxfWHzDzIDeEGv_o9rA9VM-e52_LW5dcyXQxjGNja6wo`
+    - Click **Add secret**.

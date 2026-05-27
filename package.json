@@ -1,0 +1,12 @@
+{
+  "name": "sunsethue-helper",
+  "version": "1.0.0",
+  "description": "Daily sunrise/sunset quality email notifier using Sunsethue API and Firebase.",
+  "scripts": {
+    "emulators:start": "npx firebase emulators:start --only firestore,auth,functions,hosting",
+    "deploy": "npx firebase deploy"
+  },
+  "devDependencies": {
+    "firebase-tools": "^13.0.0"
+  }
+}

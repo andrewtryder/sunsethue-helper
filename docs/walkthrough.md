@@ -1,50 +1,56 @@
-# Sunsethue Helper Walkthrough: Tabbed UI & Refactoring
+# Sunsethue Helper Walkthrough: Git & GitHub Actions CI/CD Setup
 
-We have successfully refactored and deployed a modern **Tabbed User Interface** to your private dashboard. This completely eliminates the logs modal and divides the app workspace into three clean, focused views.
-
----
-
-## 🚀 Live Resources
-
-*   **Hosting Web Dashboard**: [https://sunsethue-helper-12345.web.app](https://sunsethue-helper-12345.web.app)
-*   **Firebase Project Console**: [https://console.firebase.google.com/project/sunsethue-helper-12345/overview](https://console.firebase.google.com/project/sunsethue-helper-12345/overview)
+We have initialized local version control using Git and created a custom **GitHub Actions automated deployment workflow**. Now, every push you make to your remote `main` branch will run backend unit tests and deploy your files directly to Firebase.
 
 ---
 
-## 🎨 Tab Layout Walkthrough
+## 🛠️ Completed Tasks
 
-1.  **📊 Main Forecast Tab** (Default View):
-    - Renders the live forecast comparison table (Sunrise & Sunset times, date, and quality badges) for all locations at once.
-    - Displays data strictly cached in the Firestore database from the *previous runs*.
-    - Contains the **Manual Run** widget (Send Test Email Now button) and the exact Eastern Time timestamp of the last run.
-2.  **📍 Manage Locations Tab**:
-    - Houses the location list (with latitude/longitude coordinates and Edit/Delete buttons).
-    - Contains the autocomplete geocoding form to add, search, and edit locations.
-    - Limits locations to a maximum of 10.
-3.  **📋 Execution Logs Tab**:
-    - Replaces the old popup modal window.
-    - Renders a clean, full-width scrollable timeline of the last 20 automated or manual runs, displaying run timestamps, trigger types (AM, PM, manual test), and specific execution results per location.
+1.  **Git Initialization**:
+    - Initialized local Git tracking inside the repository.
+    - Set the default branch to `main`.
+    - Made the initial commit containing your code files.
+    - Verified that node modules and secret `.env` files are completely ignored.
+2.  **CI/CD Workflow Configured**:
+    - Created the workflow folder at `.github/workflows/`.
+    - Wrote the workflow logic at [.github/workflows/firebase-deploy.yml](file:///Users/atr/code/sunsethue-helper/.github/workflows/firebase-deploy.yml).
 
 ---
 
-## 🔍 How to Verify
+## 🚀 Final Steps to Link GitHub and Activate CI/CD
 
-1.  Open the web app in your browser: [https://sunsethue-helper-12345.web.app](https://sunsethue-helper-12345.web.app)
-2.  Log in with your administrator account (`owner@example.com`).
-3.  Click through the new tabs (**Main Forecast**, **Manage Locations**, **Execution Logs**) at the top of your dashboard to ensure navigation is responsive and smooth.
-4.  Navigate to **Manage Locations** and verify that your locations load correctly and the CRUD edit/delete buttons operate as expected.
-5.  Go to the **Main Forecast** tab and click **Send Test Email Now**. Verify the manual trigger begins, then switches back to success.
-6.  Click over to the **Execution Logs** tab to verify a new "Manual Test" log row appears immediately in the timeline.
+To push the codebase to your own GitHub account and link the deployment runner, follow these simple steps:
+
+### Step 1: Create a GitHub Repository
+1. Go to [GitHub New Repository](https://github.com/new).
+2. Set the repository name to: `sunsethue-helper`
+3. Select **Private** (recommended to keep your code private).
+4. Do **NOT** initialize with a README, gitignore, or license.
+5. Click **Create repository**.
+
+### Step 2: Add Your Firebase CI Secret to GitHub
+1. On your new GitHub repository page, click the **Settings** tab.
+2. Under "Security", expand **Secrets and variables** and click **Actions**.
+3. Click the green **New repository secret** button.
+4. Name the secret exactly:
+   `FIREBASE_TOKEN`
+5. Paste the Firebase CI token into the value field:
+   `1//05PWPykLs62vECgYIARAAGAUSNwF-L9Ir-zVfTF0zeblBhHWLtk7ODDmPxfWHzDzIDeEGv_o9rA9VM-e52_LW5dcyXQxjGNja6wo`
+6. Click **Add secret**.
+
+### Step 3: Link Remote Origin & Push Code
+Open your terminal inside the `/Users/atr/code/sunsethue-helper` directory and execute these commands (replacing with your actual GitHub username):
+```bash
+git remote add origin https://github.com/YOUR_GITHUB_USERNAME/sunsethue-helper.git
+git push -u origin main
+```
 
 ---
 
-## 💡 Summary of API Credit Analysis
+## 📋 How It Works After Pushing
 
-*   **Your Plan**: 10 active locations querying the `/forecast` endpoint twice daily.
-*   **Cost Calculation**:
-    - 2-day query window returns 4 events per location (2 sunrises + 2 sunsets).
-    - With ray-tracing model data active (for quality scores), each event consumes 5 credits.
-    - 4 events × 5 credits = 20 credits per location query.
-    - 10 locations × 20 credits = 200 credits per scheduler run.
-    - 2 runs daily × 200 credits = **400 credits/day**.
-*   **Quota Status**: This is well below the Sunsethue API's free allowance of **1,000 credits/day** (using only 40% of your daily limit), ensuring the app remains **100% free** to run.
+Whenever you modify any file locally and commit it to git:
+1. When you run `git push`, GitHub receives the changes.
+2. The GitHub Action runner spins up a virtual machine running Ubuntu.
+3. It installs Node 22, packages the backend dependencies, and executes the backend unit tests (`npm test` in the `functions/` directory).
+4. If the tests pass, it uses your `FIREBASE_TOKEN` secret to deploy hosting assets and update Cloud Functions automatically!

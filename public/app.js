@@ -63,36 +63,60 @@ async function initFirebase() {
   } catch (error) {
     console.error("Firebase init failed: ", error);
     showBanner(authErrorBanner, `Initialization Error: ${error.message}. Please run this app via Firebase CLI (e.g. 'npx firebase emulators:start').`, 0);
+    const loader = document.getElementById("loading-overlay");
+    if (loader) loader.classList.add("fade-out");
   }
 }
 
 // Banner Utility
+const bannerTimeouts = new Map();
+
 function showBanner(bannerElement, message, duration = 5000) {
+  if (bannerTimeouts.has(bannerElement)) {
+    clearTimeout(bannerTimeouts.get(bannerElement));
+  }
   bannerElement.textContent = message;
   bannerElement.classList.add("show");
   bannerElement.style.display = "block";
   
   if (duration > 0) {
-    setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       bannerElement.classList.remove("show");
       bannerElement.style.display = "none";
+      bannerTimeouts.delete(bannerElement);
     }, duration);
+    bannerTimeouts.set(bannerElement, timeoutId);
   }
 }
 
 function hideBanner(bannerElement) {
+  if (bannerTimeouts.has(bannerElement)) {
+    clearTimeout(bannerTimeouts.get(bannerElement));
+    bannerTimeouts.delete(bannerElement);
+  }
   bannerElement.style.display = "none";
   bannerElement.textContent = "";
 }
 
 // 1. Setup Auth Listeners
+let isFirstAuthCheck = true;
+
 function setupAuthListeners() {
   onAuthStateChanged(auth, (user) => {
+    const hideLoader = () => {
+      if (isFirstAuthCheck) {
+        isFirstAuthCheck = false;
+        const loader = document.getElementById("loading-overlay");
+        if (loader) loader.classList.add("fade-out");
+      }
+    };
+
     if (user) {
       // Security check: restrict email to owner@example.com
       if (user.email !== "owner@example.com") {
         showBanner(authErrorBanner, "Access Denied: Only owner@example.com is authorized.", 10000);
         signOut(auth);
+        hideLoader();
         return;
       }
       
@@ -104,6 +128,7 @@ function setupAuthListeners() {
       hideBanner(authErrorBanner);
       
       setupFirestoreListeners();
+      hideLoader();
     } else {
       // Logged out
       authContainer.classList.remove("hidden");
@@ -112,6 +137,7 @@ function setupAuthListeners() {
       locationsList = [];
       if (firestoreUnsubscribe) firestoreUnsubscribe();
       if (firestoreLogsUnsubscribe) firestoreLogsUnsubscribe();
+      hideLoader();
     }
   });
 }
@@ -674,15 +700,61 @@ async function performAddressSearch() {
 }
 
 searchAddressBtn.addEventListener("click", performAddressSearch);
+
+// Autocomplete Suggestions logic & Key-nav
+let autocompleteTimeout = null;
+let activeSuggestionIndex = -1;
+let currentSuggestions = [];
+
 searchAddressInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") {
+  const items = searchSuggestions.querySelectorAll(".suggestion-item");
+  
+  if (items.length === 0) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      performAddressSearch();
+    }
+    return;
+  }
+
+  if (e.key === "ArrowDown") {
     e.preventDefault();
-    performAddressSearch();
+    activeSuggestionIndex++;
+    if (activeSuggestionIndex >= items.length) {
+      activeSuggestionIndex = 0;
+    }
+    updateActiveSuggestion(items);
+  } else if (e.key === "ArrowUp") {
+    e.preventDefault();
+    activeSuggestionIndex--;
+    if (activeSuggestionIndex < 0) {
+      activeSuggestionIndex = items.length - 1;
+    }
+    updateActiveSuggestion(items);
+  } else if (e.key === "Enter") {
+    e.preventDefault();
+    if (activeSuggestionIndex >= 0 && activeSuggestionIndex < items.length) {
+      items[activeSuggestionIndex].click();
+    } else {
+      performAddressSearch();
+    }
+  } else if (e.key === "Escape") {
+    e.preventDefault();
+    searchSuggestions.classList.add("hidden");
+    activeSuggestionIndex = -1;
   }
 });
 
-// Autocomplete Suggestions logic
-let autocompleteTimeout = null;
+function updateActiveSuggestion(items) {
+  items.forEach((item, index) => {
+    if (index === activeSuggestionIndex) {
+      item.classList.add("active");
+      item.scrollIntoView({ block: "nearest" });
+    } else {
+      item.classList.remove("active");
+    }
+  });
+}
 
 searchAddressInput.addEventListener("input", () => {
   clearTimeout(autocompleteTimeout);
@@ -691,6 +763,8 @@ searchAddressInput.addEventListener("input", () => {
   if (queryText.length < 3) {
     searchSuggestions.classList.add("hidden");
     searchSuggestions.innerHTML = "";
+    currentSuggestions = [];
+    activeSuggestionIndex = -1;
     return;
   }
   
@@ -708,6 +782,8 @@ searchAddressInput.addEventListener("input", () => {
       } else {
         searchSuggestions.classList.add("hidden");
         searchSuggestions.innerHTML = "";
+        currentSuggestions = [];
+        activeSuggestionIndex = -1;
       }
     } catch (err) {
       console.error("Autocomplete error:", err);
@@ -718,8 +794,10 @@ searchAddressInput.addEventListener("input", () => {
 function renderSuggestions(features) {
   searchSuggestions.innerHTML = "";
   searchSuggestions.classList.remove("hidden");
+  activeSuggestionIndex = -1;
+  currentSuggestions = features;
   
-  features.forEach((feature) => {
+  features.forEach((feature, index) => {
     const props = feature.properties;
     const coords = feature.geometry.coordinates; // [Lng, Lat]
     
@@ -735,6 +813,7 @@ function renderSuggestions(features) {
     const item = document.createElement("div");
     item.className = "suggestion-item";
     item.textContent = displayName;
+    item.setAttribute("data-index", index);
     
     item.addEventListener("click", () => {
       // Photon returns [Lng, Lat] in GeoJSON format
@@ -751,6 +830,8 @@ function renderSuggestions(features) {
       searchAddressInput.value = "";
       searchSuggestions.classList.add("hidden");
       searchSuggestions.innerHTML = "";
+      currentSuggestions = [];
+      activeSuggestionIndex = -1;
       
       showBanner(dbSuccessBanner, `Selected location: ${displayName}`);
       locationNameInput.focus();
@@ -764,6 +845,7 @@ function renderSuggestions(features) {
 document.addEventListener("click", (e) => {
   if (!searchAddressInput.contains(e.target) && !searchSuggestions.contains(e.target)) {
     searchSuggestions.classList.add("hidden");
+    activeSuggestionIndex = -1;
   }
 });
 

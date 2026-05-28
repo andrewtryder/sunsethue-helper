@@ -24,6 +24,8 @@ test("Frontend File Structure & Integrity Checks", () => {
   const htmlContent = fs.readFileSync(htmlPath, "utf8");
   
   const requiredIds = [
+    // Loader view
+    "loading-overlay",
     // Auth view
     "auth-container",
     "login-form",

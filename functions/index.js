@@ -81,7 +81,7 @@ async function runAndSendReport(triggerType) {
     }
 
     // 1. Fetch locations from Firestore
-    const locationsSnapshot = await db.collection("locations").orderBy("createdAt", "asc").get();
+    const locationsSnapshot = await db.collection("locations").orderBy("createdAt", "asc").limit(10).get();
     const locations = [];
     locationsSnapshot.forEach(doc => {
       locations.push({ id: doc.id, ...doc.data() });
@@ -340,7 +340,8 @@ exports.scheduledReportAM = onSchedule({
   schedule: "0 6 * * *",
   timeZone: "America/New_York",
   memory: "256MiB",
-  timeoutSeconds: 120
+  timeoutSeconds: 120,
+  secrets: ["SUNSETHUE_API_KEY", "GMAIL_USER", "GMAIL_APP_PASSWORD", "EMAIL_TO"]
 }, async (event) => {
   try {
     await runAndSendReport("AM");
@@ -356,7 +357,8 @@ exports.scheduledReportPM = onSchedule({
   schedule: "0 18 * * *",
   timeZone: "America/New_York",
   memory: "256MiB",
-  timeoutSeconds: 120
+  timeoutSeconds: 120,
+  secrets: ["SUNSETHUE_API_KEY", "GMAIL_USER", "GMAIL_APP_PASSWORD", "EMAIL_TO"]
 }, async (event) => {
   try {
     await runAndSendReport("PM");
@@ -368,7 +370,7 @@ exports.scheduledReportPM = onSchedule({
 /**
  * HTTPS Cloud Function: Manual trigger endpoint for testing (routed from /api/triggerReport)
  */
-exports.triggerReport = onRequest({ cors: true, memory: "256MiB", timeoutSeconds: 60 }, async (req, res) => {
+exports.triggerReport = onRequest({ cors: true, memory: "256MiB", timeoutSeconds: 60, secrets: ["SUNSETHUE_API_KEY", "GMAIL_USER", "GMAIL_APP_PASSWORD", "EMAIL_TO"] }, async (req, res) => {
   // Check request type
   if (req.method !== "POST") {
     res.status(405).json({ error: "Method Not Allowed" });

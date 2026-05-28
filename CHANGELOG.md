@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.5.0] - 2026-05-27
+
+### Added
+- Smooth full-screen loading screen overlay (`#loading-overlay`) with transition fade-out to prevent page-reload auth state layout flickering.
+- Keyboard navigation accessibility (up/down arrow keys, Enter, and Escape keys) to the address autocomplete suggestions dropdown in the dashboard location form.
+- Direct database query limit `.limit(10)` to the Cloud Function locations Firestore pull to save database read operations.
+
+### Changed
+- Configured Cloud Functions (`scheduledReportAM`, `scheduledReportPM`, and `triggerReport`) to bind and fetch sensitive API keys and SMTP credentials securely from **GCP Secret Manager**.
+- Hardened alert banners logic in `public/app.js` with map-based timeout tracking to resolve overlapping message timer bugs.
+
 ## [1.4.0] - 2026-05-27
 
 ### Changed

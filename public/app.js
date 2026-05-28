@@ -486,7 +486,7 @@ function startEditLocation(id) {
   locationLngInput.value = loc.longitude;
   
   formTitle.textContent = "Edit Location";
-  saveLocationBtn.textContent = "Update Location";
+  saveLocationBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;">save</span><span>Update Location</span>';
   cancelEditBtn.classList.remove("hidden");
   
   locationNameInput.focus();
@@ -499,7 +499,7 @@ function resetForm() {
   locationLngInput.value = "";
   
   formTitle.textContent = "Add Location";
-  saveLocationBtn.textContent = "Save Location";
+  saveLocationBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;">save</span><span>Save Location</span>';
   cancelEditBtn.classList.add("hidden");
 }
 
@@ -635,7 +635,8 @@ async function performAddressSearch() {
   }
   
   searchAddressBtn.disabled = true;
-  searchAddressBtn.textContent = "⌛";
+  const searchIcon = searchAddressBtn.querySelector(".material-symbols-outlined");
+  if (searchIcon) searchIcon.textContent = "hourglass_empty";
   
   try {
     // Retrieve Auth ID Token for secure proxy access
@@ -695,7 +696,8 @@ async function performAddressSearch() {
     showBanner(dbErrorBanner, "Search failed: " + error.message);
   } finally {
     searchAddressBtn.disabled = false;
-    searchAddressBtn.textContent = "🔍";
+    const searchIcon = searchAddressBtn.querySelector(".material-symbols-outlined");
+    if (searchIcon) searchIcon.textContent = "search";
   }
 }
 

@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.4.0] - 2026-05-27
+
+### Changed
+- Relocated design system file `design.md` from the root directory to `docs/design.md` for better repository organization.
+- Updated automated extractor script `scripts/extract-stitch.js` to output to the new `docs/design.md` location.
+- Refactored backend tests in `functions/test.js` to import helper functions directly from `functions/index.js` instead of duplicating them.
+- Hardened Firestore security rules in `firestore.rules` to restrict read/write access strictly to `atr000@gmail.com` with a verified email.
+
 ## [1.3.0] - 2026-05-27
 
 ### Added

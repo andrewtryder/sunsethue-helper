@@ -460,3 +460,7 @@ exports.searchCoordinates = onRequest({ cors: true, memory: "256MiB", timeoutSec
   }
 });
 
+// Export helper functions for testing
+exports.formatTimeET = formatTimeET;
+exports.getQualityBadge = getQualityBadge;
+

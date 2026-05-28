@@ -8,28 +8,7 @@ process.env.GMAIL_APP_PASSWORD = "test-password";
 process.env.EMAIL_TO = "test@gmail.com";
 
 // Import index.js helpers
-// Note: We need to modify functions/index.js slightly or extract helpers to test them.
-// Let's implement independent test assertions that mimic the behavior in functions/index.js
-// to verify correctness, and also test the actual index.js exported functions.
-
-// 1. Timezone conversion verification
-function formatTimeET(utcString) {
-  if (!utcString) return "N/A";
-  try {
-    const date = new Date(utcString);
-    return date.toLocaleString("en-US", {
-      timeZone: "America/New_York",
-      weekday: "short",
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true
-    });
-  } catch (error) {
-    return "Invalid Date";
-  }
-}
+const { formatTimeET, getQualityBadge } = require("./index.js");
 
 test("formatTimeET converts UTC timestamps to America/New_York timezone", () => {
   // 12:44:00 UTC on May 27, 2026 is 8:44:00 AM EDT (Eastern Daylight Time, UTC-4)
@@ -86,22 +65,12 @@ test("Sunrise/Sunset selector successfully finds the closest upcoming events", (
 });
 
 // 3. Quality score badge styles mapping
-function getQualityBadge(quality) {
-  if (quality === null || quality === undefined) {
-    return "N/A";
-  }
-  const percentage = Math.round(quality * 100);
-  if (percentage >= 60) return "Spectacular";
-  if (percentage >= 30) return "Good";
-  return "Muted";
-}
-
-test("getQualityBadge returns the correct category label based on the decimal score", () => {
-  assert.strictEqual(getQualityBadge(0.85), "Spectacular"); // 85%
-  assert.strictEqual(getQualityBadge(0.60), "Spectacular"); // 60%
-  assert.strictEqual(getQualityBadge(0.59), "Good");        // 59%
-  assert.strictEqual(getQualityBadge(0.30), "Good");        // 30%
-  assert.strictEqual(getQualityBadge(0.29), "Muted");       // 29%
-  assert.strictEqual(getQualityBadge(0.0), "Muted");         // 0%
-  assert.strictEqual(getQualityBadge(null), "N/A");
+test("getQualityBadge returns the correct HTML badge based on the decimal score", () => {
+  assert.match(getQualityBadge(0.85), /Spectacular/); // 85%
+  assert.match(getQualityBadge(0.60), /Spectacular/); // 60%
+  assert.match(getQualityBadge(0.59), /Good/);        // 59%
+  assert.match(getQualityBadge(0.30), /Good/);        // 30%
+  assert.match(getQualityBadge(0.29), /Muted/);       // 29%
+  assert.match(getQualityBadge(0.0), /Muted/);         // 0%
+  assert.match(getQualityBadge(null), /N\/A/);
 });

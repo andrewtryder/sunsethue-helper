@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.5.1] - 2026-05-28
+
+### Fixed
+- Adjusted Firestore security rules in `firestore.rules` to remove `email_verified == true` checks, allowing users logging in via email/password credentials to successfully perform read/write actions.
+
 ## [1.5.0] - 2026-05-27
 
 ### Added

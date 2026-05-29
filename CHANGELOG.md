@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.5.3] - 2026-05-29
+
+### Changed
+- Configured dynamic column ordering in the HTML email forecast table; the early morning report (`AM` trigger) now places the `Next Sunset` column first for chronological urgency, while the evening and manual reports preserve the `Next Sunrise` column first.
+
 ## [1.5.2] - 2026-05-28
 
 ### Fixed

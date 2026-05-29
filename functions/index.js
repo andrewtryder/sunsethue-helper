@@ -185,6 +185,7 @@ async function runAndSendReport(triggerType) {
       timeStyle: "short"
     });
 
+    const isAM = triggerType === "AM";
     let tableRowsHtml = "";
     for (const res of results) {
       if (res.error) {
@@ -203,6 +204,19 @@ async function runAndSendReport(triggerType) {
         const sunsetTime = res.sunset ? formatTimeET(res.sunset.time) : "N/A";
         const sunsetQuality = res.sunset ? getQualityBadge(res.sunset.quality) : "N/A";
 
+        const sunriseTd = `
+          <td style="padding: 16px; color: #374151; vertical-align: middle;">
+            <div style="font-size: 14px; font-weight: 500;">${sunriseTime}</div>
+            <div style="margin-top: 6px;">${sunriseQuality}</div>
+          </td>
+        `;
+        const sunsetTd = `
+          <td style="padding: 16px; color: #374151; vertical-align: middle;">
+            <div style="font-size: 14px; font-weight: 500;">${sunsetTime}</div>
+            <div style="margin-top: 6px;">${sunsetQuality}</div>
+          </td>
+        `;
+
         tableRowsHtml += `
           <tr style="border-bottom: 1px solid #e5e7eb;">
             <td style="padding: 16px; font-weight: bold; color: #1f2937;">
@@ -211,14 +225,8 @@ async function runAndSendReport(triggerType) {
                 ${res.latitude.toFixed(4)}, ${res.longitude.toFixed(4)}
               </div>
             </td>
-            <td style="padding: 16px; color: #374151; vertical-align: middle;">
-              <div style="font-size: 14px; font-weight: 500;">${sunriseTime}</div>
-              <div style="margin-top: 6px;">${sunriseQuality}</div>
-            </td>
-            <td style="padding: 16px; color: #374151; vertical-align: middle;">
-              <div style="font-size: 14px; font-weight: 500;">${sunsetTime}</div>
-              <div style="margin-top: 6px;">${sunsetQuality}</div>
-            </td>
+            ${isAM ? sunsetTd : sunriseTd}
+            ${isAM ? sunriseTd : sunsetTd}
           </tr>
         `;
       }
@@ -247,8 +255,8 @@ async function runAndSendReport(triggerType) {
               <thead>
                 <tr style="border-bottom: 2px solid #e5e7eb; background-color: #f9fafb;">
                   <th style="padding: 12px 16px; font-size: 13px; font-weight: 700; color: #4b5563; text-transform: uppercase; letter-spacing: 0.05em; width: 40%;">Location</th>
-                  <th style="padding: 12px 16px; font-size: 13px; font-weight: 700; color: #4b5563; text-transform: uppercase; letter-spacing: 0.05em; width: 30%;">Next Sunrise</th>
-                  <th style="padding: 12px 16px; font-size: 13px; font-weight: 700; color: #4b5563; text-transform: uppercase; letter-spacing: 0.05em; width: 30%;">Next Sunset</th>
+                  <th style="padding: 12px 16px; font-size: 13px; font-weight: 700; color: #4b5563; text-transform: uppercase; letter-spacing: 0.05em; width: 30%;">${isAM ? "Next Sunset" : "Next Sunrise"}</th>
+                  <th style="padding: 12px 16px; font-size: 13px; font-weight: 700; color: #4b5563; text-transform: uppercase; letter-spacing: 0.05em; width: 30%;">${isAM ? "Next Sunrise" : "Next Sunset"}</th>
                 </tr>
               </thead>
               <tbody>

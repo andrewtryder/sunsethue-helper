@@ -5,8 +5,7 @@ functions/node_modules/
 # Build outputs
 dist/
 public/dist/
-lib/
-functions/lib/
+/lib/
 
 # Environment and secrets
 .env
@@ -14,6 +13,7 @@ functions/lib/
 .env.*.local
 functions/.env
 functions/.env.*
+functions/.secret.local
 config.json
 
 # Firebase logs
@@ -23,6 +23,16 @@ ui-debug.log*
 functions-debug.log*
 hosting-debug.log*
 pubsub-debug.log*
+
+# Test coverage
+coverage/
+functions/coverage/
+
+# Playwright
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
 
 # OS files
 .DS_Store

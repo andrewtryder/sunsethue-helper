@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Sunsethue Helper - Main Forecast</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        
+        body {
+            background-color: #0d0a27; /* Fallback */
+            background-image: radial-gradient(circle at 50% 0%, #1f1c39 0%, #0d0a27 100%);
+            background-attachment: fixed;
+            min-height: 100vh;
+        }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            border-left: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .glass-elevated {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(40px);
+            -webkit-backdrop-filter: blur(40px);
+            border-top: 1px solid rgba(255, 255, 255, 0.15);
+            border-left: 1px solid rgba(255, 255, 255, 0.15);
+        }
+
+        .gradient-fair {
+            background: linear-gradient(135deg, #ffb4a3 0%, #ff7e5f 100%);
+            box-shadow: 0 4px 15px rgba(255, 126, 95, 0.3);
+        }
+
+        .gradient-great {
+            background: linear-gradient(135deg, #ff7e5f 0%, #e4dfff 100%);
+            box-shadow: 0 4px 15px rgba(228, 223, 255, 0.3);
+        }
+        
+        .gradient-action {
+             background: linear-gradient(135deg, #a297ff 0%, #ff7e5f 100%);
+             box-shadow: 0 8px 25px rgba(162, 151, 255, 0.4);
+        }
+
+        /* Nav Segment Override for Desktop */
+        .desktop-nav-segment {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 999px;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-secondary-fixed": "#2f1400",
+                        "tertiary": "#c7bfff",
+                        "on-tertiary": "#29009f",
+                        "primary-fixed": "#ffdad2",
+                        "on-secondary-fixed-variant": "#6c3a0a",
+                        "error-container": "#93000a",
+                        "surface-container-lowest": "#0d0a27",
+                        "secondary-container": "#6f3c0d",
+                        "outline": "#a68b84",
+                        "on-primary-fixed-variant": "#84240d",
+                        "inverse-surface": "#e4dfff",
+                        "primary-fixed-dim": "#ffb4a3",
+                        "inverse-primary": "#a53b22",
+                        "background": "#120f2c",
+                        "primary-container": "#ff7e5f",
+                        "on-tertiary-container": "#3317a9",
+                        "tertiary-fixed": "#e4dfff",
+                        "on-tertiary-fixed-variant": "#412bb6",
+                        "secondary": "#ffb780",
+                        "on-error-container": "#ffdad6",
+                        "on-surface": "#e4dfff",
+                        "surface-container": "#1f1c39",
+                        "on-primary-container": "#721702",
+                        "on-secondary-container": "#f1a971",
+                        "outline-variant": "#57423d",
+                        "surface-tint": "#ffb4a3",
+                        "surface-container-low": "#1b1835",
+                        "tertiary-container": "#a297ff",
+                        "on-surface-variant": "#dec0b9",
+                        "tertiary-fixed-dim": "#c7bfff",
+                        "secondary-fixed": "#ffdcc4",
+                        "secondary-fixed-dim": "#ffb780",
+                        "surface-variant": "#343150",
+                        "surface-container-high": "#292644",
+                        "inverse-on-surface": "#302d4b",
+                        "surface": "#120f2c",
+                        "on-background": "#e4dfff",
+                        "surface-bright": "#383654",
+                        "primary": "#ffb4a3",
+                        "on-secondary": "#4e2600",
+                        "error": "#ffb4ab",
+                        "on-error": "#690005",
+                        "surface-container-highest": "#343150",
+                        "on-primary-fixed": "#3d0700",
+                        "on-primary": "#621000",
+                        "surface-dim": "#120f2c",
+                        "on-tertiary-fixed": "#170065"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "2xl": "1.5rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "sm": "8px",
+                        "lg": "24px",
+                        "xl": "32px",
+                        "gutter": "20px",
+                        "md": "16px",
+                        "unit": "4px",
+                        "margin-desktop": "48px",
+                        "margin-mobile": "16px",
+                        "xs": "4px"
+                    },
+                    "fontFamily": {
+                        "headline-md": ["Plus Jakarta Sans"],
+                        "display-lg": ["Plus Jakarta Sans"],
+                        "label-md": ["Plus Jakarta Sans"],
+                        "label-sm": ["Plus Jakarta Sans"],
+                        "headline-lg": ["Plus Jakarta Sans"],
+                        "headline-lg-mobile": ["Plus Jakarta Sans"],
+                        "body-md": ["Plus Jakarta Sans"],
+                        "body-lg": ["Plus Jakarta Sans"]
+                    },
+                    "fontSize": {
+                        "headline-md": ["20px", { "lineHeight": "1.4", "fontWeight": "600" }],
+                        "display-lg": ["48px", { "lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "label-md": ["14px", { "lineHeight": "1.2", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "label-sm": ["12px", { "lineHeight": "1.2", "fontWeight": "500" }],
+                        "headline-lg": ["32px", { "lineHeight": "1.2", "fontWeight": "700" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "1.2", "fontWeight": "700" }],
+                        "body-md": ["16px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                        "body-lg": ["18px", { "lineHeight": "1.6", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="text-on-surface antialiased flex flex-col min-h-screen pt-[72px] pb-[90px] md:pb-0">
+<!-- TopAppBar -->
+<header class="fixed top-0 left-0 w-full z-50 bg-background/80 backdrop-blur-md dark:bg-background/80 border-b border-white/5 flex justify-between items-center px-margin-mobile py-sm h-[72px]">
+<div class="flex items-center gap-sm">
+<!-- Simulated Avatar/Logo -->
+<div class="w-[32px] h-[32px] rounded-full gradient-fair flex items-center justify-center shadow-lg">
+<div class="w-[28px] h-[28px] rounded-full bg-surface-container-highest flex items-center justify-center opacity-80">
+<div class="w-[20px] h-[10px] rounded-t-full bg-primary mt-[10px]"></div>
+</div>
+</div>
+<div class="flex flex-col">
+<span class="font-headline-md text-headline-md font-bold text-on-surface leading-tight">Sunsethue</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant leading-tight">Helper</span>
+</div>
+</div>
+<!-- Desktop Navigation Segmented Control -->
+<div class="hidden md:flex items-center p-1 desktop-nav-segment h-[44px]">
+<a class="px-6 py-2 rounded-full gradient-fair text-surface-container-lowest font-label-md text-label-md shadow-md" href="#">Main Forecast</a>
+<a class="px-6 py-2 rounded-full text-on-surface-variant hover:text-primary transition-colors font-label-md text-label-md" href="#">Manage Locations</a>
+<a class="px-6 py-2 rounded-full text-on-surface-variant hover:text-primary transition-colors font-label-md text-label-md" href="#">Execution Logs</a>
+</div>
+<div class="flex items-center gap-md">
+<span class="hidden md:inline font-body-md text-body-md text-on-surface-variant">owner@example.com</span>
+<span class="hidden md:inline text-on-surface-variant opacity-30">|</span>
+<button class="font-label-md text-label-md text-tertiary-container hover:opacity-80 transition-opacity">Log Out</button>
+</div>
+</header>
+<!-- Main Canvas -->
+<main class="flex-grow w-full max-w-[800px] mx-auto px-margin-mobile md:px-margin-desktop py-lg flex flex-col gap-lg z-10 relative">
+<!-- Mobile Navigation Segmented Control (Hidden on desktop) -->
+<div class="md:hidden flex items-center w-full p-1 desktop-nav-segment h-[44px] mb-sm overflow-x-auto hide-scrollbar">
+<a class="px-4 py-2 rounded-full gradient-fair text-surface-container-lowest font-label-md text-label-md shadow-md whitespace-nowrap" href="#">Main Forecast</a>
+<a class="px-4 py-2 rounded-full text-on-surface-variant hover:text-primary transition-colors font-label-md text-label-md whitespace-nowrap" href="#">Manage Locations</a>
+<a class="px-4 py-2 rounded-full text-on-surface-variant hover:text-primary transition-colors font-label-md text-label-md whitespace-nowrap" href="#">Execution Logs</a>
+</div>
+<!-- Location Card 1: Sandown, NH -->
+<div class="glass-elevated rounded-2xl p-lg flex flex-col gap-lg">
+<div>
+<h2 class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface mb-1">Sandown, NH</h2>
+<p class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">52°50.20 N / 187°059 W</p>
+</div>
+<div class="flex flex-col gap-md">
+<!-- Sunrise -->
+<div class="flex items-center justify-between pb-md border-b border-white/5">
+<div class="flex items-center gap-md">
+<span class="material-symbols-outlined text-4xl text-on-surface" data-weight="fill">wb_twilight</span>
+<div class="flex flex-col">
+<span class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface">5:11 AM</span>
+<span class="font-body-md text-body-md text-on-surface-variant">Next Sunrise, May 28</span>
+</div>
+</div>
+<div class="gradient-fair px-4 py-1.5 rounded-full font-label-md text-label-md text-surface-container-lowest whitespace-nowrap shadow-lg">
+                        34% (Fair)
+                    </div>
+</div>
+<!-- Sunset -->
+<div class="flex items-center justify-between pt-xs">
+<div class="flex items-center gap-md">
+<span class="material-symbols-outlined text-4xl text-on-surface" data-weight="fill">wb_sunny</span>
+<div class="flex flex-col">
+<span class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface">8:11 PM</span>
+<span class="font-body-md text-body-md text-on-surface-variant">Next Sunset, May 27</span>
+</div>
+</div>
+<div class="gradient-fair px-4 py-1.5 rounded-full font-label-md text-label-md text-surface-container-lowest whitespace-nowrap shadow-lg">
+                        37% (Fair)
+                    </div>
+</div>
+</div>
+</div>
+<!-- Location Card 2: Portland Head Light -->
+<div class="glass-elevated rounded-2xl p-lg flex flex-col gap-lg">
+<div>
+<h2 class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface mb-1">Portland Head Light</h2>
+<p class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">42°0669 N / 19°.0277 W</p>
+</div>
+<div class="flex flex-col gap-md">
+<!-- Sunrise -->
+<div class="flex items-center justify-between pb-md border-b border-white/5">
+<div class="flex items-center gap-md">
+<span class="material-symbols-outlined text-4xl text-on-surface" data-weight="fill">wb_twilight</span>
+<div class="flex flex-col">
+<span class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface">5:04 AM</span>
+<span class="font-body-md text-body-md text-on-surface-variant">Next Sunrise, May 28</span>
+</div>
+</div>
+<div class="bg-surface-container-highest px-4 py-1.5 rounded-full font-label-md text-label-md text-primary whitespace-nowrap border border-primary/30">
+                        23% (Fair)
+                    </div>
+</div>
+<!-- Sunset -->
+<div class="flex items-center justify-between pt-xs">
+<div class="flex items-center gap-md">
+<span class="material-symbols-outlined text-4xl text-on-surface" data-weight="fill">wb_sunny</span>
+<div class="flex flex-col">
+<span class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface">8:09 PM</span>
+<span class="font-body-md text-body-md text-on-surface-variant">Next Sunset, May 27</span>
+</div>
+</div>
+<div class="gradient-great px-4 py-1.5 rounded-full font-label-md text-label-md text-surface-container-lowest whitespace-nowrap shadow-lg">
+                        69% (Great)
+                    </div>
+</div>
+</div>
+</div>
+<!-- Manual Run Card -->
+<div class="glass-panel rounded-2xl p-lg flex flex-col gap-md mt-sm">
+<h3 class="font-headline-md text-headline-md text-on-surface">Manual Run</h3>
+<p class="font-body-md text-body-md text-on-surface-variant">Send your email with the next forecast details. Useful for testing your settings.</p>
+<button class="w-full mt-2 gradient-action py-4 rounded-xl font-headline-md text-headline-md text-surface-container-lowest hover:opacity-90 transition-opacity active:scale-[0.98] duration-200">
+                Send Test Email Now
+            </button>
+</div>
+</main>
+<!-- BottomNavBar (Mobile Only) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full z-50 bg-surface-container/10 backdrop-blur-xl dark:bg-surface-container-low/20 rounded-t-xl bg-surface-container-high/30 backdrop-blur-2xl border-t border-white/10 shadow-lg flex justify-around items-center px-4 pb-4 pt-2">
+<a class="flex flex-col items-center justify-center bg-primary-container/20 text-primary rounded-xl px-4 py-1.5 active:scale-90 duration-150" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="wb_sunny">wb_sunny</span>
+<span class="font-label-sm text-label-sm-mobile">Forecast</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant/70 hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="location_on">location_on</span>
+<span class="font-label-sm text-label-sm-mobile">Locations</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant/70 hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="assignment">assignment</span>
+<span class="font-label-sm text-label-sm-mobile">Logs</span>
+</a>
+</nav>
+<style>
+        /* Utility to hide scrollbar for mobile segmented control */
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</body></html>

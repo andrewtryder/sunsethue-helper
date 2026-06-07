@@ -32,4 +32,9 @@ Deployments are automated via **GitHub Actions**. Whenever you push to the `main
 
 ### Local commands:
 - Run backend tests: `npm test --prefix functions`
+- Run all unit tests: `npm test`
+- Run E2E tests (Node 22, Java 21+, Firebase emulators): `npm run test:e2e`
+- On macOS without Java on PATH: `export PATH="/opt/homebrew/opt/openjdk/bin:$PATH"`
 - Deploy manually: `npx firebase-tools deploy`
+
+E2E is not required on pull requests; run it locally or trigger the **E2E** workflow manually in GitHub Actions.

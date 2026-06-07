@@ -24,7 +24,7 @@ test.describe("Authentication", () => {
     await waitForAppReady(page);
     await page.locator("#login-email").fill(TEST_EMAIL);
     await page.locator("#login-password").fill(TEST_PASSWORD);
-    await page.locator("#login-form").press("Enter");
+    await page.locator("#login-btn").click();
 
     await expect(page.locator("#app-container")).not.toHaveClass(/hidden/);
     await expect(page.locator("#display-user-email")).toHaveText(TEST_EMAIL);

@@ -10,10 +10,12 @@ test("Frontend File Structure & Integrity Checks", () => {
   const htmlPath = path.join(publicDir, "index.html");
   const cssPath = path.join(publicDir, "style.css");
   const jsPath = path.join(publicDir, "app.js");
+  const helpersPath = path.join(publicDir, "lib", "helpers.js");
 
   assert.ok(fs.existsSync(htmlPath), "index.html should exist");
   assert.ok(fs.existsSync(cssPath), "style.css should exist");
   assert.ok(fs.existsSync(jsPath), "app.js should exist");
+  assert.ok(fs.existsSync(helpersPath), "lib/helpers.js should exist");
 
   // 2. Verify files are not empty
   assert.ok(fs.statSync(htmlPath).size > 100, "index.html should not be empty");

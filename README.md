@@ -18,7 +18,7 @@ Sunsethue Helper is a secure, cloud-hosted private web application built on Fire
 
 *   **Frontend**: Single Page Application (HTML/CSS/JS) styled with a premium glassmorphic dark-mode interface, served via **Firebase Hosting**.
 *   **Database**: **Cloud Firestore** storing coordinates (`locations` collection) and logs (`runs` collection) with robust security rules.
-*   **Backend**: **Cloud Functions** v2 (Node.js 22 runtime) containing the scheduler triggers and an HTTP trigger proxy for manual runs.
+*   **Backend**: **Cloud Functions** v2 (Node.js 24 runtime) containing the scheduler triggers and an HTTP trigger proxy for manual runs.
 *   **SMTP Transporter**: Nodemailer configured using Gmail App Passwords to deliver reports.
 
 ---
@@ -28,8 +28,13 @@ Sunsethue Helper is a secure, cloud-hosted private web application built on Fire
 Deployments are automated via **GitHub Actions**. Whenever you push to the `main` branch, the workflow:
 1. Installs Node.js dependencies.
 2. Runs unit tests inside the `functions/` directory.
-3. Automatically deploys frontend assets to Firebase Hosting and upgrades Cloud Functions to Node 22.
+3. Automatically deploys frontend assets to Firebase Hosting and upgrades Cloud Functions to Node 24.
 
 ### Local commands:
 - Run backend tests: `npm test --prefix functions`
+- Run all unit tests: `npm test`
+- Run E2E tests (Node 24, Java 21+, Firebase emulators): `npm run test:e2e`
+- On macOS without Java on PATH: `export PATH="/opt/homebrew/opt/openjdk/bin:$PATH"`
 - Deploy manually: `npx firebase-tools deploy`
+
+E2E is not required on pull requests; run it locally or trigger the **E2E** workflow manually in GitHub Actions.

@@ -16,7 +16,18 @@ if [ $FRONTEND_STATUS -ne 0 ]; then
 fi
 echo "✅ Frontend structural tests PASSED."
 
-# 2. Run Backend unit tests
+# 2. Run Frontend unit tests
+echo "👉 Running Frontend unit tests..."
+node "$PROJECT_ROOT/scripts/test-frontend-unit.mjs"
+FRONTEND_UNIT_STATUS=$?
+
+if [ $FRONTEND_UNIT_STATUS -ne 0 ]; then
+  echo "❌ Frontend unit tests FAILED! Aborting commit."
+  exit 1
+fi
+echo "✅ Frontend unit tests PASSED."
+
+# 3. Run Backend unit tests
 echo "👉 Running Backend unit tests..."
 npm test --prefix "$PROJECT_ROOT/functions"
 BACKEND_STATUS=$?

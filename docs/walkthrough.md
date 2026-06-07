@@ -52,5 +52,5 @@ git push -u origin main
 Whenever you modify any file locally and commit it to git:
 1. When you run `git push`, GitHub receives the changes.
 2. The GitHub Action runner spins up a virtual machine running Ubuntu.
-3. It installs Node 22, packages the backend dependencies, and executes the backend unit tests (`npm test` in the `functions/` directory).
+3. It installs Node 24, packages the backend dependencies, and executes the backend unit tests (`npm test` in the `functions/` directory).
 4. If the tests pass, it uses your `FIREBASE_TOKEN` secret to deploy hosting assets and update Cloud Functions automatically!

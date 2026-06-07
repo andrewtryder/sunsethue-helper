@@ -2,11 +2,43 @@
   "name": "sunsethue-helper",
   "version": "1.0.0",
   "description": "Daily sunrise/sunset quality email notifier using Sunsethue API and Firebase.",
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "emulators:start": "npx firebase emulators:start --only firestore,auth,functions,hosting",
-    "deploy": "npx firebase deploy"
+    "deploy": "npx firebase deploy",
+    "commitplease": "commitplease",
+    "setup:hooks": "bash scripts/setup-git-hooks.sh",
+    "test": "npm test --prefix functions && node scripts/test-frontend.js && node scripts/test-frontend-unit.mjs",
+    "test:coverage": "npm run test:coverage --prefix functions && node scripts/test-frontend.js && node scripts/test-frontend-unit.mjs",
+    "test:e2e": "bash scripts/run-e2e.sh",
+    "test:all": "npm test && npm run test:e2e"
   },
   "devDependencies": {
-    "firebase-tools": "^13.0.0"
+    "@playwright/test": "^1.55.0",
+    "commitplease": "^3.2.0",
+    "firebase-tools": "^15.19.1"
+  },
+  "commitplease": {
+    "style": "angular",
+    "nohook": true,
+    "types": [
+      "feat",
+      "fix",
+      "docs",
+      "style",
+      "refactor",
+      "perf",
+      "test",
+      "build",
+      "ci",
+      "chore",
+      "revert"
+    ],
+    "limits": {
+      "firstLine": "72",
+      "otherLine": "80"
+    }
   }
 }

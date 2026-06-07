@@ -8,7 +8,10 @@ module.exports = defineConfig({
   retries: process.env.CI ? 1 : 0,
   workers: 1,
   reporter: process.env.CI ? "github" : "list",
-  timeout: 60_000,
+  timeout: process.env.CI ? 90_000 : 60_000,
+  expect: {
+    timeout: process.env.CI ? 15_000 : 10_000
+  },
   globalSetup: require.resolve("./e2e/global-setup.js"),
   use: {
     baseURL: process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:5010",

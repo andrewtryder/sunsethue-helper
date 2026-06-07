@@ -1,6 +1,6 @@
 // @ts-check
 const { test, expect } = require("@playwright/test");
-const { TEST_EMAIL, TEST_PASSWORD, waitForAppReady } = require("./helpers");
+const { login, TEST_EMAIL, TEST_PASSWORD, waitForAppReady } = require("./helpers");
 
 test.describe("Authentication", () => {
   test("shows the login screen on first load", async ({ page }) => {
@@ -21,10 +21,7 @@ test.describe("Authentication", () => {
   });
 
   test("signs in with the authorized emulator user and logs out", async ({ page }) => {
-    await waitForAppReady(page);
-    await page.locator("#login-email").fill(TEST_EMAIL);
-    await page.locator("#login-password").fill(TEST_PASSWORD);
-    await page.locator("#login-btn").click();
+    await login(page);
 
     await expect(page.locator("#app-container")).not.toHaveClass(/hidden/);
     await expect(page.locator("#display-user-email")).toHaveText(TEST_EMAIL);

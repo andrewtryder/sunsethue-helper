@@ -41,4 +41,4 @@ export FIREBASE_FUNCTIONS_EMULATOR_HOST="127.0.0.1:5001"
 npx firebase emulators:exec \
   --only auth,firestore,functions,hosting \
   --project sunsethue-helper-12345 \
-  "npx playwright test"
+  "node scripts/seed-auth-emulator-user.js && npx playwright test"

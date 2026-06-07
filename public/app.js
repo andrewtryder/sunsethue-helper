@@ -1,6 +1,24 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc, query, orderBy, onSnapshot, limit } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, connectAuthEmulator } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc, query, orderBy, onSnapshot, limit, connectFirestoreEmulator } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import {
+  AUTHORIZED_EMAIL,
+  escapeHtml,
+  getForecastBadgeHtml,
+  isAuthorizedEmail,
+  isEmulatorHostname,
+  getFunctionUrl,
+  canAddLocation,
+  validateCoordinates,
+  formatCoordinateDisplay,
+  formatDashboardCoordinateDisplay,
+  getLogStatusClass,
+  buildPhotonDisplayName,
+  moveSuggestionIndex,
+  shouldSearchAutocomplete,
+  mapAuthErrorCode,
+  mapGeolocationError
+} from "./lib/helpers.js";
 
 // DOM Elements
 const authContainer = document.getElementById("auth-container");
@@ -58,6 +76,13 @@ async function initFirebase() {
     const app = initializeApp(config);
     auth = getAuth(app);
     db = getFirestore(app);
+
+    if (isEmulatorHostname(window.location.hostname)) {
+      connectAuthEmulator(auth, `http://${window.location.hostname}:9099`, { disableWarnings: true });
+      connectFirestoreEmulator(db, window.location.hostname, 8080);
+      window.__firebaseAuthReady = true;
+      window.__e2eSignIn = (email, password) => signInWithEmailAndPassword(auth, email, password);
+    }
     
     setupAuthListeners();
   } catch (error) {
@@ -113,8 +138,8 @@ function setupAuthListeners() {
 
     if (user) {
       // Security check: restrict email to atr000@gmail.com
-      if (user.email !== "atr000@gmail.com") {
-        showBanner(authErrorBanner, "Access Denied: Only atr000@gmail.com is authorized.", 10000);
+      if (!isAuthorizedEmail(user.email)) {
+        showBanner(authErrorBanner, `Access Denied: Only ${AUTHORIZED_EMAIL} is authorized.`, 10000);
         signOut(auth);
         hideLoader();
         return;
@@ -148,8 +173,8 @@ loginForm.addEventListener("submit", async (e) => {
   const email = loginEmail.value.trim();
   const password = loginPassword.value;
   
-  if (email !== "atr000@gmail.com") {
-    showBanner(authErrorBanner, "Access Denied: Only atr000@gmail.com is authorized.");
+  if (!isAuthorizedEmail(email)) {
+    showBanner(authErrorBanner, `Access Denied: Only ${AUTHORIZED_EMAIL} is authorized.`);
     return;
   }
 
@@ -158,12 +183,7 @@ loginForm.addEventListener("submit", async (e) => {
     await signInWithEmailAndPassword(auth, email, password);
   } catch (error) {
     console.error(error);
-    let errorMsg = "Failed to sign in. Please check your credentials.";
-    if (error.code === "auth/user-not-found" || error.code === "auth/wrong-password") {
-      errorMsg = "Invalid email or password.";
-    } else if (error.code === "auth/invalid-credential") {
-      errorMsg = "Invalid credentials provided.";
-    }
+    let errorMsg = mapAuthErrorCode(error.code);
     showBanner(authErrorBanner, errorMsg);
   }
 });
@@ -215,19 +235,6 @@ function setupFirestoreListeners() {
 }
 
 // 3. Render Locations Card List
-function getForecastBadgeHtml(quality, text) {
-  if (quality === undefined || quality === null) {
-    return `<span class="badge badge-muted">N/A</span>`;
-  }
-  const percentage = Math.round(quality * 100);
-  if (percentage >= 60) {
-    return `<span class="badge badge-great">${percentage}% (${text || 'Great'})</span>`;
-  } else if (percentage >= 30) {
-    return `<span class="badge badge-fair">${percentage}% (${text || 'Fair'})</span>`;
-  }
-  return `<span class="badge badge-muted">${percentage}% (${text || 'Low'})</span>`;
-}
-
 function renderLocations() {
   try {
     console.log("renderLocations called. locationsList:", locationsList);
@@ -265,7 +272,7 @@ function renderLocations() {
       card.innerHTML = `
         <div class="location-info" style="flex:1;">
           <h3>${escapeHtml(location.name)}</h3>
-          <div class="location-coords">${(location.latitude || 0).toFixed(4)}° N / ${Math.abs(location.longitude || 0).toFixed(4)}° W</div>
+          <div class="location-coords">${formatCoordinateDisplay(location.latitude, location.longitude)}</div>
           <div class="location-badges">
             <span class="location-badge-chip"><span class="material-symbols-outlined" style="font-size:14px;font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 20;">wb_twilight</span> ${sunriseTimeText} ${sunriseBadge}</span>
             <span class="location-badge-chip"><span class="material-symbols-outlined" style="font-size:14px;font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 20;">wb_sunny</span> ${sunsetTimeText} ${sunsetBadge}</span>
@@ -350,9 +357,7 @@ function renderForecastDashboard() {
         ? new Date(location.latestSunsetTime).toLocaleDateString("en-US", { timeZone: "America/New_York", weekday: "short", month: "short", day: "numeric" })
         : null;
       
-      const lat  = (location.latitude  || 0).toFixed(2);
-      const lng  = Math.abs(location.longitude || 0).toFixed(2);
-      const lngDir = (location.longitude || 0) < 0 ? "W" : "E";
+      const latLngDisplay = formatDashboardCoordinateDisplay(location.latitude, location.longitude);
 
       let sunriseRowHtml;
       let sunsetRowHtml;
@@ -380,7 +385,7 @@ function renderForecastDashboard() {
       card.innerHTML = `
         <div>
           <h2 class="forecast-card-title">${escapeHtml(location.name)}</h2>
-          <p class="forecast-card-coords">${lat}° N / ${lng}° ${lngDir}</p>
+          <p class="forecast-card-coords">${latLngDisplay}</p>
         </div>
         <div class="forecast-rows">
           <div class="forecast-row">
@@ -423,13 +428,6 @@ function renderForecastDashboard() {
   }
 }
 
-// HTML Escaping Utility
-function escapeHtml(str) {
-  const div = document.createElement("div");
-  div.innerText = str;
-  return div.innerHTML;
-}
-
 // 4. CRUD Actions
 locationForm.addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -439,7 +437,7 @@ locationForm.addEventListener("submit", async (e) => {
   const latitude = parseFloat(locationLatInput.value);
   const longitude = parseFloat(locationLngInput.value);
   
-  if (isNaN(latitude) || isNaN(longitude)) {
+  if (!validateCoordinates(latitude, longitude)) {
     showBanner(dbErrorBanner, "Latitude and Longitude must be valid numbers.");
     return;
   }
@@ -456,7 +454,7 @@ locationForm.addEventListener("submit", async (e) => {
       resetForm();
     } else {
       // Create mode
-      if (locationsList.length >= 10) {
+      if (!canAddLocation(locationsList.length)) {
         showBanner(dbErrorBanner, "Limit reached: You can monitor a maximum of 10 locations.");
         return;
       }
@@ -546,18 +544,15 @@ triggerTestBtn.addEventListener("click", async () => {
     // If running in local emulator, Cloud Functions are at e.g., http://127.0.0.1:5001/<project-id>/us-central1/triggerReport
     // We can fetch the endpoint dynamically based on the current location.
     
-    const isEmulator = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+    const isEmulator = isEmulatorHostname(window.location.hostname);
     let functionUrl = "";
     
     if (isEmulator) {
-      // Find the project name from the global config
       const response = await fetch("/__/firebase/init.json");
       const config = await response.json();
-      functionUrl = `http://127.0.0.1:5001/${config.projectId}/us-central1/triggerReport`;
+      functionUrl = getFunctionUrl("triggerReport", { isEmulator: true, projectId: config.projectId });
     } else {
-      // In production hosting, we can rewrite the path /api/triggerReport to the Cloud Function
-      // or we can call it using the Cloud Function URL. Let's use the local relative path redirect configured in firebase.json redirects/rewrites
-      functionUrl = "/api/triggerReport";
+      functionUrl = getFunctionUrl("triggerReport", { isEmulator: false });
     }
     
     const reportResponse = await fetch(functionUrl, {
@@ -610,14 +605,7 @@ useCurrentLocationBtn.addEventListener("click", () => {
     },
     (error) => {
       console.error(error);
-      let errMsg = "Failed to get current location.";
-      if (error.code === error.PERMISSION_DENIED) {
-        errMsg = "Geolocation permission denied. Please allow access in browser.";
-      } else if (error.code === error.POSITION_UNAVAILABLE) {
-        errMsg = "Location unavailable. Please specify coordinates manually.";
-      } else if (error.code === error.TIMEOUT) {
-        errMsg = "Geolocation request timed out. Please specify coordinates manually.";
-      }
+      let errMsg = mapGeolocationError(error.code, error);
       showBanner(dbErrorBanner, errMsg);
       useCurrentLocationBtn.disabled = false;
       useCurrentLocationBtn.textContent = originalText;
@@ -645,14 +633,14 @@ async function performAddressSearch() {
     const idToken = await user.getIdToken();
     
     // Determine endpoint URL
-    const isEmulator = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+    const isEmulator = isEmulatorHostname(window.location.hostname);
     let functionUrl = "";
     if (isEmulator) {
       const response = await fetch("/__/firebase/init.json");
       const config = await response.json();
-      functionUrl = `http://127.0.0.1:5001/${config.projectId}/us-central1/searchCoordinates`;
+      functionUrl = getFunctionUrl("searchCoordinates", { isEmulator: true, projectId: config.projectId });
     } else {
-      functionUrl = "/api/searchCoordinates";
+      functionUrl = getFunctionUrl("searchCoordinates", { isEmulator: false });
     }
 
     // Call geocoding proxy function
@@ -721,17 +709,11 @@ searchAddressInput.addEventListener("keydown", (e) => {
 
   if (e.key === "ArrowDown") {
     e.preventDefault();
-    activeSuggestionIndex++;
-    if (activeSuggestionIndex >= items.length) {
-      activeSuggestionIndex = 0;
-    }
+    activeSuggestionIndex = moveSuggestionIndex(activeSuggestionIndex, 1, items.length);
     updateActiveSuggestion(items);
   } else if (e.key === "ArrowUp") {
     e.preventDefault();
-    activeSuggestionIndex--;
-    if (activeSuggestionIndex < 0) {
-      activeSuggestionIndex = items.length - 1;
-    }
+    activeSuggestionIndex = moveSuggestionIndex(activeSuggestionIndex, -1, items.length);
     updateActiveSuggestion(items);
   } else if (e.key === "Enter") {
     e.preventDefault();
@@ -762,7 +744,7 @@ searchAddressInput.addEventListener("input", () => {
   clearTimeout(autocompleteTimeout);
   
   const queryText = searchAddressInput.value.trim();
-  if (queryText.length < 3) {
+  if (!shouldSearchAutocomplete(queryText)) {
     searchSuggestions.classList.add("hidden");
     searchSuggestions.innerHTML = "";
     currentSuggestions = [];
@@ -804,13 +786,7 @@ function renderSuggestions(features) {
     const coords = feature.geometry.coordinates; // [Lng, Lat]
     
     // Construct user-friendly display name (e.g. "Paris, Ile-de-France, France")
-    const parts = [
-      props.name,
-      props.state || props.county,
-      props.country
-    ].filter(Boolean);
-    
-    const displayName = parts.join(", ");
+    const displayName = buildPhotonDisplayName(props);
     
     const item = document.createElement("div");
     item.className = "suggestion-item";
@@ -870,9 +846,7 @@ function renderLogs(logs) {
       timeStyle: "short"
     });
     
-    let statusClass = "success";
-    if (log.status === "warning") statusClass = "warning";
-    if (log.status === "failure") statusClass = "failure";
+    let statusClass = getLogStatusClass(log.status);
     
     const statusText = log.status.toUpperCase();
     

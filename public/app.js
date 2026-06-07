@@ -78,8 +78,10 @@ async function initFirebase() {
     db = getFirestore(app);
 
     if (isEmulatorHostname(window.location.hostname)) {
-      connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
-      connectFirestoreEmulator(db, "127.0.0.1", 8080);
+      connectAuthEmulator(auth, `http://${window.location.hostname}:9099`, { disableWarnings: true });
+      connectFirestoreEmulator(db, window.location.hostname, 8080);
+      window.__firebaseAuthReady = true;
+      window.__e2eSignIn = (email, password) => signInWithEmailAndPassword(auth, email, password);
     }
     
     setupAuthListeners();

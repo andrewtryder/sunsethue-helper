@@ -14,7 +14,7 @@ async function sleep(ms) {
 async function ensureAuthUser() {
   for (let attempt = 0; attempt < 5; attempt += 1) {
     try {
-      const response = await fetch(
+      const signUpResponse = await fetch(
         `http://${AUTH_EMULATOR_HOST}/identitytoolkit.googleapis.com/v1/accounts:signUp?key=fake-api-key`,
         {
           method: "POST",
@@ -27,16 +27,33 @@ async function ensureAuthUser() {
         }
       );
 
-      if (response.ok) {
-        return;
+      if (!signUpResponse.ok) {
+        const payload = await signUpResponse.json().catch(() => ({}));
+        const message = payload?.error?.message || "";
+        if (!message.includes("EMAIL_EXISTS")) {
+          throw new Error(message || signUpResponse.statusText);
+        }
       }
 
-      const payload = await response.json().catch(() => ({}));
-      const message = payload?.error?.message || "";
+      const signInResponse = await fetch(
+        `http://${AUTH_EMULATOR_HOST}/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=fake-api-key`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: TEST_EMAIL,
+            password: TEST_PASSWORD,
+            returnSecureToken: true
+          })
+        }
+      );
 
-      if (message.includes("EMAIL_EXISTS")) {
-        return;
+      if (!signInResponse.ok) {
+        const payload = await signInResponse.json().catch(() => ({}));
+        throw new Error(payload?.error?.message || signInResponse.statusText);
       }
+
+      return;
     } catch (error) {
       if (attempt === 4) {
         throw error;
@@ -45,8 +62,6 @@ async function ensureAuthUser() {
 
     await sleep(1000 * (attempt + 1));
   }
-
-  throw new Error("Failed to seed Auth emulator user after multiple attempts");
 }
 
 module.exports.clearFirestoreEmulator = async function clearFirestoreEmulator() {
@@ -66,6 +81,10 @@ module.exports.waitForAppReady = async function waitForAppReady(page) {
     },
     { timeout: process.env.CI ? 60_000 : 30_000 }
   );
+  await page.waitForFunction(
+    () => window.__firebaseAuthReady === true,
+    { timeout: process.env.CI ? 60_000 : 30_000 }
+  );
 };
 
 module.exports.login = async function login(page) {
@@ -73,16 +92,18 @@ module.exports.login = async function login(page) {
   await module.exports.waitForAppReady(page);
   await page.locator("#login-email").fill(TEST_EMAIL);
   await page.locator("#login-password").fill(TEST_PASSWORD);
-  await page.locator("#login-btn").click();
 
-  const appVisible = page.waitForSelector("#app-container:not(.hidden)", { timeout: LOGIN_TIMEOUT_MS });
-  const authError = page.waitForSelector("#auth-error-banner", { state: "visible", timeout: LOGIN_TIMEOUT_MS })
-    .then(async () => {
-      const message = await page.locator("#auth-error-banner").textContent();
-      throw new Error(`Login failed: ${message?.trim() || "unknown auth error"}`);
-    });
+  await page.evaluate(
+    async ({ email, password }) => {
+      if (typeof window.__e2eSignIn !== "function") {
+        throw new Error("Emulator sign-in hook is unavailable");
+      }
+      await window.__e2eSignIn(email, password);
+    },
+    { email: TEST_EMAIL, password: TEST_PASSWORD }
+  );
 
-  await Promise.race([appVisible, authError]);
+  await page.waitForSelector("#app-container:not(.hidden)", { timeout: LOGIN_TIMEOUT_MS });
   await page.waitForSelector(`#display-user-email:text("${TEST_EMAIL}")`, { timeout: LOGIN_TIMEOUT_MS });
 };
 

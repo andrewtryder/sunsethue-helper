@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Daily sunrise/sunset quality email notifier using Sunsethue API and Firebase.",
   "engines": {
-    "node": ">=22"
+    "node": ">=24"
   },
   "scripts": {
     "emulators:start": "npx firebase emulators:start --only firestore,auth,functions,hosting",

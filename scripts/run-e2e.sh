@@ -1,5 +1,5 @@
 #!/bin/bash
-# E2E: Node 22 (.nvmrc), Java 21+ (Firestore emulator). Run from repo root: npm run test:e2e
+# E2E: Node 24 (.nvmrc), Java 21+ (Firestore emulator). Run from repo root: npm run test:e2e
 # macOS without java on PATH: export PATH="/opt/homebrew/opt/openjdk/bin:$PATH"
 set -euo pipefail
 

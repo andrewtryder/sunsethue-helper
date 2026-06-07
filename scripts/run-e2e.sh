@@ -5,7 +5,9 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$PROJECT_ROOT"
 
 if ! command -v java >/dev/null 2>&1; then
-  if [ -d "/opt/homebrew/opt/openjdk@21/bin" ]; then
+  if [ -d "/opt/homebrew/opt/openjdk/bin" ]; then
+    export PATH="/opt/homebrew/opt/openjdk/bin:$PATH"
+  elif [ -d "/opt/homebrew/opt/openjdk@21/bin" ]; then
     export PATH="/opt/homebrew/opt/openjdk@21/bin:$PATH"
   elif [ -d "/usr/local/opt/openjdk@21/bin" ]; then
     export PATH="/usr/local/opt/openjdk@21/bin:$PATH"

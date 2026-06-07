@@ -15,10 +15,13 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: .nvmrc
 
       - name: Run Frontend Structural Tests
         run: node scripts/test-frontend.js
+
+      - name: Run Frontend Unit Tests
+        run: node scripts/test-frontend-unit.mjs
 
       - name: Install Functions Dependencies
         run: npm ci --prefix functions

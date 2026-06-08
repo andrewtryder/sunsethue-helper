@@ -1,4 +1,5 @@
 const { isAuthorizedEmail, parseBearerToken } = require("./auth");
+const { fetchApiCredits } = require("./sunsethue");
 
 async function handleTriggerReport(req, res, deps) {
   if (req.method !== "POST") {
@@ -76,7 +77,40 @@ async function handleSearchCoordinates(req, res, deps) {
   }
 }
 
+async function handleGetApiCredits(req, res, deps) {
+  if (req.method !== "GET") {
+    res.status(405).json({ error: "Method Not Allowed" });
+    return;
+  }
+
+  const idToken = parseBearerToken(req.headers.authorization);
+  if (!idToken) {
+    res.status(401).json({ error: "Unauthorized: Missing auth header" });
+    return;
+  }
+
+  try {
+    const decodedToken = await deps.verifyIdToken(idToken);
+
+    if (!isAuthorizedEmail(decodedToken.email)) {
+      res.status(403).json({ error: "Forbidden: Unauthorized user account." });
+      return;
+    }
+
+    const credits = await fetchApiCredits({
+      fetch: deps.fetch,
+      apiKey: deps.env.SUNSETHUE_API_KEY
+    });
+
+    res.status(200).json(credits);
+  } catch (error) {
+    console.error("Error in getApiCredits onRequest:", error);
+    res.status(500).json({ error: error.message });
+  }
+}
+
 module.exports = {
   handleTriggerReport,
-  handleSearchCoordinates
+  handleSearchCoordinates,
+  handleGetApiCredits
 };

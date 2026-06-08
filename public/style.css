@@ -995,10 +995,24 @@ body.modal-open {
   position: relative;
   width: 100%;
   max-width: 420px;
-  padding: var(--stack-md);
+  padding: var(--space-md);
   background: var(--surface-container);
   border: 1px solid var(--outline-variant);
+  border-top: 3px solid var(--quality-strong);
   border-radius: var(--radius-default);
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.45);
+  animation: modalFadeIn 0.2s ease;
+}
+
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .modal-close {
@@ -1024,10 +1038,33 @@ body.modal-open {
 }
 
 .modal-title {
-  margin: 0 0 var(--space-sm) 0;
+  margin: 0 0 4px 0;
   font-size: 20px;
   font-weight: 600;
   color: var(--primary);
+}
+
+.modal-header-row {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: flex-start;
+  padding-right: 28px;
+}
+
+.modal-icon {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(52, 211, 153, 0.12);
+  color: var(--quality-strong);
+}
+
+.modal-icon .material-symbols-outlined {
+  font-size: 24px;
 }
 
 .modal-message {
@@ -1035,4 +1072,52 @@ body.modal-open {
   font-size: 14px;
   line-height: 1.6;
   color: var(--on-surface);
+}
+
+.modal-subtext {
+  margin: var(--space-sm) 0 var(--space-md);
+  padding-left: calc(40px + var(--space-sm));
+  font-family: var(--font-label);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--on-surface-variant);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--outline-variant);
+}
+
+.btn-modal-primary {
+  min-width: 96px;
+  padding: 10px 20px;
+  background: transparent;
+  border: 1px solid var(--primary);
+  border-radius: var(--radius-default);
+  color: var(--primary);
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.btn-modal-primary:hover {
+  background: var(--surface-container-high);
+}
+
+.api-credits-badge {
+  font-family: var(--font-label);
+  font-size: 12px;
+  color: var(--on-surface-variant);
+  white-space: nowrap;
+}
+
+.api-credits-badge.error {
+  color: var(--error);
+  white-space: normal;
+  text-align: right;
+  max-width: 280px;
 }

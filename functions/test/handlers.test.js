@@ -1,7 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert");
 const { isAuthorizedEmail, parseBearerToken } = require("../lib/auth");
-const { handleTriggerReport, handleSearchCoordinates } = require("../lib/handlers");
+const { handleTriggerReport, handleSearchCoordinates, handleGetApiCredits } = require("../lib/handlers");
 const { createMockResponse } = require("./test-utils");
 
 test("auth helpers enforce the authorized email and bearer token format", () => {
@@ -102,4 +102,53 @@ test("handleSearchCoordinates validates auth, query, and proxy responses", async
   });
   assert.strictEqual(res.statusCode, 500);
   assert.match(res.body.error, /503/);
+});
+
+test("handleGetApiCredits validates auth and returns normalized credits", async () => {
+  let res = createMockResponse();
+  await handleGetApiCredits({ method: "POST" }, res, {
+    verifyIdToken: async () => ({ email: "owner@example.com" }),
+    fetch: async () => ({}),
+    env: { SUNSETHUE_API_KEY: "test-key" }
+  });
+  assert.strictEqual(res.statusCode, 405);
+
+  res = createMockResponse();
+  await handleGetApiCredits({
+    method: "GET",
+    headers: { authorization: "Bearer valid-token" }
+  }, res, {
+    verifyIdToken: async () => ({ email: "other@gmail.com" }),
+    fetch: async () => ({}),
+    env: { SUNSETHUE_API_KEY: "test-key" }
+  });
+  assert.strictEqual(res.statusCode, 403);
+
+  res = createMockResponse();
+  await handleGetApiCredits({
+    method: "GET",
+    headers: { authorization: "Bearer valid-token" }
+  }, res, {
+    verifyIdToken: async () => ({ email: "owner@example.com" }),
+    fetch: async () => ({
+      ok: true,
+      status: 200,
+      headers: {
+        get(name) {
+          const values = {
+            "content-type": "application/json",
+            "x-ratelimit-limit": "50",
+            "x-ratelimit-remaining": "41",
+            "x-ratelimit-reset": "1780885606"
+          };
+          return values[name.toLowerCase()] ?? null;
+        }
+      },
+      json: async () => ({ data: { type: "sunrise" } })
+    }),
+    env: { SUNSETHUE_API_KEY: "test-key" }
+  });
+  assert.strictEqual(res.statusCode, 200);
+  assert.strictEqual(res.body.remaining, 41);
+  assert.strictEqual(res.body.limit, 50);
 });

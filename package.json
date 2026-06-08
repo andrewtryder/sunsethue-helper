@@ -13,7 +13,8 @@
     "test": "npm test --prefix functions && node scripts/test-frontend.js && node scripts/test-frontend-unit.mjs",
     "test:coverage": "npm run test:coverage --prefix functions && node scripts/test-frontend.js && node scripts/test-frontend-unit.mjs",
     "test:e2e": "bash scripts/run-e2e.sh",
-    "test:all": "npm test && npm run test:e2e"
+    "test:all": "npm test && npm run test:e2e",
+    "preview:email": "node scripts/preview-email.js"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0",

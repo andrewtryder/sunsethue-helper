@@ -33,12 +33,11 @@ test("buildEmailTableRows swaps sunrise and sunset blocks for AM reports", () =>
   const sunsetMarker = formatTimeOnlyET(result.sunset.time);
   const sunriseMarker = formatTimeOnlyET(result.sunrise.time);
 
-  assert.ok(amRows.indexOf("Sunset ·") < amRows.indexOf("Sunrise ·"));
   assert.ok(amRows.indexOf(sunsetMarker) < amRows.indexOf(sunriseMarker));
-  assert.ok(pmRows.indexOf("Sunrise ·") < pmRows.indexOf("Sunset ·"));
   assert.ok(pmRows.indexOf(sunriseMarker) < pmRows.indexOf(sunsetMarker));
   assert.match(amRows, /Home/);
   assert.match(amRows, /85% \(Great\)/);
+  assert.doesNotMatch(amRows, /Sunrise ·/);
 });
 
 test("buildEmailTableRows renders API error rows safely", () => {
@@ -63,6 +62,8 @@ test("buildHtmlEmail includes report metadata", () => {
   assert.match(html, /Wednesday, May 27, 2026 at 6:30 AM/);
   assert.match(html, /width=device-width/);
   assert.match(html, /background-color:#f4f4f5/);
+  assert.match(html, /<table style="width:100%;/);
+  assert.match(html, /Next Sunrise/);
 });
 
 test("runAndSendReport logs success and skips email when no locations exist", async () => {

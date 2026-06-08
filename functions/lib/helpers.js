@@ -109,14 +109,14 @@ function formatColumnDateET(utcString) {
 function getQualityBadge(quality, qualityText) {
   const percentage = qualityToPercent(quality);
   if (percentage === null) {
-    return `<span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#c4c7c8;">N/A</span>`;
+    return `<span style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;color:#9ca3af;">N/A</span>`;
   }
 
   const dotColor = getQualityDotColor(percentage);
   const label = escapeHtml(formatQualityLabel(qualityText, percentage));
   const fontWeight = percentage >= 50 ? "700" : "500";
 
-  return `<span style="display:inline-flex;align-items:center;justify-content:flex-end;gap:8px;min-width:80px;font-family:'JetBrains Mono',monospace;font-size:12px;color:#ffffff;font-weight:${fontWeight};"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background-color:${dotColor};"></span>${percentage}% (${label})</span>`;
+  return `<span style="display:inline-flex;align-items:center;gap:6px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;color:#374151;font-weight:${fontWeight};"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background-color:${dotColor};"></span>${percentage}% (${label})</span>`;
 }
 
 function escapeHtml(text) {

@@ -1,111 +1,104 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+All notable changes to this project are documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+This changelog follows [Conventional Commits](https://www.conventionalcommits.org/) and is maintained by [release-please](https://github.com/googleapis/release-please). Release sections group changes by commit type (`feat`, `fix`, etc.). Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
----
+## [1.6.0](https://github.com/andrewtryder/sunsethue-helper/compare/v1.5.3...v1.6.0) (2026-06-08)
 
-## [1.6.0] - 2026-06-08
+### Features
 
-### Changed
-- Replaced the Twilight Glass UI with the **Obsidian Flux** design system (Hanken Grotesk + JetBrains Mono, near-black palette) across login, forecast dashboard, locations, logs, and navigation.
-- Refactored the forecast dashboard from per-location cards to a borderless row table with column date headers and micro-dot quality indicators.
-- Redesigned HTML email reports to match the dashboard: dark Obsidian Flux shell, column date headers, time-only cells, and inline micro-dot quality indicators.
-- Moved manual AM/PM report triggers to the app footer; simplified top navigation to plain text links with a bordered logout control.
+* obsidian flux redesign for frontend and email
+* obsidian flux design reference and stitch dashboard assets under docs/
+* shared quality-dot color helpers in frontend and backend
 
-### Added
-- Obsidian Flux design reference (`docs/design/obsidian-flux.md`) and Stitch dashboard HTML/screenshot assets under `docs/assets/`.
-- Shared quality-dot color helpers in frontend and backend (`getQualityDotColor`, email-safe `getQualityBadge`).
+### Bug Fixes
 
-### Fixed
-- Restored `#loading-overlay.fade-out` styles so the loading screen no longer intercepts clicks after auth initialization.
+* restore loading overlay fade-out so auth init no longer blocks clicks
 
-## [1.5.3] - 2026-05-29
+## [1.5.3](https://github.com/andrewtryder/sunsethue-helper/compare/v1.5.2...v1.5.3) (2026-05-29)
 
-### Changed
-- Configured dynamic column ordering in the HTML email forecast table; the early morning report (`AM` trigger) now places the `Next Sunset` column first for chronological urgency, while the evening and manual reports preserve the `Next Sunrise` column first.
+### Features
 
-## [1.5.2] - 2026-05-28
+* dynamic AM email column ordering puts next sunset first for morning reports
 
-### Fixed
-- Refactored `public/app.js` to preserve the Google Material Symbols font-icons on the search and save buttons during state transitions (preventing icons from being overwritten by plain text strings).
+## [1.5.2](https://github.com/andrewtryder/sunsethue-helper/compare/v1.5.1...v1.5.2) (2026-05-28)
 
-## [1.5.1] - 2026-05-28
+### Bug Fixes
 
-### Fixed
-- Adjusted Firestore security rules in `firestore.rules` to remove `email_verified == true` checks, allowing users logging in via email/password credentials to successfully perform read/write actions.
+* preserve material symbols icons on search and save buttons during state transitions
 
-## [1.5.0] - 2026-05-27
+## [1.5.1](https://github.com/andrewtryder/sunsethue-helper/compare/v1.5.0...v1.5.1) (2026-05-28)
 
-### Added
-- Smooth full-screen loading screen overlay (`#loading-overlay`) with transition fade-out to prevent page-reload auth state layout flickering.
-- Keyboard navigation accessibility (up/down arrow keys, Enter, and Escape keys) to the address autocomplete suggestions dropdown in the dashboard location form.
-- Direct database query limit `.limit(10)` to the Cloud Function locations Firestore pull to save database read operations.
+### Bug Fixes
 
-### Changed
-- Configured Cloud Functions (`scheduledReportAM`, `scheduledReportPM`, and `triggerReport`) to bind and fetch sensitive API keys and SMTP credentials securely from **GCP Secret Manager**.
-- Hardened alert banners logic in `public/app.js` with map-based timeout tracking to resolve overlapping message timer bugs.
+* allow email/password users to read and write firestore without verified-email rule
 
-## [1.4.0] - 2026-05-27
+## [1.5.0](https://github.com/andrewtryder/sunsethue-helper/compare/v1.4.0...v1.5.0) (2026-05-27)
 
-### Changed
-- Relocated design system file `design.md` from the root directory to `docs/design.md` for better repository organization.
-- Updated automated extractor script `scripts/extract-stitch.js` to output to the new `docs/design.md` location.
-- Refactored backend tests in `functions/test.js` to import helper functions directly from `functions/index.js` instead of duplicating them.
-- Hardened Firestore security rules in `firestore.rules` to restrict read/write access strictly to `owner@example.com` with a verified email.
+### Features
 
-## [1.3.0] - 2026-05-27
+* full-screen loading overlay with fade-out to prevent auth layout flicker
+* keyboard navigation for address autocomplete suggestions
+* cloud function location query limit to reduce firestore reads
+* bind cloud function secrets through gcp secret manager
+* harden alert banner timeout tracking in public app
 
-### Added
-- Zero-dependency frontend structural validation suite (`scripts/test-frontend.js`) using native Node.js test runner to assert crucial HTML DOM element IDs and CSS selectors are intact.
-- Local Git `pre-commit` hooks wrapper (`scripts/pre-commit.sh`) to automatically validate both frontend and backend tests before committing code locally.
-- Git hooks automated installer script (`scripts/setup-git-hooks.sh`).
-- Project change tracking documentation (`CHANGELOG.md`).
+## [1.4.0](https://github.com/andrewtryder/sunsethue-helper/compare/v1.3.0...v1.4.0) (2026-05-27)
 
-### Changed
-- Integrated frontend structural tests into the GitHub Actions CI pipeline (`.github/workflows/firebase-deploy.yml`) to abort cloud deployments if HTML/CSS structures are broken.
+### Features
 
----
+* relocate design system docs to docs/design.md
+* refactor backend tests to import helpers from functions index
 
-## [1.2.0] - 2026-05-27
+### Bug Fixes
 
-### Added
-- Local version control initialized using Git.
-- CI/CD automated deployment workflow with GitHub Actions (`.github/workflows/firebase-deploy.yml`) to deploy to Firebase on push to the `main` branch.
-- Project description and quick-start instructions in `README.md` at the root folder.
-- Saved planning design artifacts in `docs/`.
+* restrict firestore access to authorized email in security rules
 
-### Fixed
-- Replaced Docker-based `w9jds/firebase-action` with native Node `npx firebase-tools` inside GitHub Actions workflow to solve environment initialization crashes.
+## [1.3.0](https://github.com/andrewtryder/sunsethue-helper/compare/v1.2.0...v1.3.0) (2026-05-27)
 
----
+### Features
 
-## [1.1.0] - 2026-05-27
+* frontend structural validation suite scripts/test-frontend.js
+* local git pre-commit hook wrapper and installer script
+* project changelog documentation
 
-### Added
-- Redesigned the main dashboard into a tabbed layout separating **Main Forecast**, **Manage Locations**, and **Execution Logs** for simplified UX.
-- Built a Live Forecast Dashboard preview table inside the **Main Forecast** tab mirroring the daily email reports.
-- Added visual color-coded badges (Spectacular, Good, Muted) with translucent styling in the dashboard table.
-- Added resilient try-catch wrappers around the frontend JS rendering cycles (`renderLocations()` and `renderForecastDashboard()`) to log and print errors inside the UI instead of freezing.
+### Continuous Integration
 
-### Changed
-- Upgraded the backend Cloud Functions Node.js runtime environment to **Node.js 22** in `functions/package.json`.
-- Removed the logs popup modal window and its respective DOM selectors.
+* run frontend structural tests in github actions deploy workflow
 
-### Fixed
-- Solved a rendering bug where the forecast dashboard comparison table would not clear or update when the location list became empty.
+## [1.2.0](https://github.com/andrewtryder/sunsethue-helper/compare/v1.1.0...v1.2.0) (2026-05-27)
 
----
+### Features
 
-## [1.0.0] - 2026-05-27
+* initialize git repository and ci/cd deploy workflow
+* add readme and planning artifacts under docs/
 
-### Added
-- Fully cloud-hosted architecture deployed on Firebase (`sunsethue-helper-12345`).
-- Secure administrative sign-in restricted to `owner@example.com` using Firebase Authentication.
-- Dynamic geocoding coordinate lookup proxy (`searchCoordinates`) and Photon API autocomplete dropdown search on the client side.
-- Device geolocation retrieval ("Use Current Location") with macOS compatibility configurations.
-- v2 Cloud Scheduler functions (`scheduledReportAM` and `scheduledReportPM`) running daily at 6:00 AM and 6:00 PM Eastern.
-- Automated email delivery of forecast reports via Nodemailer and Gmail SMTP app passwords.
-- Cloud logging collection (`runs`) tracking execution run outcomes in Firestore.
+### Bug Fixes
+
+* replace docker firebase action with native firebase-tools in github actions
+
+## [1.1.0](https://github.com/andrewtryder/sunsethue-helper/compare/v1.0.0...v1.1.0) (2026-05-27)
+
+### Features
+
+* tabbed dashboard for forecast, locations, and execution logs
+* live forecast dashboard preview mirroring email reports
+* color-coded forecast quality badges in dashboard table
+* resilient try-catch wrappers around frontend render cycles
+* upgrade cloud functions runtime to node.js 22
+* remove logs popup modal
+
+### Bug Fixes
+
+* clear forecast dashboard when location list becomes empty
+
+## [1.0.0](https://github.com/andrewtryder/sunsethue-helper/releases/tag/v1.0.0) (2026-05-27)
+
+### Features
+
+* firebase-hosted architecture with auth restricted to authorized email
+* geocoding proxy and photon autocomplete search
+* device geolocation support for location entry
+* scheduled am/pm cloud functions for daily forecast emails
+* nodemailer email delivery and firestore run logging

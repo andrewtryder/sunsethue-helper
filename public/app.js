@@ -59,6 +59,10 @@ const triggerTestBtn = document.getElementById("trigger-test-btn");
 const triggerStatus = document.getElementById("trigger-status");
 const triggerStatusText = document.getElementById("trigger-status-text");
 
+const emailSuccessModal = document.getElementById("email-success-modal");
+const emailSuccessModalMessage = document.getElementById("email-success-modal-message");
+const emailSuccessModalClose = document.getElementById("email-success-modal-close");
+
 // Firebase references
 let auth = null;
 let db = null;
@@ -121,6 +125,29 @@ function hideBanner(bannerElement) {
   bannerElement.style.display = "none";
   bannerElement.textContent = "";
 }
+
+function showEmailSuccessModal(message) {
+  emailSuccessModalMessage.textContent = message;
+  emailSuccessModal.classList.remove("hidden");
+  document.body.classList.add("modal-open");
+}
+
+function hideEmailSuccessModal() {
+  emailSuccessModal.classList.add("hidden");
+  document.body.classList.remove("modal-open");
+}
+
+emailSuccessModalClose.addEventListener("click", hideEmailSuccessModal);
+emailSuccessModal.addEventListener("click", (event) => {
+  if (event.target === emailSuccessModal) {
+    hideEmailSuccessModal();
+  }
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !emailSuccessModal.classList.contains("hidden")) {
+    hideEmailSuccessModal();
+  }
+});
 
 // 1. Setup Auth Listeners
 let isFirstAuthCheck = true;
@@ -604,7 +631,7 @@ triggerTestBtn.addEventListener("click", async () => {
       throw new Error(result.error || "Failed to trigger email report.");
     }
     
-    showBanner(dbSuccessBanner, "Success! Test report email sent to owner@example.com.");
+    showEmailSuccessModal("Success! Test report email sent to owner@example.com.");
   } catch (error) {
     console.error(error);
     showBanner(dbErrorBanner, "Trigger Failed: " + error.message);

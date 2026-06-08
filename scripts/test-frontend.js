@@ -57,6 +57,9 @@ test("Frontend File Structure & Integrity Checks", () => {
     "trigger-test-btn",
     "trigger-status",
     "trigger-status-text",
+    "email-success-modal",
+    "email-success-modal-close",
+    "email-success-modal-message",
     // Tab panes
     "pane-main",
     "pane-locations",

@@ -62,6 +62,9 @@ const triggerStatusText = document.getElementById("trigger-status-text");
 const emailSuccessModal = document.getElementById("email-success-modal");
 const emailSuccessModalMessage = document.getElementById("email-success-modal-message");
 const emailSuccessModalClose = document.getElementById("email-success-modal-close");
+const emailSuccessModalDone = document.getElementById("email-success-modal-done");
+
+const apiCreditsStatus = document.getElementById("api-credits-status");
 
 // Firebase references
 let auth = null;
@@ -132,7 +135,7 @@ function showEmailSuccessModal() {
   emailSuccessModal.classList.add("is-open");
   emailSuccessModal.setAttribute("aria-hidden", "false");
   document.body.classList.add("modal-open");
-  emailSuccessModalClose?.focus();
+  emailSuccessModalDone?.focus();
 }
 
 function hideEmailSuccessModal() {
@@ -145,6 +148,9 @@ function hideEmailSuccessModal() {
 
 if (emailSuccessModalClose) {
   emailSuccessModalClose.addEventListener("click", hideEmailSuccessModal);
+}
+if (emailSuccessModalDone) {
+  emailSuccessModalDone.addEventListener("click", hideEmailSuccessModal);
 }
 if (emailSuccessModal) {
   emailSuccessModal.addEventListener("click", (event) => {
@@ -643,6 +649,7 @@ triggerTestBtn.addEventListener("click", async () => {
     }
     
     showEmailSuccessModal();
+    fetchApiCreditsStatus();
   } catch (error) {
     console.error(error);
     showBanner(dbErrorBanner, "Trigger Failed: " + error.message);
@@ -901,6 +908,62 @@ document.addEventListener("click", (e) => {
 });
 
 // Logs Rendering function
+function formatApiCreditsLabel(credits) {
+  const limitPart = credits.limit != null ? ` / ${credits.limit}` : "";
+  let label = `Requests remaining: ${credits.remaining}${limitPart}`;
+
+  if (credits.resetAt) {
+    const resetText = new Date(credits.resetAt).toLocaleTimeString("en-US", {
+      timeZone: "America/New_York",
+      timeStyle: "short"
+    });
+    label += ` · resets ${resetText} ET`;
+  }
+
+  return label;
+}
+
+async function fetchApiCreditsStatus() {
+  if (!apiCreditsStatus || !auth?.currentUser) {
+    return;
+  }
+
+  apiCreditsStatus.classList.remove("error");
+  apiCreditsStatus.textContent = "Loading API credits…";
+
+  try {
+    const idToken = await auth.currentUser.getIdToken();
+    const isEmulator = isEmulatorHostname(window.location.hostname);
+    let functionUrl = "";
+
+    if (isEmulator) {
+      const response = await fetch("/__/firebase/init.json");
+      const config = await response.json();
+      functionUrl = getFunctionUrl("getApiCredits", { isEmulator: true, projectId: config.projectId });
+    } else {
+      functionUrl = getFunctionUrl("getApiCredits", { isEmulator: false });
+    }
+
+    const response = await fetch(functionUrl, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${idToken}`
+      }
+    });
+
+    const result = await response.json();
+    if (!response.ok) {
+      throw new Error(result.error || "Failed to load API credits.");
+    }
+
+    apiCreditsStatus.textContent = formatApiCreditsLabel(result);
+  } catch (error) {
+    console.error(error);
+    apiCreditsStatus.classList.add("error");
+    apiCreditsStatus.textContent = `Unable to load API credits: ${error.message}`;
+  }
+}
+
 function renderLogs(logs) {
   logsListContainer.innerHTML = "";
   
@@ -966,6 +1029,10 @@ function switchTab(targetTab) {
   tabPanes.forEach(p => p.classList.remove("active"));
   const activePane = document.getElementById(`pane-${targetTab}`);
   if (activePane) activePane.classList.add("active");
+
+  if (targetTab === "logs") {
+    fetchApiCreditsStatus();
+  }
 }
 
 allNavButtons.forEach(btn => {

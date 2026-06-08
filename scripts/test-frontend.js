@@ -60,6 +60,8 @@ test("Frontend File Structure & Integrity Checks", () => {
     "email-success-modal",
     "email-success-modal-close",
     "email-success-modal-message",
+    "email-success-modal-done",
+    "api-credits-status",
     // Tab panes
     "pane-main",
     "pane-locations",

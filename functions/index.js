@@ -5,7 +5,7 @@ const nodemailer = require("nodemailer");
 
 const helpers = require("./lib/helpers");
 const { runAndSendReport } = require("./lib/report");
-const { handleTriggerReport, handleSearchCoordinates } = require("./lib/handlers");
+const { handleTriggerReport, handleSearchCoordinates, handleGetApiCredits } = require("./lib/handlers");
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -68,5 +68,18 @@ exports.searchCoordinates = onRequest({
   });
 });
 
+exports.getApiCredits = onRequest({
+  cors: true,
+  memory: "256MiB",
+  timeoutSeconds: 30,
+  secrets: ["SUNSETHUE_API_KEY"]
+}, async (req, res) => {
+  await handleGetApiCredits(req, res, {
+    verifyIdToken: (token) => admin.auth().verifyIdToken(token),
+    fetch,
+    env: process.env
+  });
+});
+
 Object.assign(exports, helpers);
-Object.assign(exports, { runAndSendReport, handleTriggerReport, handleSearchCoordinates });
+Object.assign(exports, { runAndSendReport, handleTriggerReport, handleSearchCoordinates, handleGetApiCredits });

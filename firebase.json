@@ -32,6 +32,10 @@
         "function": "searchCoordinates"
       },
       {
+        "source": "/api/getApiCredits",
+        "function": "getApiCredits"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }

@@ -18,7 +18,7 @@ const forecastResponse = {
   ]
 };
 
-test("buildEmailTableRows swaps sunrise and sunset columns for AM reports", () => {
+test("buildEmailTableRows swaps sunrise and sunset blocks for AM reports", () => {
   const result = {
     name: "Home",
     latitude: 40.7128,
@@ -33,7 +33,9 @@ test("buildEmailTableRows swaps sunrise and sunset columns for AM reports", () =
   const sunsetMarker = formatTimeOnlyET(result.sunset.time);
   const sunriseMarker = formatTimeOnlyET(result.sunrise.time);
 
+  assert.ok(amRows.indexOf("Sunset ·") < amRows.indexOf("Sunrise ·"));
   assert.ok(amRows.indexOf(sunsetMarker) < amRows.indexOf(sunriseMarker));
+  assert.ok(pmRows.indexOf("Sunrise ·") < pmRows.indexOf("Sunset ·"));
   assert.ok(pmRows.indexOf(sunriseMarker) < pmRows.indexOf(sunsetMarker));
   assert.match(amRows, /Home/);
   assert.match(amRows, /85% \(Great\)/);
@@ -57,10 +59,10 @@ test("buildEmailTableRows renders API error rows safely", () => {
 
 test("buildHtmlEmail includes report metadata", () => {
   const html = buildHtmlEmail([], "PM", "Wednesday, May 27, 2026 at 6:30 AM");
-  assert.match(html, /Forecast Dashboard/);
+  assert.match(html, /Sunrise &amp; Sunset Forecast/);
   assert.match(html, /Wednesday, May 27, 2026 at 6:30 AM/);
-  assert.match(html, /Next Sunrise/);
-  assert.match(html, /background-color:#141313/);
+  assert.match(html, /width=device-width/);
+  assert.match(html, /background-color:#f4f4f5/);
 });
 
 test("runAndSendReport logs success and skips email when no locations exist", async () => {

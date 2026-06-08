@@ -10,113 +10,90 @@ const {
   buildEmailSubject
 } = require("./helpers");
 
-function getHeaderEventTimes(results) {
-  for (const result of results) {
-    if (result.error) {
-      continue;
-    }
-    return {
-      sunrise: result.sunrise?.time || null,
-      sunset: result.sunset?.time || null
-    };
+function formatEventDateLabel(utcString) {
+  if (!utcString) {
+    return "";
   }
-  return { sunrise: null, sunset: null };
+  return formatColumnDateET(utcString).replace(/^\(|\)$/g, "");
 }
 
-function buildForecastEventCell(event, mobileLabel) {
+function buildForecastEventBlock(event, eventLabel) {
   if (!event) {
-    return `<span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#c4c7c8;">N/A</span>`;
+    return `
+      <div style="margin-bottom:14px;">
+        <div style="font-size:13px;color:#6b7280;margin-bottom:4px;">${eventLabel}</div>
+        <div style="font-size:15px;color:#9ca3af;">N/A</div>
+      </div>
+    `;
   }
 
+  const dateLabel = formatEventDateLabel(event.time);
   const time = formatTimeOnlyET(event.time);
   const qualityHtml = getQualityBadge(event.quality, event.quality_text);
+  const heading = dateLabel ? `${eventLabel} · ${dateLabel}` : eventLabel;
 
   return `
-    <div style="margin-bottom:4px;color:#e5e2e1;font-size:14px;font-weight:500;">${mobileLabel ? `${mobileLabel} ` : ""}${time}</div>
-    <div>${qualityHtml}</div>
+    <div style="margin-bottom:14px;">
+      <div style="font-size:13px;color:#6b7280;margin-bottom:6px;">${heading}</div>
+      <div style="display:block;">
+        <span style="font-size:17px;font-weight:600;color:#1a1a1a;margin-right:10px;">${time}</span>
+        ${qualityHtml}
+      </div>
+    </div>
   `;
 }
 
-function buildEmailTableRows(results, triggerType) {
+function buildEmailLocationBlocks(results, triggerType) {
   const isAM = triggerType === "AM";
-  let tableRowsHtml = "";
+  let blocksHtml = "";
 
   for (const result of results) {
     if (result.error) {
-      tableRowsHtml += `
-        <tr>
-          <td style="padding:24px 0;border-bottom:1px solid #201f1f;color:#ffffff;font-size:18px;font-weight:600;">${escapeHtml(result.name)}</td>
-          <td colspan="2" style="padding:24px 0;border-bottom:1px solid #201f1f;color:#ffb4ab;font-family:'JetBrains Mono',monospace;font-size:12px;">
-            Error querying API: ${escapeHtml(result.error)}
-          </td>
-        </tr>
+      blocksHtml += `
+        <div style="margin-bottom:16px;padding:16px;background-color:#ffffff;border:1px solid #e5e7eb;border-radius:8px;">
+          <div style="font-size:18px;font-weight:600;color:#1a1a1a;margin-bottom:8px;">${escapeHtml(result.name)}</div>
+          <div style="font-size:14px;color:#dc2626;">Error querying API: ${escapeHtml(result.error)}</div>
+        </div>
       `;
       continue;
     }
 
-    const sunriseCell = buildForecastEventCell(result.sunrise, "");
-    const sunsetCell = buildForecastEventCell(result.sunset, "");
+    const sunriseBlock = buildForecastEventBlock(result.sunrise, "Sunrise");
+    const sunsetBlock = buildForecastEventBlock(result.sunset, "Sunset");
+    const firstBlock = isAM ? sunsetBlock : sunriseBlock;
+    const secondBlock = isAM ? sunriseBlock : sunsetBlock;
 
-    const firstCol = isAM ? sunsetCell : sunriseCell;
-    const secondCol = isAM ? sunriseCell : sunsetCell;
-
-    tableRowsHtml += `
-      <tr>
-        <td style="padding:24px 0;border-bottom:1px solid #201f1f;color:#ffffff;font-size:18px;font-weight:600;vertical-align:top;width:25%;">
-          ${escapeHtml(result.name)}
-        </td>
-        <td style="padding:24px 0;border-bottom:1px solid #201f1f;vertical-align:top;width:37.5%;text-align:right;">
-          ${firstCol}
-        </td>
-        <td style="padding:24px 0;border-bottom:1px solid #201f1f;vertical-align:top;width:37.5%;text-align:right;">
-          ${secondCol}
-        </td>
-      </tr>
+    blocksHtml += `
+      <div style="margin-bottom:16px;padding:16px;background-color:#ffffff;border:1px solid #e5e7eb;border-radius:8px;">
+        <div style="font-size:18px;font-weight:600;color:#1a1a1a;margin-bottom:12px;">${escapeHtml(result.name)}</div>
+        ${firstBlock}
+        ${secondBlock}
+      </div>
     `;
   }
 
-  return tableRowsHtml;
+  return blocksHtml;
 }
 
 function buildHtmlEmail(results, triggerType, reportTimeText) {
-  const isAM = triggerType === "AM";
-  const tableRowsHtml = buildEmailTableRows(results, triggerType);
-  const headerTimes = getHeaderEventTimes(results);
-  const sunriseHeaderDate = formatColumnDateET(headerTimes.sunrise);
-  const sunsetHeaderDate = formatColumnDateET(headerTimes.sunset);
-  const firstHeader = isAM
-    ? `Next Sunset ${sunsetHeaderDate}`.trim()
-    : `Next Sunrise ${sunriseHeaderDate}`.trim();
-  const secondHeader = isAM
-    ? `Next Sunrise ${sunriseHeaderDate}`.trim()
-    : `Next Sunset ${sunsetHeaderDate}`.trim();
+  const locationBlocksHtml = buildEmailLocationBlocks(results, triggerType);
 
   return `
     <!DOCTYPE html>
     <html>
     <head>
       <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1">
       <title>Sunsethue Forecast Report</title>
     </head>
-    <body style="margin:0;padding:0;background-color:#141313;color:#e5e2e1;font-family:'Hanken Grotesk',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
-      <div style="max-width:650px;margin:0 auto;padding:32px 24px;">
-        <h1 style="margin:0 0 8px 0;font-size:32px;font-weight:700;letter-spacing:-0.02em;color:#ffffff;">Forecast Dashboard</h1>
-        <p style="margin:0 0 32px 0;font-family:'JetBrains Mono',monospace;font-size:12px;color:#c4c7c8;">Generated ${reportTimeText} (${triggerType})</p>
-        <table style="width:100%;border-collapse:collapse;text-align:left;">
-          <thead>
-            <tr>
-              <th style="padding:8px 0;border-bottom:1px solid #201f1f;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500;letter-spacing:0.05em;text-transform:uppercase;color:#c4c7c8;text-align:left;width:25%;">Location</th>
-              <th style="padding:8px 0;border-bottom:1px solid #201f1f;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500;letter-spacing:0.05em;text-transform:uppercase;color:#c4c7c8;text-align:right;width:37.5%;">${firstHeader}</th>
-              <th style="padding:8px 0;border-bottom:1px solid #201f1f;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500;letter-spacing:0.05em;text-transform:uppercase;color:#c4c7c8;text-align:right;width:37.5%;">${secondHeader}</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${tableRowsHtml}
-          </tbody>
-        </table>
-        <div style="margin-top:32px;padding-top:16px;border-top:1px solid #353434;text-align:center;font-family:'JetBrains Mono',monospace;font-size:12px;color:#8e9192;">
-          <p style="margin:0;">This email was sent automatically to you because you set up Sunsethue Helper.</p>
-          <p style="margin:8px 0 0 0;">Manage your locations via your private dashboard.</p>
+    <body style="margin:0;padding:0;background-color:#f4f4f5;color:#1a1a1a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+      <div style="max-width:600px;margin:0 auto;padding:24px 16px;">
+        <h1 style="margin:0 0 8px 0;font-size:24px;font-weight:700;line-height:1.3;color:#1a1a1a;">Sunrise &amp; Sunset Forecast</h1>
+        <p style="margin:0 0 24px 0;font-size:14px;line-height:1.5;color:#6b7280;">${reportTimeText} · ${triggerType} report</p>
+        ${locationBlocksHtml}
+        <div style="margin-top:24px;padding-top:16px;border-top:1px solid #e5e7eb;text-align:center;font-size:12px;line-height:1.5;color:#9ca3af;">
+          <p style="margin:0;">Sent automatically by Sunsethue Helper.</p>
+          <p style="margin:8px 0 0 0;">Manage locations in your private dashboard.</p>
         </div>
       </div>
     </body>
@@ -290,7 +267,8 @@ async function runAndSendReport(triggerType, deps) {
 }
 
 module.exports = {
-  buildEmailTableRows,
+  buildEmailLocationBlocks,
+  buildEmailTableRows: buildEmailLocationBlocks,
   buildHtmlEmail,
   runAndSendReport
 };

@@ -10,73 +10,76 @@ const {
   buildEmailSubject
 } = require("./helpers");
 
-function formatEventDateLabel(utcString) {
-  if (!utcString) {
-    return "";
+function getHeaderEventTimes(results) {
+  for (const result of results) {
+    if (result.error) {
+      continue;
+    }
+    return {
+      sunrise: result.sunrise?.time || null,
+      sunset: result.sunset?.time || null
+    };
   }
-  return formatColumnDateET(utcString).replace(/^\(|\)$/g, "");
+  return { sunrise: null, sunset: null };
 }
 
-function buildForecastEventBlock(event, eventLabel) {
+function buildForecastEventCell(event) {
   if (!event) {
-    return `
-      <div style="margin-bottom:14px;">
-        <div style="font-size:13px;color:#6b7280;margin-bottom:4px;">${eventLabel}</div>
-        <div style="font-size:15px;color:#9ca3af;">N/A</div>
-      </div>
-    `;
+    return `<span style="font-size:14px;color:#9ca3af;">N/A</span>`;
   }
 
-  const dateLabel = formatEventDateLabel(event.time);
   const time = formatTimeOnlyET(event.time);
   const qualityHtml = getQualityBadge(event.quality, event.quality_text);
-  const heading = dateLabel ? `${eventLabel} · ${dateLabel}` : eventLabel;
 
-  return `
-    <div style="margin-bottom:14px;">
-      <div style="font-size:13px;color:#6b7280;margin-bottom:6px;">${heading}</div>
-      <div style="display:block;">
-        <span style="font-size:17px;font-weight:600;color:#1a1a1a;margin-right:10px;">${time}</span>
-        ${qualityHtml}
-      </div>
-    </div>
-  `;
+  return `<span style="font-size:15px;font-weight:600;color:#1a1a1a;white-space:nowrap;">${time}</span> ${qualityHtml}`;
 }
 
-function buildEmailLocationBlocks(results, triggerType) {
+function buildEmailTableRows(results, triggerType) {
   const isAM = triggerType === "AM";
-  let blocksHtml = "";
+  let tableRowsHtml = "";
 
   for (const result of results) {
     if (result.error) {
-      blocksHtml += `
-        <div style="margin-bottom:16px;padding:16px;background-color:#ffffff;border:1px solid #e5e7eb;border-radius:8px;">
-          <div style="font-size:18px;font-weight:600;color:#1a1a1a;margin-bottom:8px;">${escapeHtml(result.name)}</div>
-          <div style="font-size:14px;color:#dc2626;">Error querying API: ${escapeHtml(result.error)}</div>
-        </div>
+      tableRowsHtml += `
+        <tr>
+          <td style="padding:14px 8px;border-bottom:1px solid #e5e7eb;font-size:16px;font-weight:600;color:#1a1a1a;vertical-align:top;">${escapeHtml(result.name)}</td>
+          <td colspan="2" style="padding:14px 8px;border-bottom:1px solid #e5e7eb;font-size:14px;color:#dc2626;vertical-align:top;">
+            Error querying API: ${escapeHtml(result.error)}
+          </td>
+        </tr>
       `;
       continue;
     }
 
-    const sunriseBlock = buildForecastEventBlock(result.sunrise, "Sunrise");
-    const sunsetBlock = buildForecastEventBlock(result.sunset, "Sunset");
-    const firstBlock = isAM ? sunsetBlock : sunriseBlock;
-    const secondBlock = isAM ? sunriseBlock : sunsetBlock;
+    const sunriseCell = buildForecastEventCell(result.sunrise);
+    const sunsetCell = buildForecastEventCell(result.sunset);
+    const firstCol = isAM ? sunsetCell : sunriseCell;
+    const secondCol = isAM ? sunriseCell : sunsetCell;
 
-    blocksHtml += `
-      <div style="margin-bottom:16px;padding:16px;background-color:#ffffff;border:1px solid #e5e7eb;border-radius:8px;">
-        <div style="font-size:18px;font-weight:600;color:#1a1a1a;margin-bottom:12px;">${escapeHtml(result.name)}</div>
-        ${firstBlock}
-        ${secondBlock}
-      </div>
+    tableRowsHtml += `
+      <tr>
+        <td style="padding:14px 8px;border-bottom:1px solid #e5e7eb;font-size:16px;font-weight:600;color:#1a1a1a;vertical-align:top;">${escapeHtml(result.name)}</td>
+        <td style="padding:14px 8px;border-bottom:1px solid #e5e7eb;vertical-align:top;">${firstCol}</td>
+        <td style="padding:14px 8px;border-bottom:1px solid #e5e7eb;vertical-align:top;">${secondCol}</td>
+      </tr>
     `;
   }
 
-  return blocksHtml;
+  return tableRowsHtml;
 }
 
 function buildHtmlEmail(results, triggerType, reportTimeText) {
-  const locationBlocksHtml = buildEmailLocationBlocks(results, triggerType);
+  const isAM = triggerType === "AM";
+  const tableRowsHtml = buildEmailTableRows(results, triggerType);
+  const headerTimes = getHeaderEventTimes(results);
+  const sunriseHeaderDate = formatColumnDateET(headerTimes.sunrise);
+  const sunsetHeaderDate = formatColumnDateET(headerTimes.sunset);
+  const firstHeader = isAM
+    ? `Next Sunset ${sunsetHeaderDate}`.trim()
+    : `Next Sunrise ${sunriseHeaderDate}`.trim();
+  const secondHeader = isAM
+    ? `Next Sunrise ${sunriseHeaderDate}`.trim()
+    : `Next Sunset ${sunsetHeaderDate}`.trim();
 
   return `
     <!DOCTYPE html>
@@ -89,8 +92,19 @@ function buildHtmlEmail(results, triggerType, reportTimeText) {
     <body style="margin:0;padding:0;background-color:#f4f4f5;color:#1a1a1a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
       <div style="max-width:600px;margin:0 auto;padding:24px 16px;">
         <h1 style="margin:0 0 8px 0;font-size:24px;font-weight:700;line-height:1.3;color:#1a1a1a;">Sunrise &amp; Sunset Forecast</h1>
-        <p style="margin:0 0 24px 0;font-size:14px;line-height:1.5;color:#6b7280;">${reportTimeText} · ${triggerType} report</p>
-        ${locationBlocksHtml}
+        <p style="margin:0 0 20px 0;font-size:14px;line-height:1.5;color:#6b7280;">${reportTimeText} · ${triggerType} report</p>
+        <table style="width:100%;border-collapse:collapse;background-color:#ffffff;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
+          <thead>
+            <tr style="background-color:#f9fafb;">
+              <th style="padding:10px 8px;border-bottom:1px solid #e5e7eb;font-size:12px;font-weight:600;text-align:left;color:#6b7280;width:28%;">Location</th>
+              <th style="padding:10px 8px;border-bottom:1px solid #e5e7eb;font-size:12px;font-weight:600;text-align:left;color:#6b7280;width:36%;">${firstHeader}</th>
+              <th style="padding:10px 8px;border-bottom:1px solid #e5e7eb;font-size:12px;font-weight:600;text-align:left;color:#6b7280;width:36%;">${secondHeader}</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${tableRowsHtml}
+          </tbody>
+        </table>
         <div style="margin-top:24px;padding-top:16px;border-top:1px solid #e5e7eb;text-align:center;font-size:12px;line-height:1.5;color:#9ca3af;">
           <p style="margin:0;">Sent automatically by Sunsethue Helper.</p>
           <p style="margin:8px 0 0 0;">Manage locations in your private dashboard.</p>
@@ -267,8 +281,8 @@ async function runAndSendReport(triggerType, deps) {
 }
 
 module.exports = {
-  buildEmailLocationBlocks,
-  buildEmailTableRows: buildEmailLocationBlocks,
+  buildEmailTableRows,
+  buildEmailLocationBlocks: buildEmailTableRows,
   buildHtmlEmail,
   runAndSendReport
 };

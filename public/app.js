@@ -126,25 +126,35 @@ function hideBanner(bannerElement) {
   bannerElement.textContent = "";
 }
 
-function showEmailSuccessModal(message) {
-  emailSuccessModalMessage.textContent = message;
+function showEmailSuccessModal() {
+  if (!emailSuccessModal) return;
   emailSuccessModal.classList.remove("hidden");
+  emailSuccessModal.classList.add("is-open");
+  emailSuccessModal.setAttribute("aria-hidden", "false");
   document.body.classList.add("modal-open");
+  emailSuccessModalClose?.focus();
 }
 
 function hideEmailSuccessModal() {
+  if (!emailSuccessModal) return;
   emailSuccessModal.classList.add("hidden");
+  emailSuccessModal.classList.remove("is-open");
+  emailSuccessModal.setAttribute("aria-hidden", "true");
   document.body.classList.remove("modal-open");
 }
 
-emailSuccessModalClose.addEventListener("click", hideEmailSuccessModal);
-emailSuccessModal.addEventListener("click", (event) => {
-  if (event.target === emailSuccessModal) {
-    hideEmailSuccessModal();
-  }
-});
+if (emailSuccessModalClose) {
+  emailSuccessModalClose.addEventListener("click", hideEmailSuccessModal);
+}
+if (emailSuccessModal) {
+  emailSuccessModal.addEventListener("click", (event) => {
+    if (event.target === emailSuccessModal) {
+      hideEmailSuccessModal();
+    }
+  });
+}
 document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && !emailSuccessModal.classList.contains("hidden")) {
+  if (event.key === "Escape" && emailSuccessModal?.classList.contains("is-open")) {
     hideEmailSuccessModal();
   }
 });
@@ -589,11 +599,12 @@ triggerTestBtn.addEventListener("click", async () => {
     showBanner(dbErrorBanner, "Cannot trigger test: You need to add at least 1 location.");
     return;
   }
-  
+
+  const originalTriggerLabel = triggerTestBtn.textContent;
+
   try {
     triggerTestBtn.disabled = true;
-    triggerStatus.classList.remove("hidden");
-    triggerStatusText.textContent = "Requesting email report dispatch...";
+    triggerTestBtn.textContent = "Sending…";
     
     // Retrieve Auth ID Token to pass to Cloud Function for authentication
     const user = auth.currentUser;
@@ -631,13 +642,13 @@ triggerTestBtn.addEventListener("click", async () => {
       throw new Error(result.error || "Failed to trigger email report.");
     }
     
-    showEmailSuccessModal("Success! Test report email sent to owner@example.com.");
+    showEmailSuccessModal();
   } catch (error) {
     console.error(error);
     showBanner(dbErrorBanner, "Trigger Failed: " + error.message);
   } finally {
     triggerTestBtn.disabled = false;
-    triggerStatus.classList.add("hidden");
+    triggerTestBtn.textContent = originalTriggerLabel;
   }
 });
 

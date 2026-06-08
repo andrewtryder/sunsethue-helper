@@ -56,29 +56,67 @@ function getQualityFallbackLabel(percentage) {
   return "Muted";
 }
 
+function getQualityDotColor(percentage) {
+  if (percentage === null) {
+    return null;
+  }
+  if (percentage >= 50) {
+    return "#34d399";
+  }
+  if (percentage >= 15) {
+    return "#f97316";
+  }
+  return "#ef4444";
+}
+
+function formatQualityLabel(qualityText, percentage) {
+  if (!qualityText) {
+    return getQualityFallbackLabel(percentage);
+  }
+
+  const trimmed = String(qualityText).trim();
+  if (trimmed === `${percentage}%` || trimmed === String(percentage)) {
+    return getQualityFallbackLabel(percentage);
+  }
+
+  return trimmed;
+}
+
+function formatTimeOnlyET(utcString) {
+  if (!utcString) {
+    return "N/A";
+  }
+  return new Date(utcString).toLocaleTimeString("en-US", {
+    timeZone: "America/New_York",
+    hour: "numeric",
+    minute: "2-digit"
+  });
+}
+
+function formatColumnDateET(utcString) {
+  if (!utcString) {
+    return "";
+  }
+  const formatted = new Date(utcString).toLocaleDateString("en-US", {
+    timeZone: "America/New_York",
+    weekday: "short",
+    month: "short",
+    day: "numeric"
+  });
+  return `(${formatted})`;
+}
+
 function getQualityBadge(quality, qualityText) {
   const percentage = qualityToPercent(quality);
   if (percentage === null) {
-    return `<span style="padding: 4px 8px; border-radius: 8px; font-size: 12px; font-weight: bold; background-color: #2a2a2a; color: #888;">N/A</span>`;
+    return `<span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#c4c7c8;">N/A</span>`;
   }
 
-  let bgColor;
-  let textColor;
+  const dotColor = getQualityDotColor(percentage);
+  const label = escapeHtml(formatQualityLabel(qualityText, percentage));
+  const fontWeight = percentage >= 50 ? "700" : "500";
 
-  if (percentage >= 60) {
-    bgColor = "#ffd4d6";
-    textColor = "#d92b3a";
-  } else if (percentage >= 30) {
-    bgColor = "#fef3c7";
-    textColor = "#b45309";
-  } else {
-    bgColor = "#f3f4f6";
-    textColor = "#4b5563";
-  }
-
-  const label = qualityText ? escapeHtml(String(qualityText)) : getQualityFallbackLabel(percentage);
-
-  return `<span style="padding: 4px 8px; border-radius: 8px; font-size: 12px; font-weight: bold; background-color: ${bgColor}; color: ${textColor}; display: inline-block;">${percentage}% (${label})</span>`;
+  return `<span style="display:inline-flex;align-items:center;justify-content:flex-end;gap:8px;min-width:80px;font-family:'JetBrains Mono',monospace;font-size:12px;color:#ffffff;font-weight:${fontWeight};"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background-color:${dotColor};"></span>${percentage}% (${label})</span>`;
 }
 
 function escapeHtml(text) {
@@ -159,8 +197,11 @@ function buildEmailSubject(triggerType) {
 
 module.exports = {
   formatTimeET,
+  formatTimeOnlyET,
+  formatColumnDateET,
   normalizeQualityToUnit,
   qualityToPercent,
+  getQualityDotColor,
   getQualityBadge,
   escapeHtml,
   buildForecastEventSnapshot,

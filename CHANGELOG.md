@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.6.0] - 2026-06-08
+
+### Changed
+- Replaced the Twilight Glass UI with the **Obsidian Flux** design system (Hanken Grotesk + JetBrains Mono, near-black palette) across login, forecast dashboard, locations, logs, and navigation.
+- Refactored the forecast dashboard from per-location cards to a borderless row table with column date headers and micro-dot quality indicators.
+- Redesigned HTML email reports to match the dashboard: dark Obsidian Flux shell, column date headers, time-only cells, and inline micro-dot quality indicators.
+- Moved manual AM/PM report triggers to the app footer; simplified top navigation to plain text links with a bordered logout control.
+
+### Added
+- Obsidian Flux design reference (`docs/design/obsidian-flux.md`) and Stitch dashboard HTML/screenshot assets under `docs/assets/`.
+- Shared quality-dot color helpers in frontend and backend (`getQualityDotColor`, email-safe `getQualityBadge`).
+
+### Fixed
+- Restored `#loading-overlay.fade-out` styles so the loading screen no longer intercepts clicks after auth initialization.
+
 ## [1.5.3] - 2026-05-29
 
 ### Changed

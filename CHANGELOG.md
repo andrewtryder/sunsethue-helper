@@ -4,6 +4,14 @@ All notable changes to this project are documented in this file.
 
 This changelog follows [Conventional Commits](https://www.conventionalcommits.org/) and is maintained by [release-please](https://github.com/googleapis/release-please). Release sections group changes by commit type (`feat`, `fix`, etc.). Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0](https://github.com/andrewtryder/sunsethue-helper/compare/sunsethue-helper-v1.7.0...sunsethue-helper-v1.8.0) (2026-06-08)
+
+
+### Features
+
+* **ui:** fix email modal, table email layout, and preview command ([a9505c3](https://github.com/andrewtryder/sunsethue-helper/commit/a9505c334dde8ebc4f0e131876850e39a84286a3))
+* **ui:** fix email modal, table email layout, and preview command ([9f1fa93](https://github.com/andrewtryder/sunsethue-helper/commit/9f1fa9304f8eb3df8e99a68f33db3bfb2154ae7a))
+
 ## [1.7.0](https://github.com/andrewtryder/sunsethue-helper/compare/sunsethue-helper-v1.6.0...sunsethue-helper-v1.7.0) (2026-06-08)
 
 

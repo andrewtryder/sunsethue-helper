@@ -182,7 +182,7 @@
         <span>Manual Run</span>
         <span>—</span>
         <button type="button" id="trigger-test-btn" class="footer-link-btn">Send Test Email Now</button>
-        <span id="trigger-status" class="action-status">
+        <span id="trigger-status" class="action-status hidden" aria-hidden="true">
           <span class="spinner"></span>
           <span id="trigger-status-text">Sending email…</span>
         </span>
@@ -205,11 +205,11 @@
     </nav>
   </div>
 
-  <div id="email-success-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="email-success-modal-title">
+  <div id="email-success-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="email-success-modal-title" aria-hidden="true">
     <div class="modal-dialog">
       <button type="button" id="email-success-modal-close" class="modal-close" aria-label="Close">&times;</button>
       <h2 id="email-success-modal-title" class="modal-title">Email sent</h2>
-      <p id="email-success-modal-message" class="modal-message"></p>
+      <p id="email-success-modal-message" class="modal-message">Success! Test report email sent to atr000@gmail.com.</p>
     </div>
   </div>
 

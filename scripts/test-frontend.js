@@ -86,8 +86,9 @@ test("Frontend File Structure & Integrity Checks", () => {
     ".tab-pane.active",
     ".nav-tab",
     ".nav-tab.active",
-    ".glass-elevated",
-    ".badge",
+    ".forecast-table",
+    ".quality-indicator",
+    ".quality-dot",
   ];
 
   requiredCssSelectors.forEach(selector => {

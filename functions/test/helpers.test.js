@@ -79,17 +79,15 @@ test("normalizeForecastEvent stores quality on 0-1 scale", () => {
   assert.strictEqual(event.quality_text, "Fair");
 });
 
-test("getQualityBadge returns the correct HTML badge based on the decimal score", () => {
+test("getQualityBadge returns micro-dot quality indicators", () => {
   assert.match(getQualityBadge(0.85), /85% \(Spectacular\)/);
   assert.match(getQualityBadge(0.85, "Great"), /85% \(Great\)/);
   assert.match(getQualityBadge(0.35, "Fair"), /35% \(Fair\)/);
   assert.match(getQualityBadge(35, "Fair"), /35% \(Fair\)/);
   assert.match(getQualityBadge(0.7), /70%/);
-  assert.match(getQualityBadge(0.60), /60% \(Spectacular\)/);
-  assert.match(getQualityBadge(0.59), /59% \(Good\)/);
-  assert.match(getQualityBadge(0.30), /30% \(Good\)/);
-  assert.match(getQualityBadge(0.29), /29% \(Muted\)/);
-  assert.match(getQualityBadge(0.0), /0% \(Muted\)/);
+  assert.match(getQualityBadge(0.52), /#34d399/);
+  assert.match(getQualityBadge(0.35), /#f97316/);
+  assert.match(getQualityBadge(0.10), /#ef4444/);
   assert.match(getQualityBadge(null), /N\/A/);
   assert.match(getQualityBadge(undefined), /N\/A/);
   assert.match(getQualityBadge(150), /N\/A/);

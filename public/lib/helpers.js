@@ -50,6 +50,19 @@ function getForecastFallbackLabel(percentage) {
   return "Low";
 }
 
+export function getQualityDotColor(percentage) {
+  if (percentage === null || percentage === undefined) {
+    return null;
+  }
+  if (percentage >= 50) {
+    return "#34d399";
+  }
+  if (percentage >= 15) {
+    return "#f97316";
+  }
+  return "#ef4444";
+}
+
 function formatForecastLabel(text, percentage) {
   if (!text) {
     return getForecastFallbackLabel(percentage);
@@ -66,18 +79,14 @@ function formatForecastLabel(text, percentage) {
 export function getForecastBadgeHtml(quality, text) {
   const percentage = qualityToPercent(quality);
   if (percentage === null) {
-    return `<span class="badge badge-muted">N/A</span>`;
+    return `<span class="quality-indicator quality-na"><span class="quality-text">N/A</span></span>`;
   }
 
-  const label = formatForecastLabel(text, percentage);
+  const label = escapeHtml(formatForecastLabel(text, percentage));
+  const dotColor = getQualityDotColor(percentage);
+  const strongClass = percentage >= 50 ? " quality-text-strong" : "";
 
-  if (percentage >= 60) {
-    return `<span class="badge badge-great">${percentage}% (${label})</span>`;
-  }
-  if (percentage >= 30) {
-    return `<span class="badge badge-fair">${percentage}% (${label})</span>`;
-  }
-  return `<span class="badge badge-muted">${percentage}% (${label})</span>`;
+  return `<span class="quality-indicator"><span class="quality-dot" style="background-color:${dotColor}"></span><span class="quality-text${strongClass}">${percentage}% (${label})</span></span>`;
 }
 
 export function isAuthorizedEmail(email) {

@@ -4,6 +4,25 @@ All notable changes to this project are documented in this file.
 
 This changelog follows [Conventional Commits](https://www.conventionalcommits.org/) and is maintained by [release-please](https://github.com/googleapis/release-please). Release sections group changes by commit type (`feat`, `fix`, etc.). Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0](https://github.com/andrewtryder/sunsethue-helper/compare/sunsethue-helper-v1.6.0...sunsethue-helper-v1.7.0) (2026-06-08)
+
+
+### Features
+
+* apply Stitch Twilight Glass design system to frontend ([2d44a41](https://github.com/andrewtryder/sunsethue-helper/commit/2d44a41f40b984c0d1fff16d7396fbc6b1f5834c))
+* **ci:** add tests, CI pipeline, and quality normalization ([559285e](https://github.com/andrewtryder/sunsethue-helper/commit/559285e089ab9adab15fe79b3923ee26eb66c090))
+* **ci:** add tests, CI pipeline, and quality normalization ([2ab50b9](https://github.com/andrewtryder/sunsethue-helper/commit/2ab50b9f551d64d5830a6e046eb0cb0e20a22a80))
+* **ui:** add email success modal and mobile-friendly reports ([b8917f4](https://github.com/andrewtryder/sunsethue-helper/commit/b8917f4b8327f5e8fa5c870e961103bbb07f21c5))
+* **ui:** obsidian flux redesign for frontend and email ([d3ee12d](https://github.com/andrewtryder/sunsethue-helper/commit/d3ee12d9469afae7329240445f995e35f86eb396))
+* **ui:** obsidian flux redesign for frontend and email ([0b82bb0](https://github.com/andrewtryder/sunsethue-helper/commit/0b82bb00e2c3c97a272a5d6d8c96c43bf10a447d))
+
+
+### Bug Fixes
+
+* **ci:** require Java 21 for Firebase emulator E2E job ([e9d0df5](https://github.com/andrewtryder/sunsethue-helper/commit/e9d0df55735c00956574a1a5e8fbfeeaa2fb39fb))
+* **e2e:** stabilize auth emulator login in CI ([a636fff](https://github.com/andrewtryder/sunsethue-helper/commit/a636fff7884396f7d4b2f8b02c894d3a6ad1e550))
+* **e2e:** use emulator auth hook for reliable CI sign-in ([b60756d](https://github.com/andrewtryder/sunsethue-helper/commit/b60756dcf1a5bd800f8a136e350732cdf3e2d3f7))
+
 ## [1.6.0](https://github.com/andrewtryder/sunsethue-helper/compare/v1.5.3...v1.6.0) (2026-06-08)
 
 ### Features

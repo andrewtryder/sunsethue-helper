@@ -935,10 +935,15 @@ body {
 
 /* ---- Banners & empty states ---- */
 .notification-banner {
+  display: none;
   padding: var(--space-sm) var(--space-md);
   font-size: 14px;
   border-bottom: 1px solid var(--surface-container);
   color: var(--on-surface);
+}
+
+.notification-banner.show {
+  display: block;
 }
 
 .notification-banner.error {
@@ -966,16 +971,20 @@ body {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  z-index: 2000;
+  z-index: 10000;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: var(--space-md);
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.72);
 }
 
 .modal-overlay.hidden {
-  display: none;
+  display: none !important;
+}
+
+.modal-overlay.is-open {
+  display: flex !important;
 }
 
 body.modal-open {

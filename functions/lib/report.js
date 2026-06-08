@@ -1,13 +1,41 @@
 const {
-  formatTimeET,
+  formatTimeOnlyET,
+  formatColumnDateET,
   getQualityBadge,
   escapeHtml,
+  buildForecastEventSnapshot,
+  normalizeForecastEvent,
   selectNextSunEvents,
   validateReportEnv,
-  buildEmailSubject,
-  buildForecastEventSnapshot,
-  normalizeForecastEvent
+  buildEmailSubject
 } = require("./helpers");
+
+function getHeaderEventTimes(results) {
+  for (const result of results) {
+    if (result.error) {
+      continue;
+    }
+    return {
+      sunrise: result.sunrise?.time || null,
+      sunset: result.sunset?.time || null
+    };
+  }
+  return { sunrise: null, sunset: null };
+}
+
+function buildForecastEventCell(event, mobileLabel) {
+  if (!event) {
+    return `<span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#c4c7c8;">N/A</span>`;
+  }
+
+  const time = formatTimeOnlyET(event.time);
+  const qualityHtml = getQualityBadge(event.quality, event.quality_text);
+
+  return `
+    <div style="margin-bottom:4px;color:#e5e2e1;font-size:14px;font-weight:500;">${mobileLabel ? `${mobileLabel} ` : ""}${time}</div>
+    <div>${qualityHtml}</div>
+  `;
+}
 
 function buildEmailTableRows(results, triggerType) {
   const isAM = triggerType === "AM";
@@ -16,50 +44,35 @@ function buildEmailTableRows(results, triggerType) {
   for (const result of results) {
     if (result.error) {
       tableRowsHtml += `
-          <tr style="border-bottom: 1px solid #e5e7eb;">
-            <td style="padding: 12px 16px; font-weight: bold; color: #1f2937;">${escapeHtml(result.name)}</td>
-            <td colspan="2" style="padding: 12px 16px; color: #dc2626; font-style: italic;">
-              Error querying API: ${escapeHtml(result.error)}
-            </td>
-          </tr>
-        `;
+        <tr>
+          <td style="padding:24px 0;border-bottom:1px solid #201f1f;color:#ffffff;font-size:18px;font-weight:600;">${escapeHtml(result.name)}</td>
+          <td colspan="2" style="padding:24px 0;border-bottom:1px solid #201f1f;color:#ffb4ab;font-family:'JetBrains Mono',monospace;font-size:12px;">
+            Error querying API: ${escapeHtml(result.error)}
+          </td>
+        </tr>
+      `;
       continue;
     }
 
-    const sunriseTime = result.sunrise ? formatTimeET(result.sunrise.time) : "N/A";
-    const sunriseQuality = result.sunrise
-      ? getQualityBadge(result.sunrise.quality, result.sunrise.quality_text)
-      : "N/A";
-    const sunsetTime = result.sunset ? formatTimeET(result.sunset.time) : "N/A";
-    const sunsetQuality = result.sunset
-      ? getQualityBadge(result.sunset.quality, result.sunset.quality_text)
-      : "N/A";
+    const sunriseCell = buildForecastEventCell(result.sunrise, "");
+    const sunsetCell = buildForecastEventCell(result.sunset, "");
 
-    const sunriseTd = `
-          <td style="padding: 16px; color: #374151; vertical-align: middle;">
-            <div style="font-size: 14px; font-weight: 500;">${sunriseTime}</div>
-            <div style="margin-top: 6px;">${sunriseQuality}</div>
-          </td>
-        `;
-    const sunsetTd = `
-          <td style="padding: 16px; color: #374151; vertical-align: middle;">
-            <div style="font-size: 14px; font-weight: 500;">${sunsetTime}</div>
-            <div style="margin-top: 6px;">${sunsetQuality}</div>
-          </td>
-        `;
+    const firstCol = isAM ? sunsetCell : sunriseCell;
+    const secondCol = isAM ? sunriseCell : sunsetCell;
 
     tableRowsHtml += `
-          <tr style="border-bottom: 1px solid #e5e7eb;">
-            <td style="padding: 16px; font-weight: bold; color: #1f2937;">
-              ${escapeHtml(result.name)}
-              <div style="font-size: 11px; color: #6b7280; font-weight: normal; margin-top: 4px; font-family: monospace;">
-                ${result.latitude.toFixed(4)}, ${result.longitude.toFixed(4)}
-              </div>
-            </td>
-            ${isAM ? sunsetTd : sunriseTd}
-            ${isAM ? sunriseTd : sunsetTd}
-          </tr>
-        `;
+      <tr>
+        <td style="padding:24px 0;border-bottom:1px solid #201f1f;color:#ffffff;font-size:18px;font-weight:600;vertical-align:top;width:25%;">
+          ${escapeHtml(result.name)}
+        </td>
+        <td style="padding:24px 0;border-bottom:1px solid #201f1f;vertical-align:top;width:37.5%;text-align:right;">
+          ${firstCol}
+        </td>
+        <td style="padding:24px 0;border-bottom:1px solid #201f1f;vertical-align:top;width:37.5%;text-align:right;">
+          ${secondCol}
+        </td>
+      </tr>
+    `;
   }
 
   return tableRowsHtml;
@@ -68,43 +81,47 @@ function buildEmailTableRows(results, triggerType) {
 function buildHtmlEmail(results, triggerType, reportTimeText) {
   const isAM = triggerType === "AM";
   const tableRowsHtml = buildEmailTableRows(results, triggerType);
+  const headerTimes = getHeaderEventTimes(results);
+  const sunriseHeaderDate = formatColumnDateET(headerTimes.sunrise);
+  const sunsetHeaderDate = formatColumnDateET(headerTimes.sunset);
+  const firstHeader = isAM
+    ? `Next Sunset ${sunsetHeaderDate}`.trim()
+    : `Next Sunrise ${sunriseHeaderDate}`.trim();
+  const secondHeader = isAM
+    ? `Next Sunrise ${sunriseHeaderDate}`.trim()
+    : `Next Sunset ${sunsetHeaderDate}`.trim();
 
   return `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <title>Sunsethue Quality Report</title>
-      </head>
-      <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f4f5f7; color: #333;">
-        <div style="max-width: 650px; margin: 20px auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.08); border: 1px solid #e5e7eb;">
-          <div style="background: linear-gradient(135deg, #ff5e62 0%, #ff9966 100%); padding: 32px 24px; text-align: center; color: #ffffff;">
-            <span style="font-size: 40px;">🌅</span>
-            <h1 style="margin: 10px 0 5px 0; font-size: 24px; font-weight: 800; letter-spacing: -0.02em;">Sunsethue Forecast Report</h1>
-            <p style="margin: 0; font-size: 14px; opacity: 0.9;">Generated on ${reportTimeText} (${triggerType})</p>
-          </div>
-          <div style="padding: 24px;">
-            <table style="width: 100%; border-collapse: collapse; text-align: left;">
-              <thead>
-                <tr style="border-bottom: 2px solid #e5e7eb; background-color: #f9fafb;">
-                  <th style="padding: 12px 16px; font-size: 13px; font-weight: 700; color: #4b5563; text-transform: uppercase; letter-spacing: 0.05em; width: 40%;">Location</th>
-                  <th style="padding: 12px 16px; font-size: 13px; font-weight: 700; color: #4b5563; text-transform: uppercase; letter-spacing: 0.05em; width: 30%;">${isAM ? "Next Sunset" : "Next Sunrise"}</th>
-                  <th style="padding: 12px 16px; font-size: 13px; font-weight: 700; color: #4b5563; text-transform: uppercase; letter-spacing: 0.05em; width: 30%;">${isAM ? "Next Sunrise" : "Next Sunset"}</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${tableRowsHtml}
-              </tbody>
-            </table>
-            <div style="margin-top: 24px; border-top: 1px solid #e5e7eb; padding-top: 16px; text-align: center; font-size: 12px; color: #9ca3af;">
-              <p style="margin: 0;">This email was sent automatically to you because you set up Sunsethue Helper.</p>
-              <p style="margin: 4px 0 0 0;">Manage your locations via your private dashboard.</p>
-            </div>
-          </div>
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>Sunsethue Forecast Report</title>
+    </head>
+    <body style="margin:0;padding:0;background-color:#141313;color:#e5e2e1;font-family:'Hanken Grotesk',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+      <div style="max-width:650px;margin:0 auto;padding:32px 24px;">
+        <h1 style="margin:0 0 8px 0;font-size:32px;font-weight:700;letter-spacing:-0.02em;color:#ffffff;">Forecast Dashboard</h1>
+        <p style="margin:0 0 32px 0;font-family:'JetBrains Mono',monospace;font-size:12px;color:#c4c7c8;">Generated ${reportTimeText} (${triggerType})</p>
+        <table style="width:100%;border-collapse:collapse;text-align:left;">
+          <thead>
+            <tr>
+              <th style="padding:8px 0;border-bottom:1px solid #201f1f;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500;letter-spacing:0.05em;text-transform:uppercase;color:#c4c7c8;text-align:left;width:25%;">Location</th>
+              <th style="padding:8px 0;border-bottom:1px solid #201f1f;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500;letter-spacing:0.05em;text-transform:uppercase;color:#c4c7c8;text-align:right;width:37.5%;">${firstHeader}</th>
+              <th style="padding:8px 0;border-bottom:1px solid #201f1f;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500;letter-spacing:0.05em;text-transform:uppercase;color:#c4c7c8;text-align:right;width:37.5%;">${secondHeader}</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${tableRowsHtml}
+          </tbody>
+        </table>
+        <div style="margin-top:32px;padding-top:16px;border-top:1px solid #353434;text-align:center;font-family:'JetBrains Mono',monospace;font-size:12px;color:#8e9192;">
+          <p style="margin:0;">This email was sent automatically to you because you set up Sunsethue Helper.</p>
+          <p style="margin:8px 0 0 0;">Manage your locations via your private dashboard.</p>
         </div>
-      </body>
-      </html>
-    `;
+      </div>
+    </body>
+    </html>
+  `;
 }
 
 function buildRunResultEntry(result) {
@@ -126,7 +143,7 @@ async function runAndSendReport(triggerType, deps) {
   const fetchFn = deps.fetch;
   const createTransport = deps.createTransport;
   const env = deps.env;
-  const now = deps.now ?? Date.now;
+  const now = deps.now ?? Date.now();
 
   console.log(`Starting daily report check. Trigger: ${triggerType}. Target Email: ${env.EMAIL_TO}`);
 

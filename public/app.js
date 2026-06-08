@@ -11,7 +11,6 @@ import {
   canAddLocation,
   validateCoordinates,
   formatCoordinateDisplay,
-  formatDashboardCoordinateDisplay,
   getLogStatusClass,
   buildPhotonDisplayName,
   moveSuggestionIndex,
@@ -315,13 +314,42 @@ function renderLocations() {
   }
 }
 
-// 3.1 Render Forecast Dashboard (Card Layout)
+// 3.1 Render Forecast Dashboard (Obsidian Flux row table)
+function formatForecastColumnDate(isoTime) {
+  if (!isoTime) {
+    return "";
+  }
+  const formatted = new Date(isoTime).toLocaleDateString("en-US", {
+    timeZone: "America/New_York",
+    weekday: "short",
+    month: "short",
+    day: "numeric"
+  });
+  return `(${formatted})`;
+}
+
+function buildForecastEventColumnHtml({ timeText, badgeHtml, mobileLabel, errorHtml, emptyHtml }) {
+  if (errorHtml) {
+    return `<div class="forecast-event-col">${errorHtml}</div>`;
+  }
+  if (emptyHtml) {
+    return `<div class="forecast-event-col">${emptyHtml}</div>`;
+  }
+
+  return `
+    <div class="forecast-event-col">
+      <span class="forecast-event-mobile-label">${mobileLabel}:</span>
+      <span class="forecast-event-time">${timeText}</span>
+      ${badgeHtml}
+    </div>
+  `;
+}
+
 function renderForecastDashboard() {
   try {
     console.log("renderForecastDashboard called. locationsList:", locationsList);
     if (!forecastCardsContainer) return;
-    
-    // Remove old location cards (keep the empty-state node)
+
     Array.from(forecastCardsContainer.children).forEach(child => {
       if (child !== forecastEmptyState) child.remove();
     });
@@ -331,83 +359,90 @@ function renderForecastDashboard() {
       if (dashboardLastUpdated) dashboardLastUpdated.textContent = "Last Run: N/A";
       return;
     }
-    
+
     if (forecastEmptyState) forecastEmptyState.classList.add("hidden");
+
     let maxTimestamp = 0;
-    
+    let headerSunriseTime = null;
+    let headerSunsetTime = null;
+
     locationsList.forEach((location) => {
-      const hasForecast = location.latestSunriseTime !== undefined && location.latestSunriseTime !== null;
       if (location.lastForecastUpdate && location.lastForecastUpdate > maxTimestamp) {
         maxTimestamp = location.lastForecastUpdate;
       }
-      
+      if (!headerSunriseTime && location.latestSunriseTime) {
+        headerSunriseTime = location.latestSunriseTime;
+      }
+      if (!headerSunsetTime && location.latestSunsetTime) {
+        headerSunsetTime = location.latestSunsetTime;
+      }
+    });
+
+    const table = document.createElement("div");
+    table.className = "forecast-table";
+
+    const header = document.createElement("div");
+    header.className = "forecast-table-header";
+    header.innerHTML = `
+      <div class="forecast-table-header-location">Location</div>
+      <div class="forecast-table-header-events">
+        <div class="forecast-table-header-col">Next Sunrise ${formatForecastColumnDate(headerSunriseTime)}</div>
+        <div class="forecast-table-header-col">Next Sunset ${formatForecastColumnDate(headerSunsetTime)}</div>
+      </div>
+    `;
+    table.appendChild(header);
+
+    locationsList.forEach((location) => {
+      const hasForecast = location.latestSunriseTime !== undefined && location.latestSunriseTime !== null;
       const sunriseBadge = getForecastBadgeHtml(location.latestSunriseQuality, location.latestSunriseText);
-      const sunsetBadge  = getForecastBadgeHtml(location.latestSunsetQuality,  location.latestSunsetText);
-      
-      const sunriseTimeText = location.latestSunriseTime 
+      const sunsetBadge = getForecastBadgeHtml(location.latestSunsetQuality, location.latestSunsetText);
+
+      const sunriseTimeText = location.latestSunriseTime
         ? new Date(location.latestSunriseTime).toLocaleTimeString("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" })
         : null;
-      const sunsetTimeText = location.latestSunsetTime 
+      const sunsetTimeText = location.latestSunsetTime
         ? new Date(location.latestSunsetTime).toLocaleTimeString("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" })
         : null;
-      const sunriseDateText = location.latestSunriseTime
-        ? new Date(location.latestSunriseTime).toLocaleDateString("en-US", { timeZone: "America/New_York", weekday: "short", month: "short", day: "numeric" })
-        : null;
-      const sunsetDateText = location.latestSunsetTime
-        ? new Date(location.latestSunsetTime).toLocaleDateString("en-US", { timeZone: "America/New_York", weekday: "short", month: "short", day: "numeric" })
-        : null;
-      
-      const latLngDisplay = formatDashboardCoordinateDisplay(location.latitude, location.longitude);
 
-      let sunriseRowHtml;
-      let sunsetRowHtml;
+      let sunriseColHtml;
+      let sunsetColHtml;
 
       if (location.forecastError) {
         const errHtml = `<span class="forecast-error-text">⚠️ ${escapeHtml(location.forecastError)}</span>`;
-        sunriseRowHtml = errHtml;
-        sunsetRowHtml  = errHtml;
+        sunriseColHtml = buildForecastEventColumnHtml({ errorHtml: errHtml });
+        sunsetColHtml = buildForecastEventColumnHtml({ errorHtml: errHtml });
       } else if (!hasForecast) {
-        sunriseRowHtml = `<span class="forecast-no-data">No forecast cached yet</span>`;
-        sunsetRowHtml  = `<span class="forecast-no-data">No forecast cached yet</span>`;
+        const emptyHtml = `<span class="forecast-no-data">No forecast cached yet</span>`;
+        sunriseColHtml = buildForecastEventColumnHtml({ emptyHtml });
+        sunsetColHtml = buildForecastEventColumnHtml({ emptyHtml });
       } else {
-        sunriseRowHtml = `
-          <div class="forecast-time">${sunriseTimeText}</div>
-          <div class="forecast-label">Next Sunrise${sunriseDateText ? ', ' + sunriseDateText : ''}</div>
-        `;
-        sunsetRowHtml = `
-          <div class="forecast-time">${sunsetTimeText}</div>
-          <div class="forecast-label">Next Sunset${sunsetDateText ? ', ' + sunsetDateText : ''}</div>
-        `;
+        sunriseColHtml = buildForecastEventColumnHtml({
+          timeText: sunriseTimeText,
+          badgeHtml: sunriseBadge,
+          mobileLabel: "Sunrise"
+        });
+        sunsetColHtml = buildForecastEventColumnHtml({
+          timeText: sunsetTimeText,
+          badgeHtml: sunsetBadge,
+          mobileLabel: "Sunset"
+        });
       }
 
-      const card = document.createElement("div");
-      card.className = "location-forecast-card";
-      card.innerHTML = `
-        <div>
-          <h2 class="forecast-card-title">${escapeHtml(location.name)}</h2>
-          <p class="forecast-card-coords">${latLngDisplay}</p>
-        </div>
-        <div class="forecast-rows">
-          <div class="forecast-row">
-            <div class="forecast-row-left">
-              <span class="material-symbols-outlined forecast-icon">wb_twilight</span>
-              <div>${sunriseRowHtml}</div>
-            </div>
-            ${hasForecast && !location.forecastError ? sunriseBadge : ''}
-          </div>
-          <div class="forecast-row">
-            <div class="forecast-row-left">
-              <span class="material-symbols-outlined forecast-icon">wb_sunny</span>
-              <div>${sunsetRowHtml}</div>
-            </div>
-            ${hasForecast && !location.forecastError ? sunsetBadge : ''}
-          </div>
+      const row = document.createElement("div");
+      row.className = "forecast-table-row";
+      row.innerHTML = `
+        <div class="forecast-table-location">${escapeHtml(location.name)}</div>
+        <div class="forecast-table-events">
+          ${sunriseColHtml}
+          <div class="forecast-event-separator">|</div>
+          ${sunsetColHtml}
         </div>
       `;
-      
-      forecastCardsContainer.appendChild(card);
+      table.appendChild(row);
     });
-    
+
+    forecastCardsContainer.appendChild(table);
+
     if (dashboardLastUpdated) {
       if (maxTimestamp > 0) {
         const timeStr = new Date(maxTimestamp).toLocaleString("en-US", {
@@ -852,7 +887,7 @@ function renderLogs(logs) {
     
     let detailsHtml = "";
     if (log.error) {
-      detailsHtml = `<div class="log-details" style="color: var(--error-color);">Error: ${escapeHtml(log.error)}</div>`;
+      detailsHtml = `<div class="log-details" style="color: var(--error);">Error: ${escapeHtml(log.error)}</div>`;
     } else if (log.results && log.results.length > 0) {
       const resultsText = log.results.map(r => {
         const dot = r.status === "error" ? "🔴" : "🟢";

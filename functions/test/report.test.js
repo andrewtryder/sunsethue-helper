@@ -1,7 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert");
 const { buildEmailTableRows, buildHtmlEmail, runAndSendReport } = require("../lib/report");
-const { formatTimeET } = require("../lib/helpers");
+const { formatTimeOnlyET } = require("../lib/helpers");
 const {
   createMockDb,
   createMockFetch,
@@ -30,8 +30,8 @@ test("buildEmailTableRows swaps sunrise and sunset columns for AM reports", () =
 
   const amRows = buildEmailTableRows([result], "AM");
   const pmRows = buildEmailTableRows([result], "PM");
-  const sunsetMarker = formatTimeET(result.sunset.time);
-  const sunriseMarker = formatTimeET(result.sunrise.time);
+  const sunsetMarker = formatTimeOnlyET(result.sunset.time);
+  const sunriseMarker = formatTimeOnlyET(result.sunrise.time);
 
   assert.ok(amRows.indexOf(sunsetMarker) < amRows.indexOf(sunriseMarker));
   assert.ok(pmRows.indexOf(sunriseMarker) < pmRows.indexOf(sunsetMarker));
@@ -57,9 +57,10 @@ test("buildEmailTableRows renders API error rows safely", () => {
 
 test("buildHtmlEmail includes report metadata", () => {
   const html = buildHtmlEmail([], "PM", "Wednesday, May 27, 2026 at 6:30 AM");
-  assert.match(html, /Sunsethue Forecast Report/);
+  assert.match(html, /Forecast Dashboard/);
   assert.match(html, /Wednesday, May 27, 2026 at 6:30 AM/);
   assert.match(html, /Next Sunrise/);
+  assert.match(html, /background-color:#141313/);
 });
 
 test("runAndSendReport logs success and skips email when no locations exist", async () => {

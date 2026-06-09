@@ -45,6 +45,16 @@ exports.scheduledReportPM = onSchedule({
   await runScheduledReport("PM");
 });
 
+exports.scheduledReportNoon = onSchedule({
+  schedule: "0 12 * * *",
+  timeZone: "America/New_York",
+  memory: "256MiB",
+  timeoutSeconds: 120,
+  secrets: ["SUNSETHUE_API_KEY", "GMAIL_USER", "GMAIL_APP_PASSWORD", "EMAIL_TO"]
+}, async () => {
+  await runScheduledReport("NOON");
+});
+
 exports.triggerReport = onRequest({
   cors: true,
   memory: "256MiB",

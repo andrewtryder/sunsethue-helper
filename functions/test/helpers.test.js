@@ -123,5 +123,6 @@ test("validateReportEnv rejects missing or placeholder configuration", () => {
 test("buildEmailSubject labels trigger types correctly", () => {
   assert.match(buildEmailSubject("AM"), /Morning/);
   assert.match(buildEmailSubject("PM"), /Evening/);
+  assert.match(buildEmailSubject("NOON"), /Midday/);
   assert.match(buildEmailSubject("Manual Test"), /On-Demand Test/);
 });

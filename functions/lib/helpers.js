@@ -198,7 +198,9 @@ function buildEmailSubject(triggerType) {
     ? "Morning"
     : triggerType === "PM"
       ? "Evening"
-      : "On-Demand Test";
+      : triggerType === "NOON"
+        ? "Midday"
+        : "On-Demand Test";
   return `🌅 Sunsethue Forecast: Next Sunrise & Sunset Quality (${label})`;
 }
 

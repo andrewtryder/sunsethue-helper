@@ -9,6 +9,7 @@ This changelog follows [Conventional Commits](https://www.conventionalcommits.or
 ### Features
 
 * **email:** remove times and use quality color as background for badge
+* **report:** add noon (12:00 PM Eastern) scheduled report function
 
 ## [1.9.0](https://github.com/andrewtryder/sunsethue-helper/compare/sunsethue-helper-v1.8.0...sunsethue-helper-v1.9.0) (2026-06-08)
 

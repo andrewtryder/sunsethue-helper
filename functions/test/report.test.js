@@ -1,7 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert");
 const { buildEmailTableRows, buildHtmlEmail, runAndSendReport } = require("../lib/report");
-const { formatTimeOnlyET } = require("../lib/helpers");
 const {
   createMockDb,
   createMockFetch,
@@ -30,8 +29,8 @@ test("buildEmailTableRows swaps sunrise and sunset blocks for AM reports", () =>
 
   const amRows = buildEmailTableRows([result], "AM");
   const pmRows = buildEmailTableRows([result], "PM");
-  const sunsetMarker = formatTimeOnlyET(result.sunset.time);
-  const sunriseMarker = formatTimeOnlyET(result.sunrise.time);
+  const sunsetMarker = "75% (Great)";
+  const sunriseMarker = "85% (Great)";
 
   assert.ok(amRows.indexOf(sunsetMarker) < amRows.indexOf(sunriseMarker));
   assert.ok(pmRows.indexOf(sunriseMarker) < pmRows.indexOf(sunsetMarker));

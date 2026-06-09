@@ -1,5 +1,4 @@
 const {
-  formatTimeOnlyET,
   formatColumnDateET,
   getQualityBadge,
   escapeHtml,
@@ -28,10 +27,7 @@ function buildForecastEventCell(event) {
     return `<span style="font-size:14px;color:#9ca3af;">N/A</span>`;
   }
 
-  const time = formatTimeOnlyET(event.time);
-  const qualityHtml = getQualityBadge(event.quality, event.quality_text);
-
-  return `<span style="font-size:15px;font-weight:600;color:#1a1a1a;white-space:nowrap;">${time}</span> ${qualityHtml}`;
+  return getQualityBadge(event.quality, event.quality_text);
 }
 
 function buildEmailTableRows(results, triggerType) {

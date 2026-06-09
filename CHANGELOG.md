@@ -4,6 +4,14 @@ All notable changes to this project are documented in this file.
 
 This changelog follows [Conventional Commits](https://www.conventionalcommits.org/) and is maintained by [release-please](https://github.com/googleapis/release-please). Release sections group changes by commit type (`feat`, `fix`, etc.). Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0](https://github.com/andrewtryder/sunsethue-helper/compare/sunsethue-helper-v1.8.0...sunsethue-helper-v1.9.0) (2026-06-08)
+
+
+### Features
+
+* **ui:** polish email modal and show api credits on logs ([bb8ab93](https://github.com/andrewtryder/sunsethue-helper/commit/bb8ab936ef12b98c49b5bb6e96a4db39c827726a))
+* **ui:** polish email modal and show api credits on logs ([918caaf](https://github.com/andrewtryder/sunsethue-helper/commit/918caaf870d69c027bef8292de773d88b8b67d91))
+
 ## [1.8.0](https://github.com/andrewtryder/sunsethue-helper/compare/sunsethue-helper-v1.7.0...sunsethue-helper-v1.8.0) (2026-06-08)
 
 

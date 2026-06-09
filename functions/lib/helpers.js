@@ -114,9 +114,16 @@ function getQualityBadge(quality, qualityText) {
 
   const dotColor = getQualityDotColor(percentage);
   const label = escapeHtml(formatQualityLabel(qualityText, percentage));
-  const fontWeight = percentage >= 50 ? "700" : "500";
+  const fontWeight = "600";
 
-  return `<span style="display:inline-flex;align-items:center;gap:6px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;color:#374151;font-weight:${fontWeight};"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background-color:${dotColor};"></span>${percentage}% (${label})</span>`;
+  // Determine readable text color based on background color
+  let textColor = "#ffffff";
+  if (percentage >= 50) {
+    // For light green (#34d399), dark green text is much more readable
+    textColor = "#064e3b";
+  }
+
+  return `<span style="display:inline-block;padding:3px 8px;border-radius:4px;background-color:${dotColor};color:${textColor};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:13px;font-weight:${fontWeight};white-space:nowrap;">${percentage}% (${label})</span>`;
 }
 
 function escapeHtml(text) {
@@ -191,7 +198,9 @@ function buildEmailSubject(triggerType) {
     ? "Morning"
     : triggerType === "PM"
       ? "Evening"
-      : "On-Demand Test";
+      : triggerType === "NOON"
+        ? "Midday"
+        : "On-Demand Test";
   return `🌅 Sunsethue Forecast: Next Sunrise & Sunset Quality (${label})`;
 }
 

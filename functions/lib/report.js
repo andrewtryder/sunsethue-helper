@@ -1,5 +1,4 @@
 const {
-  formatTimeOnlyET,
   formatColumnDateET,
   getQualityBadge,
   escapeHtml,
@@ -28,14 +27,11 @@ function buildForecastEventCell(event) {
     return `<span style="font-size:14px;color:#9ca3af;">N/A</span>`;
   }
 
-  const time = formatTimeOnlyET(event.time);
-  const qualityHtml = getQualityBadge(event.quality, event.quality_text);
-
-  return `<span style="font-size:15px;font-weight:600;color:#1a1a1a;white-space:nowrap;">${time}</span> ${qualityHtml}`;
+  return getQualityBadge(event.quality, event.quality_text);
 }
 
 function buildEmailTableRows(results, triggerType) {
-  const isAM = triggerType === "AM";
+  const isSunsetFirst = triggerType === "AM" || triggerType === "NOON";
   let tableRowsHtml = "";
 
   for (const result of results) {
@@ -53,8 +49,8 @@ function buildEmailTableRows(results, triggerType) {
 
     const sunriseCell = buildForecastEventCell(result.sunrise);
     const sunsetCell = buildForecastEventCell(result.sunset);
-    const firstCol = isAM ? sunsetCell : sunriseCell;
-    const secondCol = isAM ? sunriseCell : sunsetCell;
+    const firstCol = isSunsetFirst ? sunsetCell : sunriseCell;
+    const secondCol = isSunsetFirst ? sunriseCell : sunsetCell;
 
     tableRowsHtml += `
       <tr>
@@ -69,15 +65,15 @@ function buildEmailTableRows(results, triggerType) {
 }
 
 function buildHtmlEmail(results, triggerType, reportTimeText) {
-  const isAM = triggerType === "AM";
+  const isSunsetFirst = triggerType === "AM" || triggerType === "NOON";
   const tableRowsHtml = buildEmailTableRows(results, triggerType);
   const headerTimes = getHeaderEventTimes(results);
   const sunriseHeaderDate = formatColumnDateET(headerTimes.sunrise);
   const sunsetHeaderDate = formatColumnDateET(headerTimes.sunset);
-  const firstHeader = isAM
+  const firstHeader = isSunsetFirst
     ? `Next Sunset ${sunsetHeaderDate}`.trim()
     : `Next Sunrise ${sunriseHeaderDate}`.trim();
-  const secondHeader = isAM
+  const secondHeader = isSunsetFirst
     ? `Next Sunrise ${sunriseHeaderDate}`.trim()
     : `Next Sunset ${sunsetHeaderDate}`.trim();
 

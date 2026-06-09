@@ -4,6 +4,14 @@ All notable changes to this project are documented in this file.
 
 This changelog follows [Conventional Commits](https://www.conventionalcommits.org/) and is maintained by [release-please](https://github.com/googleapis/release-please). Release sections group changes by commit type (`feat`, `fix`, etc.). Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.0](https://github.com/andrewtryder/sunsethue-helper/compare/sunsethue-helper-v1.9.0...sunsethue-helper-v1.10.0) (2026-06-09)
+
+
+### Features
+
+* **email:** remove times and style quality badge background ([1fd78ec](https://github.com/andrewtryder/sunsethue-helper/commit/1fd78ecc6ab8d685d9b23413cb155f7c5862e7d7))
+* **report:** add 12:00 pm scheduled report email ([239ec53](https://github.com/andrewtryder/sunsethue-helper/commit/239ec53dc5c874506450cf4f2d1a00a5b5ef113a))
+
 ## [Unreleased]
 
 ### Features

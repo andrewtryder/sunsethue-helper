@@ -54,7 +54,9 @@ This application requires the following environment variables to be set:
 These variables **must be configured** locally in `functions/.env.local` (and `functions/.secret.local` for emulator testing), and in production as secrets/environment variables in Google Cloud Secret Manager.
 
 > [!IMPORTANT]
-> Because Firestore security rules are evaluated statically on Firebase servers, the authorized email address cannot be read dynamically from environment variables within `firestore.rules`. You must edit [firestore.rules](file:///Users/atr/code/sunsethue-helper/firestore.rules) and replace the placeholder `YOUR_AUTHORIZED_EMAIL@example.com` with your actual email address before deploying.
+> Because Firestore security rules are evaluated statically on Firebase servers, the authorized email address cannot be read dynamically from environment variables at runtime within `firestore.rules`.
+> - **GitHub Actions Deployments**: The deployment workflow [firebase-deploy.yml](file:///.github/workflows/firebase-deploy.yml) automatically replaces the placeholder `YOUR_AUTHORIZED_EMAIL@example.com` in [firestore.rules](file:///firestore.rules) with the value of the `EMAIL_TO` GitHub Repository Secret at deploy-time. Make sure `EMAIL_TO` is configured in your GitHub Secrets.
+> - **Local / Manual Deployments**: If you deploy manually from your machine via `npx firebase-tools deploy`, you must either replace `YOUR_AUTHORIZED_EMAIL@example.com` in [firestore.rules](file:///firestore.rules) with your actual authorized email address beforehand, or run a similar `sed` replacement locally.
 
 ### Client-Side Debug Mode
 By default, verbose render cycle logs (which output locations and coordinates) are disabled. To enable client-side debugging:

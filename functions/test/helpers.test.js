@@ -112,6 +112,14 @@ test("validateReportEnv rejects missing or placeholder configuration", () => {
     }),
     /Gmail SMTP/
   );
+  assert.throws(
+    () => validateReportEnv({
+      SUNSETHUE_API_KEY: "valid",
+      GMAIL_USER: "user@gmail.com",
+      GMAIL_APP_PASSWORD: "secret"
+    }),
+    /EMAIL_TO/
+  );
   assert.doesNotThrow(() => validateReportEnv({
     SUNSETHUE_API_KEY: "valid",
     GMAIL_USER: "user@gmail.com",

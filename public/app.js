@@ -19,6 +19,11 @@ import {
   mapGeolocationError
 } from "./lib/helpers.js";
 
+const DEBUG = typeof window !== "undefined" && (
+  window.location.search.includes("debug=true") || 
+  localStorage.getItem("debug") === "true"
+);
+
 // DOM Elements
 const authContainer = document.getElementById("auth-container");
 const appContainer = document.getElementById("app-container");
@@ -131,6 +136,9 @@ function hideBanner(bannerElement) {
 
 function showEmailSuccessModal() {
   if (!emailSuccessModal) return;
+  if (emailSuccessModalMessage && auth.currentUser) {
+    emailSuccessModalMessage.textContent = `Success! Test report email sent to ${auth.currentUser.email}.`;
+  }
   emailSuccessModal.classList.remove("hidden");
   emailSuccessModal.classList.add("is-open");
   emailSuccessModal.setAttribute("aria-hidden", "false");
@@ -179,8 +187,8 @@ function setupAuthListeners() {
     };
 
     if (user) {
-      // Security check: restrict email to owner@example.com
-      if (!isAuthorizedEmail(user.email)) {
+      // Security check: restrict email if AUTHORIZED_EMAIL is configured
+      if (AUTHORIZED_EMAIL && !isAuthorizedEmail(user.email)) {
         showBanner(authErrorBanner, `Access Denied: Only ${AUTHORIZED_EMAIL} is authorized.`, 10000);
         signOut(auth);
         hideLoader();
@@ -260,7 +268,12 @@ function setupFirestoreListeners() {
     renderLocations();
   }, (error) => {
     console.error("Firestore snapshot error: ", error);
-    showBanner(dbErrorBanner, "Failed to fetch locations: " + error.message);
+    if (error.code === "permission-denied") {
+      showBanner(authErrorBanner, "Access Denied: Your account is not authorized to access this dashboard.", 10000);
+      signOut(auth);
+    } else {
+      showBanner(dbErrorBanner, "Failed to fetch locations: " + error.message);
+    }
   });
 
   // Logs listener (fetch last 20)
@@ -273,13 +286,17 @@ function setupFirestoreListeners() {
     renderLogs(logs);
   }, (error) => {
     console.error("Firestore logs error: ", error);
+    if (error.code === "permission-denied") {
+      showBanner(authErrorBanner, "Access Denied: Your account is not authorized to access this dashboard.", 10000);
+      signOut(auth);
+    }
   });
 }
 
 // 3. Render Locations Card List
 function renderLocations() {
   try {
-    console.log("renderLocations called. locationsList:", locationsList);
+    if (DEBUG) console.log("renderLocations called. locationsList:", locationsList);
     locationsCountBadge.textContent = `${locationsList.length} / 10`;
     locationsListContainer.innerHTML = "";
     
@@ -390,7 +407,7 @@ function buildForecastEventColumnHtml({ timeText, badgeHtml, mobileLabel, errorH
 
 function renderForecastDashboard() {
   try {
-    console.log("renderForecastDashboard called. locationsList:", locationsList);
+    if (DEBUG) console.log("renderForecastDashboard called. locationsList:", locationsList);
     if (!forecastCardsContainer) return;
 
     Array.from(forecastCardsContainer.children).forEach(child => {
@@ -421,6 +438,8 @@ function renderForecastDashboard() {
       }
     });
 
+    const isSunsetFirst = headerSunriseTime && headerSunsetTime && new Date(headerSunsetTime) < new Date(headerSunriseTime);
+
     const table = document.createElement("div");
     table.className = "forecast-table";
 
@@ -429,8 +448,12 @@ function renderForecastDashboard() {
     header.innerHTML = `
       <div class="forecast-table-header-location">Location</div>
       <div class="forecast-table-header-events">
-        <div class="forecast-table-header-col">Next Sunrise ${formatForecastColumnDate(headerSunriseTime)}</div>
-        <div class="forecast-table-header-col">Next Sunset ${formatForecastColumnDate(headerSunsetTime)}</div>
+        ${isSunsetFirst
+          ? `<div class="forecast-table-header-col">Next Sunset ${formatForecastColumnDate(headerSunsetTime)}</div>
+             <div class="forecast-table-header-col">Next Sunrise ${formatForecastColumnDate(headerSunriseTime)}</div>`
+          : `<div class="forecast-table-header-col">Next Sunrise ${formatForecastColumnDate(headerSunriseTime)}</div>
+             <div class="forecast-table-header-col">Next Sunset ${formatForecastColumnDate(headerSunsetTime)}</div>`
+        }
       </div>
     `;
     table.appendChild(header);
@@ -476,9 +499,9 @@ function renderForecastDashboard() {
       row.innerHTML = `
         <div class="forecast-table-location">${escapeHtml(location.name)}</div>
         <div class="forecast-table-events">
-          ${sunriseColHtml}
+          ${isSunsetFirst ? sunsetColHtml : sunriseColHtml}
           <div class="forecast-event-separator">|</div>
-          ${sunsetColHtml}
+          ${isSunsetFirst ? sunriseColHtml : sunsetColHtml}
         </div>
       `;
       table.appendChild(row);

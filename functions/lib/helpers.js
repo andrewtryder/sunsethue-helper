@@ -191,6 +191,9 @@ function validateReportEnv(env = process.env) {
   if (!env.GMAIL_USER || !env.GMAIL_APP_PASSWORD || env.GMAIL_APP_PASSWORD === "PLACEHOLDER_GMAIL_APP_PASSWORD") {
     throw new Error("Gmail SMTP configuration environment variables are missing or not set.");
   }
+  if (!env.EMAIL_TO) {
+    throw new Error("EMAIL_TO environment variable is not configured.");
+  }
 }
 
 function buildEmailSubject(triggerType) {

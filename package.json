@@ -14,11 +14,14 @@
     "test:coverage": "npm run test:coverage --prefix functions && node scripts/test-frontend.js && node scripts/test-frontend-unit.mjs",
     "test:e2e": "bash scripts/run-e2e.sh",
     "test:all": "npm test && npm run test:e2e",
-    "preview:email": "node scripts/preview-email.js"
+    "preview:email": "node scripts/preview-email.js",
+    "lint": "eslint ."
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0",
     "commitplease": "^3.2.0",
+    "eslint": "^10.5.0",
+    "eslint-plugin-security": "^4.0.1",
     "firebase-tools": "^15.19.1"
   },
   "commitplease": {

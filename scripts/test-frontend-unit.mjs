@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   AUTHORIZED_EMAIL,
+  setAuthorizedEmail,
   escapeHtml,
   getForecastBadgeHtml,
   normalizeQualityToUnit,
@@ -42,11 +43,18 @@ test("frontend helpers normalize quality values", () => {
 });
 
 test("frontend helpers enforce auth and location limits", () => {
-  assert.strictEqual(isAuthorizedEmail(AUTHORIZED_EMAIL), true);
+  setAuthorizedEmail("atr000@gmail.com");
+  assert.strictEqual(isAuthorizedEmail("atr000@gmail.com"), true);
   assert.strictEqual(isAuthorizedEmail("other@gmail.com"), false);
   assert.strictEqual(canAddLocation(9), true);
   assert.strictEqual(canAddLocation(10), false);
   assert.strictEqual(validateCoordinates(40.1, -74.2), true);
+  assert.strictEqual(validateCoordinates(90, 180), true);
+  assert.strictEqual(validateCoordinates(-90, -180), true);
+  assert.strictEqual(validateCoordinates(91, 0), false);
+  assert.strictEqual(validateCoordinates(-91, 0), false);
+  assert.strictEqual(validateCoordinates(0, 181), false);
+  assert.strictEqual(validateCoordinates(0, -181), false);
   assert.strictEqual(validateCoordinates(Number("bad"), 1), false);
 });
 
@@ -58,8 +66,10 @@ test("frontend helpers build URLs and display strings", () => {
     "http://127.0.0.1:5001/demo/us-central1/triggerReport"
   );
   assert.strictEqual(getFunctionUrl("triggerReport", { isEmulator: false }), "/api/triggerReport");
-  assert.match(formatCoordinateDisplay(40.7128, -74.006), /40\.7128/);
-  assert.match(formatDashboardCoordinateDisplay(40.7128, -74.006), /74\.01° W/);
+  assert.match(formatCoordinateDisplay(40.7128, -74.006), /40\.7128° N \/ 74\.0060° W/);
+  assert.match(formatDashboardCoordinateDisplay(40.7128, -74.006), /40\.71° N \/ 74\.01° W/);
+  assert.match(formatCoordinateDisplay(-33.8688, 151.2093), /33\.8688° S \/ 151\.2093° E/);
+  assert.match(formatDashboardCoordinateDisplay(-33.8688, 151.2093), /33\.87° S \/ 151\.21° E/);
 });
 
 test("frontend helpers support autocomplete and log rendering", () => {

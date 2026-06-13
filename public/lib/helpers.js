@@ -1,4 +1,7 @@
-export const AUTHORIZED_EMAIL = "atr000@gmail.com";
+export let AUTHORIZED_EMAIL = null;
+export function setAuthorizedEmail(email) {
+  AUTHORIZED_EMAIL = email;
+}
 export const MAX_LOCATIONS = 10;
 
 export function escapeHtml(str) {
@@ -90,6 +93,7 @@ export function getForecastBadgeHtml(quality, text) {
 }
 
 export function isAuthorizedEmail(email) {
+  if (!AUTHORIZED_EMAIL) return true;
   return email === AUTHORIZED_EMAIL;
 }
 
@@ -109,20 +113,28 @@ export function canAddLocation(currentCount, maxLocations = MAX_LOCATIONS) {
 }
 
 export function validateCoordinates(latitude, longitude) {
-  return !Number.isNaN(latitude) && !Number.isNaN(longitude);
+  const latVal = Number(latitude);
+  const lngVal = Number(longitude);
+  return (
+    !Number.isNaN(latVal) && latVal >= -90 && latVal <= 90 &&
+    !Number.isNaN(lngVal) && lngVal >= -180 && lngVal <= 180
+  );
 }
 
 export function formatCoordinateDisplay(latitude, longitude) {
-  const lat = (latitude || 0).toFixed(4);
+  const latDir = (latitude || 0) >= 0 ? "N" : "S";
+  const lngDir = (longitude || 0) >= 0 ? "E" : "W";
+  const lat = Math.abs(latitude || 0).toFixed(4);
   const lng = Math.abs(longitude || 0).toFixed(4);
-  return `${lat}° N / ${lng}° W`;
+  return `${lat}° ${latDir} / ${lng}° ${lngDir}`;
 }
 
 export function formatDashboardCoordinateDisplay(latitude, longitude) {
-  const lat = (latitude || 0).toFixed(2);
+  const latDir = (latitude || 0) >= 0 ? "N" : "S";
+  const lngDir = (longitude || 0) >= 0 ? "E" : "W";
+  const lat = Math.abs(latitude || 0).toFixed(2);
   const lng = Math.abs(longitude || 0).toFixed(2);
-  const lngDir = (longitude || 0) < 0 ? "W" : "E";
-  return `${lat}° N / ${lng}° ${lngDir}`;
+  return `${lat}° ${latDir} / ${lng}° ${lngDir}`;
 }
 
 export function getLogStatusClass(status) {

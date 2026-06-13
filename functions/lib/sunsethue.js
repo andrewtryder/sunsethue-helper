@@ -42,8 +42,8 @@ function normalizeCreditsJson(json) {
   }
 
   const remaining = json.remaining ?? json.remaining_credits ?? json.credits_remaining ?? json.requests_remaining;
-  const limit = json.limit ?? json.daily_limit ?? json.credits_limit ?? json.total ?? json.requests_limit;
-  const used = json.used ?? json.credits_used ?? json.requests_used;
+  const limit = json.limit ?? json.daily_limit ?? json.credits_limit ?? json.total ?? json.requests_limit ?? json.daily_quota;
+  const used = json.used ?? json.credits_used ?? json.requests_used ?? json.daily_usage;
 
   if (remaining === undefined && limit === undefined && used === undefined) {
     return null;
@@ -133,7 +133,7 @@ async function fetchApiCredits({ fetch: fetchFn, apiKey }) {
     throw new Error("SUNSETHUE_API_KEY environment variable is not configured.");
   }
 
-  for (const path of ["credits", "quota"]) {
+  for (const path of ["usage", "credits", "quota"]) {
     try {
       const credits = await fetchCreditsFromEndpoint(fetchFn, apiKey, path);
       if (credits) {

@@ -94,7 +94,8 @@ export function getForecastBadgeHtml(quality, text) {
 
 export function isAuthorizedEmail(email) {
   if (!AUTHORIZED_EMAIL) return true;
-  return email === AUTHORIZED_EMAIL;
+  if (!email) return false;
+  return email.trim().toLowerCase() === AUTHORIZED_EMAIL.trim().toLowerCase();
 }
 
 export function isEmulatorHostname(hostname) {

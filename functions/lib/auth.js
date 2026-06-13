@@ -1,7 +1,8 @@
-const AUTHORIZED_EMAIL = process.env.AUTHORIZED_EMAIL || process.env.EMAIL_TO;
+const AUTHORIZED_EMAIL = (process.env.AUTHORIZED_EMAIL || process.env.EMAIL_TO || "").trim().toLowerCase();
 
 function isAuthorizedEmail(email) {
-  return email === AUTHORIZED_EMAIL;
+  if (!email) return false;
+  return email.trim().toLowerCase() === AUTHORIZED_EMAIL;
 }
 
 function parseBearerToken(authHeader) {

@@ -4,6 +4,15 @@ All notable changes to this project are documented in this file.
 
 This changelog follows [Conventional Commits](https://www.conventionalcommits.org/) and is maintained by [release-please](https://github.com/googleapis/release-please). Release sections group changes by commit type (`feat`, `fix`, etc.). Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.3](https://github.com/andrewtryder/sunsethue-helper/compare/sunsethue-helper-v1.10.2...sunsethue-helper-v1.10.3) (2026-06-13)
+
+
+### Bug Fixes
+
+* **api:** trim SUNSETHUE_API_KEY to handle trailing newlines ([7815556](https://github.com/andrewtryder/sunsethue-helper/commit/781555655302077ff6f542388b829b80b6a4ac31))
+* **auth:** trim and ignore case of authorized email addresses ([8f3ebed](https://github.com/andrewtryder/sunsethue-helper/commit/8f3ebed1a0cc93e4e9fc8ca3374f24bb0ae516db))
+* **functions:** mount EMAIL_TO secret on endpoint functions ([623955a](https://github.com/andrewtryder/sunsethue-helper/commit/623955a42b2fbf922a54540b827ae984270c4762))
+
 ## [1.10.2](https://github.com/andrewtryder/sunsethue-helper/compare/sunsethue-helper-v1.10.1...sunsethue-helper-v1.10.2) (2026-06-13)
 
 

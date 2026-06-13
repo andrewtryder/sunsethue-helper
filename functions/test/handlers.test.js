@@ -1,3 +1,5 @@
+process.env.EMAIL_TO = "e2e-test@gmail.com";
+
 const test = require("node:test");
 const assert = require("node:assert");
 const { isAuthorizedEmail, parseBearerToken } = require("../lib/auth");
@@ -5,7 +7,7 @@ const { handleTriggerReport, handleSearchCoordinates, handleGetApiCredits, handl
 const { createMockResponse } = require("./test-utils");
 
 test("auth helpers enforce the authorized email and bearer token format", () => {
-  assert.strictEqual(isAuthorizedEmail("owner@example.com"), true);
+  assert.strictEqual(isAuthorizedEmail("e2e-test@gmail.com"), true);
   assert.strictEqual(isAuthorizedEmail("other@gmail.com"), false);
   assert.strictEqual(parseBearerToken("Bearer abc123"), "abc123");
   assert.strictEqual(parseBearerToken("Basic abc123"), null);
@@ -17,14 +19,14 @@ test("handleTriggerReport rejects unsupported methods and missing auth", async (
 
   let res = createMockResponse();
   await handleTriggerReport({ method: "GET" }, res, {
-    verifyIdToken: async () => ({ email: "owner@example.com" }),
+    verifyIdToken: async () => ({ email: "e2e-test@gmail.com" }),
     runAndSendReport: async () => runCalls.push("called")
   });
   assert.strictEqual(res.statusCode, 405);
 
   res = createMockResponse();
   await handleTriggerReport({ method: "POST", headers: {} }, res, {
-    verifyIdToken: async () => ({ email: "owner@example.com" }),
+    verifyIdToken: async () => ({ email: "e2e-test@gmail.com" }),
     runAndSendReport: async () => runCalls.push("called")
   });
   assert.strictEqual(res.statusCode, 401);
@@ -49,7 +51,7 @@ test("handleTriggerReport rejects unauthorized users and runs report for authori
     method: "POST",
     headers: { authorization: "Bearer valid-token" }
   }, res, {
-    verifyIdToken: async () => ({ email: "owner@example.com" }),
+    verifyIdToken: async () => ({ email: "e2e-test@gmail.com" }),
     runAndSendReport: async (triggerType) => runCalls.push(triggerType)
   });
   assert.strictEqual(res.statusCode, 200);
@@ -67,7 +69,7 @@ test("handleSearchCoordinates validates auth, query, and proxy responses", async
     headers: { authorization: "Bearer valid-token" },
     body: {}
   }, res, {
-    verifyIdToken: async () => ({ email: "owner@example.com" }),
+    verifyIdToken: async () => ({ email: "e2e-test@gmail.com" }),
     fetch: async () => ({ ok: true, json: async () => [] })
   });
   assert.strictEqual(res.statusCode, 400);
@@ -78,10 +80,10 @@ test("handleSearchCoordinates validates auth, query, and proxy responses", async
     headers: { authorization: "Bearer valid-token" },
     body: { query: "Paris" }
   }, res, {
-    verifyIdToken: async () => ({ email: "owner@example.com" }),
+    verifyIdToken: async () => ({ email: "e2e-test@gmail.com" }),
     fetch: async (url, options) => {
       assert.match(url, /Paris/);
-      assert.strictEqual(options.headers["User-Agent"], "SunsethueHelper/1.0 (owner@example.com)");
+      assert.strictEqual(options.headers["User-Agent"], "SunsethueHelper/1.0 (e2e-test@gmail.com)");
       return {
         ok: true,
         json: async () => [{ lat: "48.8566", lon: "2.3522", display_name: "Paris, France" }]
@@ -97,7 +99,7 @@ test("handleSearchCoordinates validates auth, query, and proxy responses", async
     headers: { authorization: "Bearer valid-token" },
     body: { query: "Paris" }
   }, res, {
-    verifyIdToken: async () => ({ email: "owner@example.com" }),
+    verifyIdToken: async () => ({ email: "e2e-test@gmail.com" }),
     fetch: async () => ({ ok: false, status: 503, json: async () => [] })
   });
   assert.strictEqual(res.statusCode, 500);
@@ -107,7 +109,7 @@ test("handleSearchCoordinates validates auth, query, and proxy responses", async
 test("handleGetApiCredits validates auth and returns normalized credits", async () => {
   let res = createMockResponse();
   await handleGetApiCredits({ method: "POST" }, res, {
-    verifyIdToken: async () => ({ email: "owner@example.com" }),
+    verifyIdToken: async () => ({ email: "e2e-test@gmail.com" }),
     fetch: async () => ({}),
     env: { SUNSETHUE_API_KEY: "test-key" }
   });
@@ -129,7 +131,7 @@ test("handleGetApiCredits validates auth and returns normalized credits", async 
     method: "GET",
     headers: { authorization: "Bearer valid-token" }
   }, res, {
-    verifyIdToken: async () => ({ email: "owner@example.com" }),
+    verifyIdToken: async () => ({ email: "e2e-test@gmail.com" }),
     fetch: async () => ({
       ok: true,
       status: 200,

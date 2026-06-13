@@ -1,4 +1,4 @@
-const AUTHORIZED_EMAIL = process.env.AUTHORIZED_EMAIL || process.env.EMAIL_TO || "owner@example.com";
+const AUTHORIZED_EMAIL = process.env.AUTHORIZED_EMAIL || process.env.EMAIL_TO;
 
 function isAuthorizedEmail(email) {
   return email === AUTHORIZED_EMAIL;

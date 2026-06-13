@@ -43,8 +43,8 @@ test("frontend helpers normalize quality values", () => {
 });
 
 test("frontend helpers enforce auth and location limits", () => {
-  setAuthorizedEmail("owner@example.com");
-  assert.strictEqual(isAuthorizedEmail("owner@example.com"), true);
+  setAuthorizedEmail("e2e-test@gmail.com");
+  assert.strictEqual(isAuthorizedEmail("e2e-test@gmail.com"), true);
   assert.strictEqual(isAuthorizedEmail("other@gmail.com"), false);
   assert.strictEqual(canAddLocation(9), true);
   assert.strictEqual(canAddLocation(10), false);

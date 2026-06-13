@@ -1,5 +1,5 @@
 const AUTH_EMULATOR_HOST = process.env.FIREBASE_AUTH_EMULATOR_HOST || "127.0.0.1:9099";
-const TEST_EMAIL = "owner@example.com";
+const TEST_EMAIL = "e2e-test@gmail.com";
 const TEST_PASSWORD = "test-password-123";
 const LOGIN_TIMEOUT_MS = process.env.CI ? 60_000 : 20_000;
 

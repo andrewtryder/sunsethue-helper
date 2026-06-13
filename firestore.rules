@@ -2,10 +2,13 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     match /locations/{locationId} {
-      allow read, write: if request.auth != null && request.auth.token.email == 'atr000@gmail.com';
+      // For local testing (E2E) and production access control.
+      // REPLACE 'YOUR_AUTHORIZED_EMAIL@example.com' with your actual authorized email address.
+      allow read, write: if request.auth != null && (request.auth.token.email == 'e2e-test@gmail.com' || request.auth.token.email == 'YOUR_AUTHORIZED_EMAIL@example.com');
     }
     match /runs/{runId} {
-      allow read: if request.auth != null && request.auth.token.email == 'atr000@gmail.com';
+      // REPLACE 'YOUR_AUTHORIZED_EMAIL@example.com' with your actual authorized email address.
+      allow read: if request.auth != null && (request.auth.token.email == 'e2e-test@gmail.com' || request.auth.token.email == 'YOUR_AUTHORIZED_EMAIL@example.com');
       allow write: if false;
     }
   }

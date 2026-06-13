@@ -58,7 +58,7 @@ async function handleSearchCoordinates(req, res, deps) {
     console.log(`Nominatim search via proxy: "${query}"`);
 
     const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`;
-    const userAgentEmail = process.env.EMAIL_TO || "atr000@gmail.com";
+    const userAgentEmail = process.env.EMAIL_TO || "user@example.com";
     const response = await deps.fetch(url, {
       headers: {
         "User-Agent": `SunsethueHelper/1.0 (${userAgentEmail})`,
@@ -117,7 +117,7 @@ async function handleGetAppConfig(req, res, deps) {
   }
 
   res.status(200).json({
-    authorizedEmail: deps.env.AUTHORIZED_EMAIL || deps.env.EMAIL_TO || "atr000@gmail.com"
+    authorizedEmail: deps.env.AUTHORIZED_EMAIL || deps.env.EMAIL_TO || ""
   });
 }
 

@@ -9,8 +9,8 @@ Sunsethue Helper is a secure, cloud-hosted private web application built on Fire
 *   **📊 Live Forecast Dashboard**: Visualizes cached forecast quality indicators (Spectacular, Good, Muted) and timezone-adjusted event times from the previous run.
 *   **📍 Location Management (CRUD)**: Manage up to 10 coordinates with direct device geolocation ("Use Current Location") and Photon API geocoding search autocomplete.
 *   **📋 Run Execution Logs**: Timeline log showing the execution history and status of the last 20 scheduler or manual runs.
-*   **📧 Automated Email Reports**: Sends HTML reports to `atr000@gmail.com` daily at 6:00 AM and 6:00 PM Eastern Time.
-*   **🔒 Complete Privacy**: Restricts application logins and manual triggers strictly to `atr000@gmail.com`.
+*   **📧 Automated Email Reports**: Sends HTML reports to the configured recipient email (`EMAIL_TO`) daily at 6:00 AM and 6:00 PM Eastern Time.
+*   **🔒 Complete Privacy**: Restricts application logins and manual triggers strictly to the configured authorized email (`AUTHORIZED_EMAIL` / `EMAIL_TO`).
 
 ---
 
@@ -37,21 +37,24 @@ Deployments are automated via **GitHub Actions**. Whenever you push to the `main
 - On macOS without Java on PATH: `export PATH="/opt/homebrew/opt/openjdk/bin:$PATH"`
 - Deploy manually: `npx firebase-tools deploy`
 
-E2E is not required on pull requests; run it locally or trigger the **E2E** workflow manually in GitHub Actions.
+E2E tests must be run locally. Install Java (`brew install openjdk@21`) and run `npm run test:e2e` to execute them.
 
 ---
 
 ## 🔧 Configuration & Debugging
 
 ### Environment Variables
-This application uses the following environment variables:
+This application requires the following environment variables to be set:
 *   `SUNSETHUE_API_KEY`: The API key for queries to the Sunsethue API.
 *   `GMAIL_USER`: The Gmail address used to send out automated reports (via SMTP).
 *   `GMAIL_APP_PASSWORD`: A secure Google App Password for the SMTP server.
-*   `EMAIL_TO`: The email address where daily reports are sent (also used as the authorized client-side login email).
-*   `EMAIL_FROM`: (Optional) The `From` display/header for automated emails (e.g., `"Sunsethue Helper" <your-email@example.com>`). Defaults to `GMAIL_USER`.
+*   `EMAIL_TO`: The email address where daily reports are sent (also used as the authorized login email on client and server).
+*   `EMAIL_FROM`: The `From` display/header for automated emails (e.g., `"Sunsethue Helper" <your-email@example.com>`). Defaults to `GMAIL_USER`.
 
-Set these variables locally in `functions/.env.local` (and `functions/.secret.local` for emulator testing), or as secrets in GitHub Actions and Google Cloud Secret Manager.
+These variables **must be configured** locally in `functions/.env.local` (and `functions/.secret.local` for emulator testing), and in production as secrets/environment variables in Google Cloud Secret Manager.
+
+> [!IMPORTANT]
+> Because Firestore security rules are evaluated statically on Firebase servers, the authorized email address cannot be read dynamically from environment variables within `firestore.rules`. You must edit [firestore.rules](file:///Users/atr/code/sunsethue-helper/firestore.rules) and replace the placeholder `YOUR_AUTHORIZED_EMAIL@example.com` with your actual email address before deploying.
 
 ### Client-Side Debug Mode
 By default, verbose render cycle logs (which output locations and coordinates) are disabled. To enable client-side debugging:

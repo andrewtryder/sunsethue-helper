@@ -117,7 +117,7 @@ async function handleGetAppConfig(req, res, deps) {
   }
 
   res.status(200).json({
-    authorizedEmail: deps.env.AUTHORIZED_EMAIL || deps.env.EMAIL_TO || ""
+    authorizedEmail: (deps.env.AUTHORIZED_EMAIL || deps.env.EMAIL_TO || "").trim()
   });
 }
 

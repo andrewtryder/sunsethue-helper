@@ -5,7 +5,7 @@ const LOGIN_TIMEOUT_MS = process.env.CI ? 60_000 : 20_000;
 
 module.exports.TEST_EMAIL = TEST_EMAIL;
 module.exports.TEST_PASSWORD = TEST_PASSWORD;
-module.exports.PROJECT_ID = "sunsethue-helper-12345";
+module.exports.PROJECT_ID = "demo-sunsethue-helper";
 
 async function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));

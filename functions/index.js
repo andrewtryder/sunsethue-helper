@@ -94,8 +94,7 @@ exports.getApiCredits = onRequest({
 exports.getAppConfig = onRequest({
   cors: true,
   memory: "256MiB",
-  timeoutSeconds: 15,
-  secrets: ["EMAIL_TO"]
+  timeoutSeconds: 15
 }, async (req, res) => {
   await handleGetAppConfig(req, res, {
     env: process.env

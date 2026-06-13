@@ -98,7 +98,12 @@ async function initFirebase() {
 
     try {
       const configUrl = getFunctionUrl("getAppConfig", { isEmulator, projectId: config.projectId });
-      const configResponse = await fetch(configUrl);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
+      
+      const configResponse = await fetch(configUrl, { signal: controller.signal });
+      clearTimeout(timeoutId);
+      
       if (configResponse.ok) {
         const appConfig = await configResponse.json();
         if (appConfig.authorizedEmail) {

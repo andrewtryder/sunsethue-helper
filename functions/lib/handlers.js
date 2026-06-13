@@ -110,8 +110,21 @@ async function handleGetApiCredits(req, res, deps) {
   }
 }
 
+async function handleGetAppConfig(req, res, deps) {
+  if (req.method !== "GET") {
+    res.status(405).json({ error: "Method Not Allowed" });
+    return;
+  }
+
+  res.status(200).json({
+    authorizedEmail: deps.env.AUTHORIZED_EMAIL || deps.env.EMAIL_TO || "owner@example.com"
+  });
+}
+
 module.exports = {
   handleTriggerReport,
   handleSearchCoordinates,
-  handleGetApiCredits
+  handleGetApiCredits,
+  handleGetAppConfig
 };
+

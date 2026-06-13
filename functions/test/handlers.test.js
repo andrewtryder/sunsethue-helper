@@ -1,7 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert");
 const { isAuthorizedEmail, parseBearerToken } = require("../lib/auth");
-const { handleTriggerReport, handleSearchCoordinates, handleGetApiCredits } = require("../lib/handlers");
+const { handleTriggerReport, handleSearchCoordinates, handleGetApiCredits, handleGetAppConfig } = require("../lib/handlers");
 const { createMockResponse } = require("./test-utils");
 
 test("auth helpers enforce the authorized email and bearer token format", () => {
@@ -151,4 +151,24 @@ test("handleGetApiCredits validates auth and returns normalized credits", async 
   assert.strictEqual(res.statusCode, 200);
   assert.strictEqual(res.body.remaining, 41);
   assert.strictEqual(res.body.limit, 50);
+});
+
+test("handleGetAppConfig returns correct authorized email", async () => {
+  let res = createMockResponse();
+  await handleGetAppConfig({ method: "POST" }, res, { env: {} });
+  assert.strictEqual(res.statusCode, 405);
+
+  res = createMockResponse();
+  await handleGetAppConfig({ method: "GET" }, res, {
+    env: { AUTHORIZED_EMAIL: "config@gmail.com" }
+  });
+  assert.strictEqual(res.statusCode, 200);
+  assert.strictEqual(res.body.authorizedEmail, "config@gmail.com");
+
+  res = createMockResponse();
+  await handleGetAppConfig({ method: "GET" }, res, {
+    env: { EMAIL_TO: "to@gmail.com" }
+  });
+  assert.strictEqual(res.statusCode, 200);
+  assert.strictEqual(res.body.authorizedEmail, "to@gmail.com");
 });

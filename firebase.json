@@ -36,6 +36,10 @@
         "function": "getApiCredits"
       },
       {
+        "source": "/api/config",
+        "function": "getAppConfig"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }

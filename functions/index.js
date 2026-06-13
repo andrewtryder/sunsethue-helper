@@ -5,7 +5,7 @@ const nodemailer = require("nodemailer");
 
 const helpers = require("./lib/helpers");
 const { runAndSendReport } = require("./lib/report");
-const { handleTriggerReport, handleSearchCoordinates, handleGetApiCredits } = require("./lib/handlers");
+const { handleTriggerReport, handleSearchCoordinates, handleGetApiCredits, handleGetAppConfig } = require("./lib/handlers");
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -91,5 +91,16 @@ exports.getApiCredits = onRequest({
   });
 });
 
+exports.getAppConfig = onRequest({
+  cors: true,
+  memory: "256MiB",
+  timeoutSeconds: 15,
+  secrets: ["EMAIL_TO"]
+}, async (req, res) => {
+  await handleGetAppConfig(req, res, {
+    env: process.env
+  });
+});
+
 Object.assign(exports, helpers);
-Object.assign(exports, { runAndSendReport, handleTriggerReport, handleSearchCoordinates, handleGetApiCredits });
+Object.assign(exports, { runAndSendReport, handleTriggerReport, handleSearchCoordinates, handleGetApiCredits, handleGetAppConfig });

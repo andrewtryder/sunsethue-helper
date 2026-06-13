@@ -3,6 +3,7 @@ import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, conne
 import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc, query, orderBy, onSnapshot, limit, connectFirestoreEmulator } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import {
   AUTHORIZED_EMAIL,
+  setAuthorizedEmail,
   escapeHtml,
   getForecastBadgeHtml,
   isAuthorizedEmail,
@@ -88,11 +89,28 @@ async function initFirebase() {
     auth = getAuth(app);
     db = getFirestore(app);
 
-    if (isEmulatorHostname(window.location.hostname)) {
+    const isEmulator = isEmulatorHostname(window.location.hostname);
+    if (isEmulator) {
       connectAuthEmulator(auth, `http://${window.location.hostname}:9099`, { disableWarnings: true });
       connectFirestoreEmulator(db, window.location.hostname, 8080);
-      window.__firebaseAuthReady = true;
       window.__e2eSignIn = (email, password) => signInWithEmailAndPassword(auth, email, password);
+    }
+
+    try {
+      const configUrl = getFunctionUrl("getAppConfig", { isEmulator, projectId: config.projectId });
+      const configResponse = await fetch(configUrl);
+      if (configResponse.ok) {
+        const appConfig = await configResponse.json();
+        if (appConfig.authorizedEmail) {
+          setAuthorizedEmail(appConfig.authorizedEmail);
+        }
+      }
+    } catch (e) {
+      console.error("Failed to load authorized email configuration:", e);
+    }
+
+    if (isEmulator) {
+      window.__firebaseAuthReady = true;
     }
     
     setupAuthListeners();

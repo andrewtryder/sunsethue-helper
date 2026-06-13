@@ -4,6 +4,13 @@ All notable changes to this project are documented in this file.
 
 This changelog follows [Conventional Commits](https://www.conventionalcommits.org/) and is maintained by [release-please](https://github.com/googleapis/release-please). Release sections group changes by commit type (`feat`, `fix`, etc.). Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.2](https://github.com/andrewtryder/sunsethue-helper/compare/sunsethue-helper-v1.10.1...sunsethue-helper-v1.10.2) (2026-06-13)
+
+
+### Bug Fixes
+
+* **functions:** remove EMAIL_FROM from secrets configuration ([e613b0f](https://github.com/andrewtryder/sunsethue-helper/commit/e613b0fdd88bd4c433d5df948aa1dd0852c0c72c))
+
 ## [1.10.1](https://github.com/andrewtryder/sunsethue-helper/compare/sunsethue-helper-v1.10.0...sunsethue-helper-v1.10.1) (2026-06-13)
 
 

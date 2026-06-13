@@ -240,7 +240,7 @@ async function runAndSendReport(triggerType, deps) {
     });
 
     const mailOptions = {
-      from: `"Sunsethue Helper" <${env.GMAIL_USER}>`,
+      from: env.EMAIL_FROM || `"Sunsethue Helper" <${env.GMAIL_USER}>`,
       to: env.EMAIL_TO,
       subject: buildEmailSubject(triggerType),
       html: htmlEmail

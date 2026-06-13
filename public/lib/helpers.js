@@ -1,4 +1,4 @@
-export let AUTHORIZED_EMAIL = null;
+export let AUTHORIZED_EMAIL = "atr000@gmail.com";
 export function setAuthorizedEmail(email) {
   AUTHORIZED_EMAIL = email;
 }

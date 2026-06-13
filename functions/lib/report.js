@@ -163,8 +163,9 @@ async function runAndSendReport(triggerType, deps) {
       try {
         console.log(`Fetching forecast for location: ${loc.name} (${loc.latitude}, ${loc.longitude})`);
 
+        const cleanApiKey = String(env.SUNSETHUE_API_KEY).trim();
         const response = await fetchFn(
-          `https://api.sunsethue.com/forecast?latitude=${loc.latitude}&longitude=${loc.longitude}&days=2&key=${env.SUNSETHUE_API_KEY}`
+          `https://api.sunsethue.com/forecast?latitude=${loc.latitude}&longitude=${loc.longitude}&days=2&key=${cleanApiKey}`
         );
 
         if (!response.ok) {

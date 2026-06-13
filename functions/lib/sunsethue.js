@@ -132,10 +132,11 @@ async function fetchApiCredits({ fetch: fetchFn, apiKey }) {
   if (!apiKey) {
     throw new Error("SUNSETHUE_API_KEY environment variable is not configured.");
   }
+  const cleanApiKey = String(apiKey).trim();
 
   for (const path of ["usage", "credits", "quota"]) {
     try {
-      const credits = await fetchCreditsFromEndpoint(fetchFn, apiKey, path);
+      const credits = await fetchCreditsFromEndpoint(fetchFn, cleanApiKey, path);
       if (credits) {
         return credits;
       }
@@ -146,7 +147,7 @@ async function fetchApiCredits({ fetch: fetchFn, apiKey }) {
     }
   }
 
-  return fetchRateLimitViaEventProbe(fetchFn, apiKey);
+  return fetchRateLimitViaEventProbe(fetchFn, cleanApiKey);
 }
 
 module.exports = {

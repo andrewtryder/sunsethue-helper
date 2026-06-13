@@ -4,6 +4,16 @@ All notable changes to this project are documented in this file.
 
 This changelog follows [Conventional Commits](https://www.conventionalcommits.org/) and is maintained by [release-please](https://github.com/googleapis/release-please). Release sections group changes by commit type (`feat`, `fix`, etc.). Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.1](https://github.com/andrewtryder/sunsethue-helper/compare/sunsethue-helper-v1.10.0...sunsethue-helper-v1.10.1) (2026-06-13)
+
+
+### Bug Fixes
+
+* **e2e:** fetch authorized email dynamically on startup ([e86ac3c](https://github.com/andrewtryder/sunsethue-helper/commit/e86ac3cd6b51aed4ad720867caf8926c8210e0a3))
+* **e2e:** robust email validation fallback and config fetch timeout ([59a2817](https://github.com/andrewtryder/sunsethue-helper/commit/59a281748fcb92838ea47169e4a86ceb32608300))
+* **e2e:** use demo project for offline emulator runs ([fb6e476](https://github.com/andrewtryder/sunsethue-helper/commit/fb6e476fab949726a569946bc9e8b6439f224899))
+* **functions:** remove EMAIL_FROM from GCP secrets to prevent crash ([d943ab8](https://github.com/andrewtryder/sunsethue-helper/commit/d943ab82e24f73aeb1645809a7bcb926ef18120b))
+
 ## [1.10.0](https://github.com/andrewtryder/sunsethue-helper/compare/sunsethue-helper-v1.9.0...sunsethue-helper-v1.10.0) (2026-06-09)
 
 

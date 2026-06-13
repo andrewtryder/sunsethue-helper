@@ -36,6 +36,10 @@ jobs:
       - name: Run Backend Unit Tests
         run: npm test --prefix functions
 
+      - name: Inject Authorized Email into Firestore Rules
+        run: |
+          sed -i "s/YOUR_AUTHORIZED_EMAIL@example.com/${{ secrets.EMAIL_TO }}/g" firestore.rules
+
       - name: Deploy to Firebase
         run: npx firebase-tools deploy --non-interactive
         env:

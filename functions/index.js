@@ -70,7 +70,8 @@ exports.triggerReport = onRequest({
 exports.searchCoordinates = onRequest({
   cors: true,
   memory: "256MiB",
-  timeoutSeconds: 30
+  timeoutSeconds: 30,
+  secrets: ["EMAIL_TO"]
 }, async (req, res) => {
   await handleSearchCoordinates(req, res, {
     verifyIdToken: (token) => admin.auth().verifyIdToken(token),
@@ -82,7 +83,7 @@ exports.getApiCredits = onRequest({
   cors: true,
   memory: "256MiB",
   timeoutSeconds: 30,
-  secrets: ["SUNSETHUE_API_KEY"]
+  secrets: ["SUNSETHUE_API_KEY", "EMAIL_TO"]
 }, async (req, res) => {
   await handleGetApiCredits(req, res, {
     verifyIdToken: (token) => admin.auth().verifyIdToken(token),
@@ -94,7 +95,8 @@ exports.getApiCredits = onRequest({
 exports.getAppConfig = onRequest({
   cors: true,
   memory: "256MiB",
-  timeoutSeconds: 15
+  timeoutSeconds: 15,
+  secrets: ["EMAIL_TO"]
 }, async (req, res) => {
   await handleGetAppConfig(req, res, {
     env: process.env

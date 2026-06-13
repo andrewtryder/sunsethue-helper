@@ -30,7 +30,7 @@ exports.scheduledReportAM = onSchedule({
   timeZone: "America/New_York",
   memory: "256MiB",
   timeoutSeconds: 120,
-  secrets: ["SUNSETHUE_API_KEY", "GMAIL_USER", "GMAIL_APP_PASSWORD", "EMAIL_TO"]
+  secrets: ["SUNSETHUE_API_KEY", "GMAIL_USER", "GMAIL_APP_PASSWORD", "EMAIL_TO", "EMAIL_FROM"]
 }, async () => {
   await runScheduledReport("AM");
 });
@@ -40,7 +40,7 @@ exports.scheduledReportPM = onSchedule({
   timeZone: "America/New_York",
   memory: "256MiB",
   timeoutSeconds: 120,
-  secrets: ["SUNSETHUE_API_KEY", "GMAIL_USER", "GMAIL_APP_PASSWORD", "EMAIL_TO"]
+  secrets: ["SUNSETHUE_API_KEY", "GMAIL_USER", "GMAIL_APP_PASSWORD", "EMAIL_TO", "EMAIL_FROM"]
 }, async () => {
   await runScheduledReport("PM");
 });
@@ -50,7 +50,7 @@ exports.scheduledReportNoon = onSchedule({
   timeZone: "America/New_York",
   memory: "256MiB",
   timeoutSeconds: 120,
-  secrets: ["SUNSETHUE_API_KEY", "GMAIL_USER", "GMAIL_APP_PASSWORD", "EMAIL_TO"]
+  secrets: ["SUNSETHUE_API_KEY", "GMAIL_USER", "GMAIL_APP_PASSWORD", "EMAIL_TO", "EMAIL_FROM"]
 }, async () => {
   await runScheduledReport("NOON");
 });
@@ -59,7 +59,7 @@ exports.triggerReport = onRequest({
   cors: true,
   memory: "256MiB",
   timeoutSeconds: 60,
-  secrets: ["SUNSETHUE_API_KEY", "GMAIL_USER", "GMAIL_APP_PASSWORD", "EMAIL_TO"]
+  secrets: ["SUNSETHUE_API_KEY", "GMAIL_USER", "GMAIL_APP_PASSWORD", "EMAIL_TO", "EMAIL_FROM"]
 }, async (req, res) => {
   await handleTriggerReport(req, res, {
     verifyIdToken: (token) => admin.auth().verifyIdToken(token),

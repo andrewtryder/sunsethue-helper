@@ -27,6 +27,7 @@ SUNSETHUE_API_KEY=e2e-test-key
 GMAIL_USER=e2e-test@gmail.com
 GMAIL_APP_PASSWORD=e2e-test-password
 EMAIL_TO=e2e-test@gmail.com
+EMAIL_FROM=e2e-test@gmail.com
 EOF
 
 echo "=== INSTALLING FUNCTION DEPENDENCIES ==="

@@ -38,3 +38,23 @@ Deployments are automated via **GitHub Actions**. Whenever you push to the `main
 - Deploy manually: `npx firebase-tools deploy`
 
 E2E is not required on pull requests; run it locally or trigger the **E2E** workflow manually in GitHub Actions.
+
+---
+
+## 🔧 Configuration & Debugging
+
+### Environment Variables
+This application uses the following environment variables:
+*   `SUNSETHUE_API_KEY`: The API key for queries to the Sunsethue API.
+*   `GMAIL_USER`: The Gmail address used to send out automated reports (via SMTP).
+*   `GMAIL_APP_PASSWORD`: A secure Google App Password for the SMTP server.
+*   `EMAIL_TO`: The email address where daily reports are sent (also used as the authorized client-side login email).
+*   `EMAIL_FROM`: (Optional) The `From` display/header for automated emails (e.g., `"Sunsethue Helper" <your-email@example.com>`). Defaults to `GMAIL_USER`.
+
+Set these variables locally in `functions/.env.local` (and `functions/.secret.local` for emulator testing), or as secrets in GitHub Actions and Google Cloud Secret Manager.
+
+### Client-Side Debug Mode
+By default, verbose render cycle logs (which output locations and coordinates) are disabled. To enable client-side debugging:
+*   Append `?debug=true` to the browser URL (e.g., `http://localhost:5000/?debug=true`), or
+*   Run `localStorage.setItem('debug', 'true')` in your browser's developer tools console and refresh the page.
+

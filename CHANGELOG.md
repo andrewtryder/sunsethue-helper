@@ -4,6 +4,14 @@ All notable changes to this project are documented in this file.
 
 This changelog follows [Conventional Commits](https://www.conventionalcommits.org/) and is maintained by [release-please](https://github.com/googleapis/release-please). Release sections group changes by commit type (`feat`, `fix`, etc.). Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.0](https://github.com/andrewtryder/sunsethue-helper/compare/sunsethue-helper-v1.10.3...sunsethue-helper-v1.11.0) (2026-06-14)
+
+
+### Features
+
+* **report:** add webapp dashboard link to automated report emails ([e43f8e8](https://github.com/andrewtryder/sunsethue-helper/commit/e43f8e8b859f74b50d7365baf30ba88a20949efa))
+* **report:** add webapp dashboard link to automated report emails ([17f7ebb](https://github.com/andrewtryder/sunsethue-helper/commit/17f7ebbe9c5cf020f7011a819ffdaa13300a401a))
+
 ## [1.10.3](https://github.com/andrewtryder/sunsethue-helper/compare/sunsethue-helper-v1.10.2...sunsethue-helper-v1.10.3) (2026-06-13)
 
 

@@ -1,6 +1,6 @@
 {
   "name": "sunsethue-helper",
-  "version": "1.10.3",
+  "version": "1.11.0",
   "description": "Daily sunrise/sunset quality email notifier using Sunsethue API and Firebase.",
   "engines": {
     "node": ">=24"

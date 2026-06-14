@@ -77,6 +77,9 @@ function buildHtmlEmail(results, triggerType, reportTimeText) {
     ? `Next Sunrise ${sunriseHeaderDate}`.trim()
     : `Next Sunset ${sunsetHeaderDate}`.trim();
 
+  const projectId = process.env.GCLOUD_PROJECT || "sunsethue-helper-12345";
+  const webappUrl = `https://${projectId}.web.app`;
+
   return `
     <!DOCTYPE html>
     <html>
@@ -103,7 +106,9 @@ function buildHtmlEmail(results, triggerType, reportTimeText) {
         </table>
         <div style="margin-top:24px;padding-top:16px;border-top:1px solid #e5e7eb;text-align:center;font-size:12px;line-height:1.5;color:#9ca3af;">
           <p style="margin:0;">Sent automatically by Sunsethue Helper.</p>
-          <p style="margin:8px 0 0 0;">Manage locations in your private dashboard.</p>
+          <p style="margin:8px 0 0 0;">
+            <a href="${webappUrl}" style="color:#2563eb;text-decoration:underline;">Manage locations in your private dashboard</a>.
+          </p>
         </div>
       </div>
     </body>

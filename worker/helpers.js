@@ -1,4 +1,4 @@
-function formatTimeET(utcString) {
+export function formatTimeET(utcString) {
   if (!utcString) return "N/A";
   try {
     const date = new Date(utcString);
@@ -17,7 +17,7 @@ function formatTimeET(utcString) {
   }
 }
 
-function normalizeQualityToUnit(quality) {
+export function normalizeQualityToUnit(quality) {
   if (quality === null || quality === undefined) {
     return null;
   }
@@ -38,7 +38,7 @@ function normalizeQualityToUnit(quality) {
   return null;
 }
 
-function qualityToPercent(quality) {
+export function qualityToPercent(quality) {
   const normalized = normalizeQualityToUnit(quality);
   if (normalized === null) {
     return null;
@@ -56,7 +56,7 @@ function getQualityFallbackLabel(percentage) {
   return "Muted";
 }
 
-function getQualityDotColor(percentage) {
+export function getQualityDotColor(percentage) {
   if (percentage === null) {
     return null;
   }
@@ -82,7 +82,7 @@ function formatQualityLabel(qualityText, percentage) {
   return trimmed;
 }
 
-function formatTimeOnlyET(utcString) {
+export function formatTimeOnlyET(utcString) {
   if (!utcString) {
     return "N/A";
   }
@@ -93,7 +93,7 @@ function formatTimeOnlyET(utcString) {
   });
 }
 
-function formatColumnDateET(utcString) {
+export function formatColumnDateET(utcString) {
   if (!utcString) {
     return "";
   }
@@ -106,7 +106,7 @@ function formatColumnDateET(utcString) {
   return `(${formatted})`;
 }
 
-function getQualityBadge(quality, qualityText) {
+export function getQualityBadge(quality, qualityText) {
   const percentage = qualityToPercent(quality);
   if (percentage === null) {
     return `<span style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;color:#9ca3af;">N/A</span>`;
@@ -126,7 +126,7 @@ function getQualityBadge(quality, qualityText) {
   return `<span style="display:inline-block;padding:3px 8px;border-radius:4px;background-color:${dotColor};color:${textColor};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:13px;font-weight:${fontWeight};white-space:nowrap;">${percentage}% (${label})</span>`;
 }
 
-function escapeHtml(text) {
+export function escapeHtml(text) {
   if (!text) return "";
   return String(text)
     .replace(/&/g, "&amp;")
@@ -136,7 +136,7 @@ function escapeHtml(text) {
     .replace(/'/g, "&#039;");
 }
 
-function buildForecastEventSnapshot(event) {
+export function buildForecastEventSnapshot(event) {
   if (!event) {
     return null;
   }
@@ -153,7 +153,7 @@ function buildForecastEventSnapshot(event) {
   };
 }
 
-function normalizeForecastEvent(event) {
+export function normalizeForecastEvent(event) {
   if (!event) {
     return null;
   }
@@ -169,7 +169,7 @@ function normalizeForecastEvent(event) {
   };
 }
 
-function selectNextSunEvents(events, nowMs = Date.now()) {
+export function selectNextSunEvents(events, nowMs = Date.now()) {
   const sunriseEvents = events
     .filter((event) => event.type === "sunrise" && new Date(event.time).getTime() > nowMs)
     .sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
@@ -184,7 +184,7 @@ function selectNextSunEvents(events, nowMs = Date.now()) {
   };
 }
 
-function validateReportEnv(env = process.env) {
+export function validateReportEnv(env) {
   if (!env.SUNSETHUE_API_KEY || env.SUNSETHUE_API_KEY === "PLACEHOLDER") {
     throw new Error("SUNSETHUE_API_KEY environment variable is not configured.");
   }
@@ -196,7 +196,7 @@ function validateReportEnv(env = process.env) {
   }
 }
 
-function buildEmailSubject(triggerType) {
+export function buildEmailSubject(triggerType) {
   const label = triggerType === "AM"
     ? "Morning"
     : triggerType === "PM"
@@ -206,19 +206,3 @@ function buildEmailSubject(triggerType) {
         : "On-Demand Test";
   return `🌅 Sunsethue Forecast: Next Sunrise & Sunset Quality (${label})`;
 }
-
-module.exports = {
-  formatTimeET,
-  formatTimeOnlyET,
-  formatColumnDateET,
-  normalizeQualityToUnit,
-  qualityToPercent,
-  getQualityDotColor,
-  getQualityBadge,
-  escapeHtml,
-  buildForecastEventSnapshot,
-  normalizeForecastEvent,
-  selectNextSunEvents,
-  validateReportEnv,
-  buildEmailSubject
-};

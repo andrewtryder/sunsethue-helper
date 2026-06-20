@@ -28,17 +28,8 @@ test("Frontend File Structure & Integrity Checks", () => {
   const requiredIds = [
     // Loader view
     "loading-overlay",
-    // Auth view
-    "auth-container",
-    "login-form",
-    "login-email",
-    "login-password",
     // App view
     "app-container",
-    "display-user-email",
-    "logout-btn",
-    // Auth banners
-    "auth-error-banner",
     // App banners
     "db-success-banner",
     "db-error-banner",

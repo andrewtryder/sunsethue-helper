@@ -19,35 +19,7 @@
     <div class="spinner" style="width: 32px; height: 32px; border-width: 3.5px;"></div>
   </div>
 
-  <div id="auth-container">
-    <div class="login-card">
-      <div class="login-header">
-        <h1><span class="gradient-text">Sunsethue</span> Helper</h1>
-        <p>Sign in to manage your daily forecast notifications</p>
-      </div>
-
-      <div id="auth-error-banner" class="notification-banner error"></div>
-
-      <form id="login-form">
-        <div class="form-group">
-          <label for="login-email">Email Address</label>
-          <input type="email" id="login-email" class="form-input" placeholder="email@example.com" required autocomplete="email">
-        </div>
-
-        <div class="form-group">
-          <label for="login-password">Password</label>
-          <input type="password" id="login-password" class="form-input" placeholder="••••••••" required autocomplete="current-password">
-        </div>
-
-        <button type="submit" class="btn btn-primary" id="login-btn">
-          <span class="material-symbols-outlined" style="font-size:20px;">login</span>
-          <span>Sign In</span>
-        </button>
-      </form>
-    </div>
-  </div>
-
-  <div id="app-container" class="hidden">
+  <div id="app-container">
     <header id="top-app-bar">
       <div class="top-bar-inner">
         <div class="logo-text-wrap">
@@ -60,11 +32,6 @@
           <button class="nav-tab" data-tab="locations" id="nav-locations">Manage Locations</button>
           <button class="nav-tab" data-tab="logs" id="nav-logs">Execution Logs</button>
         </nav>
-
-        <div class="app-bar-actions">
-          <span id="display-user-email"></span>
-          <button id="logout-btn">Log Out</button>
-        </div>
       </div>
     </header>
 

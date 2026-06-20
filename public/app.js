@@ -1,14 +1,6 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, connectAuthEmulator } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc, query, orderBy, onSnapshot, limit, connectFirestoreEmulator } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import {
-  AUTHORIZED_EMAIL,
-  setAuthorizedEmail,
   escapeHtml,
   getForecastBadgeHtml,
-  isAuthorizedEmail,
-  isEmulatorHostname,
-  getFunctionUrl,
   canAddLocation,
   validateCoordinates,
   formatCoordinateDisplay,
@@ -16,7 +8,6 @@ import {
   buildPhotonDisplayName,
   moveSuggestionIndex,
   shouldSearchAutocomplete,
-  mapAuthErrorCode,
   mapGeolocationError
 } from "./lib/helpers.js";
 
@@ -25,15 +16,12 @@ const DEBUG = typeof window !== "undefined" && (
   localStorage.getItem("debug") === "true"
 );
 
-// DOM Elements
-const authContainer = document.getElementById("auth-container");
-const appContainer = document.getElementById("app-container");
-const loginForm = document.getElementById("login-form");
-const loginEmail = document.getElementById("login-email");
-const loginPassword = document.getElementById("login-password");
-const displayUserEmail = document.getElementById("display-user-email");
-const logoutBtn = document.getElementById("logout-btn");
+const API_BASE = (typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"))
+  ? "http://localhost:8789"
+  : "https://sunsethue-helper-worker.mrcoffee.workers.dev";
 
+// DOM Elements
+const appContainer = document.getElementById("app-container");
 const locationForm = document.getElementById("location-form");
 const locationIdInput = document.getElementById("edit-location-id");
 const locationNameInput = document.getElementById("location-name");
@@ -57,7 +45,6 @@ const forecastCardsContainer = document.getElementById("forecast-cards-container
 const forecastEmptyState = document.getElementById("forecast-empty-state");
 const dashboardLastUpdated = document.getElementById("dashboard-last-updated");
 
-const authErrorBanner = document.getElementById("auth-error-banner");
 const dbSuccessBanner = document.getElementById("db-success-banner");
 const dbErrorBanner = document.getElementById("db-error-banner");
 
@@ -72,65 +59,14 @@ const emailSuccessModalDone = document.getElementById("email-success-modal-done"
 
 const apiCreditsStatus = document.getElementById("api-credits-status");
 
-// Firebase references
-let auth = null;
-let db = null;
+// State
 let locationsList = [];
-
-// Initialize Firebase dynamically from hosting environment
-async function initFirebase() {
-  try {
-    const response = await fetch("/__/firebase/init.json");
-    if (!response.ok) {
-      throw new Error("Could not fetch Firebase config. Ensure you are running under Firebase Hosting or Emulators.");
-    }
-    const config = await response.json();
-    const app = initializeApp(config);
-    auth = getAuth(app);
-    db = getFirestore(app);
-
-    const isEmulator = isEmulatorHostname(window.location.hostname);
-    if (isEmulator) {
-      connectAuthEmulator(auth, `http://${window.location.hostname}:9099`, { disableWarnings: true });
-      connectFirestoreEmulator(db, window.location.hostname, 8080);
-      window.__e2eSignIn = (email, password) => signInWithEmailAndPassword(auth, email, password);
-    }
-
-    try {
-      const configUrl = getFunctionUrl("getAppConfig", { isEmulator, projectId: config.projectId });
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000);
-      
-      const configResponse = await fetch(configUrl, { signal: controller.signal });
-      clearTimeout(timeoutId);
-      
-      if (configResponse.ok) {
-        const appConfig = await configResponse.json();
-        if (appConfig.authorizedEmail) {
-          setAuthorizedEmail(appConfig.authorizedEmail);
-        }
-      }
-    } catch (e) {
-      console.error("Failed to load authorized email configuration:", e);
-    }
-
-    if (isEmulator) {
-      window.__firebaseAuthReady = true;
-    }
-    
-    setupAuthListeners();
-  } catch (error) {
-    console.error("Firebase init failed: ", error);
-    showBanner(authErrorBanner, `Initialization Error: ${error.message}. Please run this app via Firebase CLI (e.g. 'npx firebase emulators:start').`, 0);
-    const loader = document.getElementById("loading-overlay");
-    if (loader) loader.classList.add("fade-out");
-  }
-}
 
 // Banner Utility
 const bannerTimeouts = new Map();
 
 function showBanner(bannerElement, message, duration = 5000) {
+  if (!bannerElement) return;
   if (bannerTimeouts.has(bannerElement)) {
     clearTimeout(bannerTimeouts.get(bannerElement));
   }
@@ -149,6 +85,7 @@ function showBanner(bannerElement, message, duration = 5000) {
 }
 
 function hideBanner(bannerElement) {
+  if (!bannerElement) return;
   if (bannerTimeouts.has(bannerElement)) {
     clearTimeout(bannerTimeouts.get(bannerElement));
     bannerTimeouts.delete(bannerElement);
@@ -159,8 +96,8 @@ function hideBanner(bannerElement) {
 
 function showEmailSuccessModal() {
   if (!emailSuccessModal) return;
-  if (emailSuccessModalMessage && auth.currentUser) {
-    emailSuccessModalMessage.textContent = `Success! Test report email sent to ${auth.currentUser.email}.`;
+  if (emailSuccessModalMessage) {
+    emailSuccessModalMessage.textContent = `Success! Test report email sent.`;
   }
   emailSuccessModal.classList.remove("hidden");
   emailSuccessModal.classList.add("is-open");
@@ -196,127 +133,69 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
-// 1. Setup Auth Listeners
-let isFirstAuthCheck = true;
-
-function setupAuthListeners() {
-  onAuthStateChanged(auth, (user) => {
-    const hideLoader = () => {
-      if (isFirstAuthCheck) {
-        isFirstAuthCheck = false;
-        const loader = document.getElementById("loading-overlay");
-        if (loader) loader.classList.add("fade-out");
-      }
-    };
-
-    if (user) {
-      // Security check: restrict email if AUTHORIZED_EMAIL is configured
-      if (AUTHORIZED_EMAIL && !isAuthorizedEmail(user.email)) {
-        showBanner(authErrorBanner, `Access Denied: Only ${AUTHORIZED_EMAIL} is authorized.`, 10000);
-        signOut(auth);
-        hideLoader();
-        return;
-      }
-      
-      // Logged in
-      displayUserEmail.textContent = user.email;
-      authContainer.classList.add("hidden");
-      appContainer.classList.remove("hidden");
-      document.body.classList.add("app-visible");
-      hideBanner(authErrorBanner);
-      
-      setupFirestoreListeners();
-      hideLoader();
-    } else {
-      // Logged out
-      authContainer.classList.remove("hidden");
-      appContainer.classList.add("hidden");
-      document.body.classList.remove("app-visible");
-      locationsList = [];
-      if (firestoreUnsubscribe) firestoreUnsubscribe();
-      if (firestoreLogsUnsubscribe) firestoreLogsUnsubscribe();
-      hideLoader();
-    }
-  });
-}
-
-// Login form
-loginForm.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const email = loginEmail.value.trim();
-  const password = loginPassword.value;
-  
-  if (!isAuthorizedEmail(email)) {
-    showBanner(authErrorBanner, `Access Denied: Only ${AUTHORIZED_EMAIL} is authorized.`);
-    return;
-  }
-
+// Load Initial Data
+async function initApp() {
+  const loader = document.getElementById("loading-overlay");
   try {
-    hideBanner(authErrorBanner);
-    await signInWithEmailAndPassword(auth, email, password);
-  } catch (error) {
-    console.error(error);
-    let errorMsg = mapAuthErrorCode(error.code);
-    showBanner(authErrorBanner, errorMsg);
-  }
-});
-
-// Logout btn
-logoutBtn.addEventListener("click", () => {
-  signOut(auth).catch(err => {
-    console.error(err);
-    showBanner(dbErrorBanner, "Failed to log out: " + err.message);
-  });
-});
-
-// 2. Setup Database Listeners
-let firestoreUnsubscribe = null;
-let firestoreLogsUnsubscribe = null;
-function setupFirestoreListeners() {
-  if (firestoreUnsubscribe) {
-    firestoreUnsubscribe();
-  }
-  if (firestoreLogsUnsubscribe) {
-    firestoreLogsUnsubscribe();
-  }
-  
-  // Locations listener
-  const q = query(collection(db, "locations"), orderBy("createdAt", "asc"));
-  firestoreUnsubscribe = onSnapshot(q, (snapshot) => {
-    locationsList = [];
-    snapshot.forEach((doc) => {
-      locationsList.push({ id: doc.id, ...doc.data() });
-    });
+    appContainer.classList.remove("hidden");
+    document.body.classList.add("app-visible");
     
-    renderLocations();
-  }, (error) => {
-    console.error("Firestore snapshot error: ", error);
-    if (error.code === "permission-denied") {
-      showBanner(authErrorBanner, "Access Denied: Your account is not authorized to access this dashboard.", 10000);
-      signOut(auth);
-    } else {
-      showBanner(dbErrorBanner, "Failed to fetch locations: " + error.message);
+    // Load config
+    try {
+      const configResponse = await fetch(`${API_BASE}/api/config`);
+      if (configResponse.ok) {
+        const appConfig = await configResponse.json();
+        console.log("Config loaded:", appConfig);
+      }
+    } catch (e) {
+      console.error("Failed to load configuration:", e);
     }
-  });
 
-  // Logs listener (fetch last 20)
-  const logsQuery = query(collection(db, "runs"), orderBy("timestamp", "desc"), limit(20));
-  firestoreLogsUnsubscribe = onSnapshot(logsQuery, (snapshot) => {
-    const logs = [];
-    snapshot.forEach((doc) => {
-      logs.push({ id: doc.id, ...doc.data() });
-    });
-    renderLogs(logs);
-  }, (error) => {
-    console.error("Firestore logs error: ", error);
-    if (error.code === "permission-denied") {
-      showBanner(authErrorBanner, "Access Denied: Your account is not authorized to access this dashboard.", 10000);
-      signOut(auth);
+    // Load locations and runs
+    await Promise.all([
+      fetchLocations(),
+      fetchRuns()
+    ]);
+  } catch (error) {
+    console.error("Initialization failed: ", error);
+    showBanner(dbErrorBanner, `Initialization Error: ${error.message}`, 0);
+  } finally {
+    if (loader) {
+      loader.classList.add("fade-out");
     }
-  });
+  }
 }
 
-// 3. Render Locations Card List
+// Fetch Locations
+async function fetchLocations() {
+  try {
+    const response = await fetch(`${API_BASE}/api/locations`);
+    if (!response.ok) {
+      throw new Error(`Failed to load locations: ${response.statusText}`);
+    }
+    locationsList = await response.json();
+    renderLocations();
+  } catch (error) {
+    console.error("Error fetching locations:", error);
+    showBanner(dbErrorBanner, "Failed to load locations: " + error.message);
+  }
+}
+
+// Fetch Runs
+async function fetchRuns() {
+  try {
+    const response = await fetch(`${API_BASE}/api/runs`);
+    if (!response.ok) {
+      throw new Error(`Failed to load logs: ${response.statusText}`);
+    }
+    const logs = await response.json();
+    renderLogs(logs);
+  } catch (error) {
+    console.error("Error fetching logs:", error);
+  }
+}
+
+// Render Locations Card List
 function renderLocations() {
   try {
     if (DEBUG) console.log("renderLocations called. locationsList:", locationsList);
@@ -397,11 +276,9 @@ function renderLocations() {
   }
 }
 
-// 3.1 Render Forecast Dashboard (Obsidian Flux row table)
+// Render Forecast Dashboard
 function formatForecastColumnDate(isoTime) {
-  if (!isoTime) {
-    return "";
-  }
+  if (!isoTime) return "";
   const formatted = new Date(isoTime).toLocaleDateString("en-US", {
     timeZone: "America/New_York",
     weekday: "short",
@@ -552,7 +429,7 @@ function renderForecastDashboard() {
   }
 }
 
-// 4. CRUD Actions
+// CRUD Actions
 locationForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   
@@ -568,30 +445,35 @@ locationForm.addEventListener("submit", async (e) => {
   
   try {
     if (id) {
-      // Edit mode
-      await updateDoc(doc(db, "locations", id), {
-        name,
-        latitude,
-        longitude
+      // Edit mode via API
+      const response = await fetch(`${API_BASE}/api/locations/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, latitude, longitude })
       });
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
       showBanner(dbSuccessBanner, `Location "${name}" updated successfully.`);
       resetForm();
     } else {
-      // Create mode
+      // Create mode via API
       if (!canAddLocation(locationsList.length)) {
         showBanner(dbErrorBanner, "Limit reached: You can monitor a maximum of 10 locations.");
         return;
       }
-      
-      await addDoc(collection(db, "locations"), {
-        name,
-        latitude,
-        longitude,
-        createdAt: new Date().getTime()
+      const response = await fetch(`${API_BASE}/api/locations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, latitude, longitude })
       });
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
       showBanner(dbSuccessBanner, `Location "${name}" added successfully.`);
       resetForm();
     }
+    await fetchLocations();
   } catch (error) {
     console.error(error);
     showBanner(dbErrorBanner, "Database Error: " + error.message);
@@ -610,7 +492,6 @@ function startEditLocation(id) {
   formTitle.textContent = "Edit Location";
   saveLocationBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;">save</span><span>Update Location</span>';
   cancelEditBtn.classList.remove("hidden");
-  
   locationNameInput.focus();
 }
 
@@ -633,11 +514,17 @@ async function deleteLocation(id) {
   
   if (confirm(`Are you sure you want to delete "${loc.name}"?`)) {
     try {
-      await deleteDoc(doc(db, "locations", id));
+      const response = await fetch(`${API_BASE}/api/locations/${id}`, {
+        method: "DELETE"
+      });
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
       showBanner(dbSuccessBanner, `Location "${loc.name}" deleted.`);
       if (locationIdInput.value === id) {
         resetForm();
       }
+      await fetchLocations();
     } catch (error) {
       console.error(error);
       showBanner(dbErrorBanner, "Delete failed: " + error.message);
@@ -645,7 +532,7 @@ async function deleteLocation(id) {
   }
 }
 
-// 5. Test Trigger for Daily Email Functions
+// Test Trigger for Daily Email Functions
 triggerTestBtn.addEventListener("click", async () => {
   if (locationsList.length === 0) {
     showBanner(dbErrorBanner, "Cannot trigger test: You need to add at least 1 location.");
@@ -657,35 +544,10 @@ triggerTestBtn.addEventListener("click", async () => {
   try {
     triggerTestBtn.disabled = true;
     triggerTestBtn.textContent = "Sending…";
+    triggerStatus.classList.remove("hidden");
     
-    // Retrieve Auth ID Token to pass to Cloud Function for authentication
-    const user = auth.currentUser;
-    if (!user) throw new Error("User not signed in.");
-    const idToken = await user.getIdToken();
-    
-    // Call the https v2 function (configured to fetch locations and send email)
-    // We'll write the Cloud Function as a POST endpoint at /triggerReport
-    // In production, we'll map the function or call its URL directly.
-    // If running in local emulator, Cloud Functions are at e.g., http://127.0.0.1:5001/<project-id>/us-central1/triggerReport
-    // We can fetch the endpoint dynamically based on the current location.
-    
-    const isEmulator = isEmulatorHostname(window.location.hostname);
-    let functionUrl = "";
-    
-    if (isEmulator) {
-      const response = await fetch("/__/firebase/init.json");
-      const config = await response.json();
-      functionUrl = getFunctionUrl("triggerReport", { isEmulator: true, projectId: config.projectId });
-    } else {
-      functionUrl = getFunctionUrl("triggerReport", { isEmulator: false });
-    }
-    
-    const reportResponse = await fetch(functionUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${idToken}`
-      }
+    const reportResponse = await fetch(`${API_BASE}/api/triggerReport`, {
+      method: "POST"
     });
     
     const result = await reportResponse.json();
@@ -695,13 +557,16 @@ triggerTestBtn.addEventListener("click", async () => {
     }
     
     showEmailSuccessModal();
-    fetchApiCreditsStatus();
+    await fetchApiCreditsStatus();
+    await fetchRuns();
+    await fetchLocations();
   } catch (error) {
     console.error(error);
     showBanner(dbErrorBanner, "Trigger Failed: " + error.message);
   } finally {
     triggerTestBtn.disabled = false;
     triggerTestBtn.textContent = originalTriggerLabel;
+    triggerStatus.classList.add("hidden");
   }
 });
 
@@ -724,7 +589,6 @@ useCurrentLocationBtn.addEventListener("click", () => {
       useCurrentLocationBtn.disabled = false;
       useCurrentLocationBtn.textContent = originalText;
       
-      // Auto-fill a name if empty
       if (!locationNameInput.value) {
         locationNameInput.value = "Current Location";
       }
@@ -740,7 +604,7 @@ useCurrentLocationBtn.addEventListener("click", () => {
   );
 });
 
-// Address Search Handler (Fallback for manual submission)
+// Address Search Handler
 async function performAddressSearch() {
   const queryText = searchAddressInput.value.trim();
   if (!queryText) {
@@ -753,29 +617,9 @@ async function performAddressSearch() {
   if (searchIcon) searchIcon.textContent = "hourglass_empty";
   
   try {
-    // Retrieve Auth ID Token for secure proxy access
-    const user = auth.currentUser;
-    if (!user) throw new Error("User not signed in.");
-    const idToken = await user.getIdToken();
-    
-    // Determine endpoint URL
-    const isEmulator = isEmulatorHostname(window.location.hostname);
-    let functionUrl = "";
-    if (isEmulator) {
-      const response = await fetch("/__/firebase/init.json");
-      const config = await response.json();
-      functionUrl = getFunctionUrl("searchCoordinates", { isEmulator: true, projectId: config.projectId });
-    } else {
-      functionUrl = getFunctionUrl("searchCoordinates", { isEmulator: false });
-    }
-
-    // Call geocoding proxy function
-    const response = await fetch(functionUrl, {
+    const response = await fetch(`${API_BASE}/api/searchCoordinates`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${idToken}`
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ query: queryText })
     });
     
@@ -793,7 +637,6 @@ async function performAddressSearch() {
       locationLatInput.value = lat.toFixed(6);
       locationLngInput.value = lon.toFixed(6);
       
-      // Auto-fill location name if empty or if it matches placeholder text
       if (!locationNameInput.value || locationNameInput.value === "Current Location") {
         const shortName = match.display_name.split(",")[0].trim();
         locationNameInput.value = shortName;
@@ -878,10 +721,8 @@ searchAddressInput.addEventListener("input", () => {
     return;
   }
   
-  // Debounce API calls (wait 250ms after user stops typing)
   autocompleteTimeout = setTimeout(async () => {
     try {
-      // Fetch from Photon API (Fast, CORS-enabled geocoding suggestions based on OSM)
       const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(queryText)}&limit=5`;
       const response = await fetch(url);
       if (!response.ok) return;
@@ -911,7 +752,6 @@ function renderSuggestions(features) {
     const props = feature.properties;
     const coords = feature.geometry.coordinates; // [Lng, Lat]
     
-    // Construct user-friendly display name (e.g. "Paris, Ile-de-France, France")
     const displayName = buildPhotonDisplayName(props);
     
     const item = document.createElement("div");
@@ -920,17 +760,13 @@ function renderSuggestions(features) {
     item.setAttribute("data-index", index);
     
     item.addEventListener("click", () => {
-      // Photon returns [Lng, Lat] in GeoJSON format
       const lon = coords[0];
       const lat = coords[1];
       
       locationLatInput.value = lat.toFixed(6);
       locationLngInput.value = lon.toFixed(6);
-      
-      // Auto-populate location name
       locationNameInput.value = props.name;
       
-      // Reset search field and suggestions
       searchAddressInput.value = "";
       searchSuggestions.classList.add("hidden");
       searchSuggestions.innerHTML = "";
@@ -970,38 +806,17 @@ function formatApiCreditsLabel(credits) {
 }
 
 async function fetchApiCreditsStatus() {
-  if (!apiCreditsStatus || !auth?.currentUser) {
-    return;
-  }
+  if (!apiCreditsStatus) return;
 
   apiCreditsStatus.classList.remove("error");
   apiCreditsStatus.textContent = "Loading API credits…";
 
   try {
-    const idToken = await auth.currentUser.getIdToken();
-    const isEmulator = isEmulatorHostname(window.location.hostname);
-    let functionUrl = "";
-
-    if (isEmulator) {
-      const response = await fetch("/__/firebase/init.json");
-      const config = await response.json();
-      functionUrl = getFunctionUrl("getApiCredits", { isEmulator: true, projectId: config.projectId });
-    } else {
-      functionUrl = getFunctionUrl("getApiCredits", { isEmulator: false });
-    }
-
-    const response = await fetch(functionUrl, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${idToken}`
-      }
-    });
-
+    const response = await fetch(`${API_BASE}/api/getApiCredits`);
     const result = await response.json();
     if (!response.ok) {
       throw new Error(result.error || "Failed to load API credits.");
     }
-
     apiCreditsStatus.textContent = formatApiCreditsLabel(result);
   } catch (error) {
     console.error(error);
@@ -1029,7 +844,6 @@ function renderLogs(logs) {
     });
     
     let statusClass = getLogStatusClass(log.status);
-    
     const statusText = log.status.toUpperCase();
     
     let detailsHtml = "";
@@ -1058,12 +872,11 @@ function renderLogs(logs) {
   });
 }
 
-// Tab Switching logic — covers desktop nav, mobile segment nav, and bottom nav
+// Tab Switching logic
 const allNavButtons = document.querySelectorAll(".nav-tab, .bottom-nav-item");
 const tabPanes = document.querySelectorAll(".tab-pane");
 
 function switchTab(targetTab) {
-  // Update all nav buttons across all surfaces
   allNavButtons.forEach(b => {
     if (b.getAttribute("data-tab") === targetTab) {
       b.classList.add("active");
@@ -1071,7 +884,6 @@ function switchTab(targetTab) {
       b.classList.remove("active");
     }
   });
-  // Show/hide panes
   tabPanes.forEach(p => p.classList.remove("active"));
   const activePane = document.getElementById(`pane-${targetTab}`);
   if (activePane) activePane.classList.add("active");
@@ -1089,4 +901,4 @@ allNavButtons.forEach(btn => {
 });
 
 // Run
-initFirebase();
+initApp();

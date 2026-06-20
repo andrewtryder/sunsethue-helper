@@ -11,7 +11,7 @@ function getHeader(headers, name) {
   return key ? headers[key] : null;
 }
 
-function parseRateLimitHeaders(headers) {
+export function parseRateLimitHeaders(headers) {
   const limitRaw = getHeader(headers, "x-ratelimit-limit");
   const remainingRaw = getHeader(headers, "x-ratelimit-remaining");
   const resetRaw = getHeader(headers, "x-ratelimit-reset");
@@ -36,7 +36,7 @@ function parseRateLimitHeaders(headers) {
   };
 }
 
-function normalizeCreditsJson(json) {
+export function normalizeCreditsJson(json) {
   if (!json || typeof json !== "object" || Array.isArray(json)) {
     return null;
   }
@@ -120,7 +120,7 @@ async function fetchRateLimitViaEventProbe(fetchFn, apiKey) {
         message = json.message;
       }
     } catch {
-      // Ignore JSON parse errors for non-JSON error bodies.
+      // Ignore JSON parse errors.
     }
     throw new Error(message);
   }
@@ -128,7 +128,7 @@ async function fetchRateLimitViaEventProbe(fetchFn, apiKey) {
   throw new Error("Sunsethue API did not return rate limit headers");
 }
 
-async function fetchApiCredits({ fetch: fetchFn, apiKey }) {
+export async function fetchApiCredits({ fetch: fetchFn, apiKey }) {
   if (!apiKey) {
     throw new Error("SUNSETHUE_API_KEY environment variable is not configured.");
   }
@@ -149,9 +149,3 @@ async function fetchApiCredits({ fetch: fetchFn, apiKey }) {
 
   return fetchRateLimitViaEventProbe(fetchFn, cleanApiKey);
 }
-
-module.exports = {
-  parseRateLimitHeaders,
-  normalizeCreditsJson,
-  fetchApiCredits
-};

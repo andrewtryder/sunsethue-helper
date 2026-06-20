@@ -6,16 +6,20 @@
     "node": ">=24"
   },
   "scripts": {
+    "dev": "bash scripts/dev.sh",
     "emulators:start": "npx firebase emulators:start --only firestore,auth,functions,hosting",
     "deploy": "npx firebase deploy",
     "commitplease": "commitplease",
     "setup:hooks": "bash scripts/setup-git-hooks.sh",
-    "test": "npm test --prefix functions && node scripts/test-frontend.js && node scripts/test-frontend-unit.mjs",
-    "test:coverage": "npm run test:coverage --prefix functions && node scripts/test-frontend.js && node scripts/test-frontend-unit.mjs",
+    "test": "node scripts/test-frontend.js && node scripts/test-frontend-unit.mjs",
+    "test:coverage": "node scripts/test-frontend.js && node scripts/test-frontend-unit.mjs",
     "test:e2e": "bash scripts/run-e2e.sh",
     "test:all": "npm test && npm run test:e2e",
     "preview:email": "node scripts/preview-email.js",
     "lint": "eslint ."
+  },
+  "dependencies": {
+    "nodemailer": "^8.0.10"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0",

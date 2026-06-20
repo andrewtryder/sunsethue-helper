@@ -1,4 +1,6 @@
-const {
+import nodemailer from "nodemailer";
+import * as db from "./db.js";
+import {
   formatColumnDateET,
   getQualityBadge,
   escapeHtml,
@@ -7,7 +9,7 @@ const {
   selectNextSunEvents,
   validateReportEnv,
   buildEmailSubject
-} = require("./helpers");
+} from "./helpers.js";
 
 function getHeaderEventTimes(results) {
   for (const result of results) {
@@ -26,7 +28,6 @@ function buildForecastEventCell(event) {
   if (!event) {
     return `<span style="font-size:14px;color:#9ca3af;">N/A</span>`;
   }
-
   return getQualityBadge(event.quality, event.quality_text);
 }
 
@@ -64,7 +65,7 @@ function buildEmailTableRows(results, triggerType) {
   return tableRowsHtml;
 }
 
-function buildHtmlEmail(results, triggerType, reportTimeText) {
+export function buildHtmlEmail(results, triggerType, reportTimeText, webappUrl) {
   const isSunsetFirst = triggerType === "AM" || triggerType === "NOON";
   const tableRowsHtml = buildEmailTableRows(results, triggerType);
   const headerTimes = getHeaderEventTimes(results);
@@ -76,9 +77,6 @@ function buildHtmlEmail(results, triggerType, reportTimeText) {
   const secondHeader = isSunsetFirst
     ? `Next Sunrise ${sunriseHeaderDate}`.trim()
     : `Next Sunset ${sunsetHeaderDate}`.trim();
-
-  const projectId = process.env.GCLOUD_PROJECT || "sunsethue-helper-12345";
-  const webappUrl = `https://${projectId}.web.app`;
 
   return `
     <!DOCTYPE html>
@@ -130,28 +128,19 @@ function buildRunResultEntry(result) {
   };
 }
 
-async function runAndSendReport(triggerType, deps) {
-  const db = deps.db;
-  const fetchFn = deps.fetch;
-  const createTransport = deps.createTransport;
-  const env = deps.env;
-  const now = deps.now ?? Date.now();
-
-  console.log(`Starting daily report check. Trigger: ${triggerType}. Target Email: ${env.EMAIL_TO}`);
+export async function runAndSendReport(triggerType, env) {
+  const now = Date.now();
+  console.log(`Starting report run. Trigger: ${triggerType}. Target Email: ${env.EMAIL_TO}`);
 
   try {
     validateReportEnv(env);
 
-    const locationsSnapshot = await db.collection("locations").orderBy("createdAt", "asc").limit(10).get();
-    const locations = [];
-    locationsSnapshot.forEach((doc) => {
-      locations.push({ id: doc.id, ...doc.data() });
-    });
-
+    const locations = await db.getLocations(env);
     if (locations.length === 0) {
-      console.log("No locations found in Firestore. Skipping email.");
-      await db.collection("runs").add({
-        timestamp: Date.now(),
+      console.log("No locations found in D1. Skipping email.");
+      await db.addRun(env, {
+        id: crypto.randomUUID(),
+        timestamp: now,
         triggerType,
         status: "success",
         locationsCount: 0,
@@ -169,7 +158,7 @@ async function runAndSendReport(triggerType, deps) {
         console.log(`Fetching forecast for location: ${loc.name} (${loc.latitude}, ${loc.longitude})`);
 
         const cleanApiKey = String(env.SUNSETHUE_API_KEY).trim();
-        const response = await fetchFn(
+        const response = await fetch(
           `https://api.sunsethue.com/forecast?latitude=${loc.latitude}&longitude=${loc.longitude}&days=2&key=${cleanApiKey}`
         );
 
@@ -202,14 +191,14 @@ async function runAndSendReport(triggerType, deps) {
           error: null
         });
 
-        await db.collection("locations").doc(loc.id).update({
+        await db.updateLocationForecast(env, loc.id, {
           latestSunriseTime: sunrise ? sunrise.time : null,
           latestSunriseQuality: sunrise ? sunrise.quality : null,
           latestSunriseText: sunrise ? sunrise.quality_text : null,
           latestSunsetTime: sunset ? sunset.time : null,
           latestSunsetQuality: sunset ? sunset.quality : null,
           latestSunsetText: sunset ? sunset.quality_text : null,
-          lastForecastUpdate: Date.now(),
+          lastForecastUpdate: now,
           forecastError: null
         });
       } catch (error) {
@@ -223,8 +212,8 @@ async function runAndSendReport(triggerType, deps) {
           error: error.message
         });
 
-        await db.collection("locations").doc(loc.id).update({
-          lastForecastUpdate: Date.now(),
+        await db.updateLocationForecast(env, loc.id, {
+          lastForecastUpdate: now,
           forecastError: error.message
         });
       }
@@ -236,8 +225,10 @@ async function runAndSendReport(triggerType, deps) {
       timeStyle: "short"
     });
 
-    const htmlEmail = buildHtmlEmail(results, triggerType, reportTimeText);
-    const transporter = createTransport({
+    const webappUrl = env.WEBAPP_URL || "https://sunsethue-helper.pages.dev";
+    const htmlEmail = buildHtmlEmail(results, triggerType, reportTimeText, webappUrl);
+    
+    const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {
         user: env.GMAIL_USER,
@@ -256,8 +247,9 @@ async function runAndSendReport(triggerType, deps) {
     console.log("Email dispatched successfully! Message ID:", info.messageId);
 
     const hasErrors = results.some((result) => result.error);
-    await db.collection("runs").add({
-      timestamp: Date.now(),
+    await db.addRun(env, {
+      id: crypto.randomUUID(),
+      timestamp: now,
       triggerType,
       status: hasErrors ? "warning" : "success",
       locationsCount: activeLocations.length,
@@ -267,8 +259,9 @@ async function runAndSendReport(triggerType, deps) {
   } catch (globalError) {
     console.error("Global report execution failed:", globalError);
     try {
-      await db.collection("runs").add({
-        timestamp: Date.now(),
+      await db.addRun(env, {
+        id: crypto.randomUUID(),
+        timestamp: now,
         triggerType,
         status: "failure",
         locationsCount: 0,
@@ -276,15 +269,8 @@ async function runAndSendReport(triggerType, deps) {
         error: globalError.message
       });
     } catch (logError) {
-      console.error("Failed to write failure log to Firestore:", logError);
+      console.error("Failed to write failure log to D1 database:", logError);
     }
     throw globalError;
   }
 }
-
-module.exports = {
-  buildEmailTableRows,
-  buildEmailLocationBlocks: buildEmailTableRows,
-  buildHtmlEmail,
-  runAndSendReport
-};

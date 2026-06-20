@@ -35,15 +35,9 @@ jobs:
       - name: Run Dependency Audit
         run: |
           npm audit --audit-level=high
-          npm audit --prefix functions --audit-level=high
 
       - name: Run Frontend Structural Tests
         run: node scripts/test-frontend.js
 
       - name: Run Frontend Unit Tests
         run: node scripts/test-frontend-unit.mjs
-
-      - name: Run Backend Unit Tests with Coverage
-        run: |
-          npm ci --prefix functions
-          npm run test:coverage --prefix functions

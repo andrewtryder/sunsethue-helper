@@ -9,7 +9,8 @@ module.exports = [
       "coverage/**",
       "functions/coverage/**",
       "test-results/**",
-      "playwright-report/**"
+      "playwright-report/**",
+      "**/.wrangler/**"
     ]
   },
   {

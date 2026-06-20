@@ -1,0 +1,12 @@
+name = "sunsethue-helper-worker"
+main = "worker/index.js"
+compatibility_date = "2026-05-01"
+compatibility_flags = [ "nodejs_compat" ]
+
+[vars]
+AUTHORIZED_EMAIL = "owner@example.com"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "sunsethue-db"
+database_id = "00000000-0000-0000-0000-000000000000"

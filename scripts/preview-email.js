@@ -3,8 +3,8 @@
 const fs = require("fs");
 const path = require("path");
 const { execSync } = require("child_process");
-const { buildHtmlEmail } = require("../functions/lib/report");
-const { buildEmailSubject } = require("../functions/lib/helpers");
+const { buildHtmlEmail } = require("../worker/report.js");
+const { buildEmailSubject } = require("../worker/helpers.js");
 
 const args = process.argv.slice(2);
 const triggerType = args.includes("--am") ? "AM" : "PM";

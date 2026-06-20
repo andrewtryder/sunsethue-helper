@@ -9,12 +9,16 @@ public/dist/
 
 # Environment and secrets
 .env
+.dev.vars
 .env.local
 .env.*.local
 functions/.env
 functions/.env.*
 functions/.secret.local
 config.json
+
+# Wrangler state
+.wrangler/
 
 # Firebase logs
 firebase-debug.log*

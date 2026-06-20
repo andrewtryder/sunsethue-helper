@@ -1,4 +1,3 @@
-import nodemailer from "nodemailer";
 import * as db from "./db.js";
 import {
   formatColumnDateET,
@@ -11,51 +10,15 @@ import {
   buildEmailSubject
 } from "./helpers.js";
 
-async function resolveSmtpIp(hostname) {
-  const parts = hostname.split(".");
-  const isIP = parts.length === 4 && parts.every(part => {
-    const num = Number(part);
-    return !isNaN(num) && num >= 0 && num <= 255 && String(num) === part;
-  });
-  if (isIP) {
-    return hostname;
+function parseEmailAddress(addressString) {
+  const clean = addressString.trim();
+  if (clean.includes("<") && clean.endsWith(">")) {
+    const parts = clean.split("<");
+    const namePart = parts[0].trim().replace(/^"/, "").replace(/"$/, "").trim();
+    const emailPart = parts[1].replace(">", "").trim();
+    return { name: namePart, email: emailPart };
   }
-  try {
-    const res = await fetch(`https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(hostname)}&type=A`, {
-      headers: { accept: "application/dns-json" }
-    });
-    if (res.ok) {
-      const data = await res.json();
-      if (data.Answer && data.Answer.length > 0) {
-        const aRecord = data.Answer.find(record => record.type === 1);
-        if (aRecord) {
-          return aRecord.data;
-        }
-      }
-    }
-  } catch (err) {
-    console.error(`Cloudflare DoH failed for ${hostname}:`, err);
-  }
-
-  try {
-    const res = await fetch(`https://dns.google/resolve?name=${encodeURIComponent(hostname)}&type=A`);
-    if (res.ok) {
-      const data = await res.json();
-      if (data.Answer && data.Answer.length > 0) {
-        const aRecord = data.Answer.find(record => record.type === 1);
-        if (aRecord) {
-          return aRecord.data;
-        }
-      }
-    }
-  } catch (err) {
-    console.error(`Google DoH failed for ${hostname}:`, err);
-  }
-
-  if (hostname === "smtp.gmail.com") {
-    return "74.125.134.108";
-  }
-  throw new Error(`Failed to resolve hostname: ${hostname}`);
+  return { name: "", email: clean };
 }
 
 function getHeaderEventTimes(results) {
@@ -275,37 +238,34 @@ export async function runAndSendReport(triggerType, env) {
     const webappUrl = env.WEBAPP_URL || "https://sunsethue-helper.pages.dev";
     const htmlEmail = buildHtmlEmail(results, triggerType, reportTimeText, webappUrl);
     
-    let smtpHost = "smtp.gmail.com";
-    try {
-      console.log("Resolving smtp.gmail.com IP via DNS-over-HTTPS...");
-      smtpHost = await resolveSmtpIp("smtp.gmail.com");
-      console.log(`Resolved smtp.gmail.com to: ${smtpHost}`);
-    } catch (resolveError) {
-      console.error("DNS-over-HTTPS resolution failed, falling back to hostname:", resolveError);
-    }
-
-    const transporter = nodemailer.createTransport({
-      host: smtpHost,
+    const { WorkerMailer } = await import("worker-mailer");
+    console.log("Connecting to SMTP server via worker-mailer...");
+    const mailer = await WorkerMailer.connect({
+      host: "smtp.gmail.com",
       port: 465,
       secure: true,
-      auth: {
-        user: env.GMAIL_USER,
-        pass: env.GMAIL_APP_PASSWORD
+      credentials: {
+        username: env.GMAIL_USER,
+        password: env.GMAIL_APP_PASSWORD
       },
-      tls: {
-        servername: "smtp.gmail.com"
-      }
+      authType: ["plain", "login"]
     });
 
-    const mailOptions = {
-      from: env.EMAIL_FROM || `"Sunsethue Helper" <${env.GMAIL_USER}>`,
-      to: env.EMAIL_TO,
+    const parsedFrom = parseEmailAddress(env.EMAIL_FROM || `"Sunsethue Helper" <${env.GMAIL_USER}>`);
+
+    console.log("Sending email...");
+    await mailer.send({
+      from: {
+        name: parsedFrom.name,
+        email: parsedFrom.email
+      },
+      to: {
+        email: env.EMAIL_TO
+      },
       subject: buildEmailSubject(triggerType),
       html: htmlEmail
-    };
-
-    const info = await transporter.sendMail(mailOptions);
-    console.log("Email dispatched successfully! Message ID:", info.messageId);
+    });
+    console.log("Email dispatched successfully via worker-mailer!");
 
     const hasErrors = results.some((result) => result.error);
     await db.addRun(env, {

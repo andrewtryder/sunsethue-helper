@@ -17,7 +17,7 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "nodemailer": "^9.0.1"
+    "worker-mailer": "^1.2.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0",

@@ -4,6 +4,20 @@ All notable changes to this project are documented in this file.
 
 This changelog follows [Conventional Commits](https://www.conventionalcommits.org/) and is maintained by [release-please](https://github.com/googleapis/release-please). Release sections group changes by commit type (`feat`, `fix`, etc.). Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.0](https://github.com/andrewtryder/sunsethue-helper/compare/sunsethue-helper-v1.11.0...sunsethue-helper-v1.12.0) (2026-06-20)
+
+
+### Features
+
+* **cf:** migrate from firebase to cloudflare ([13fd9f3](https://github.com/andrewtryder/sunsethue-helper/commit/13fd9f3fc631613b71f89e39e33e99edffbe4f01))
+* **cf:** migrate from firebase to cloudflare ([e37b9d2](https://github.com/andrewtryder/sunsethue-helper/commit/e37b9d2f1166a0308f5defc1db69e2a8fa615295))
+
+
+### Bug Fixes
+
+* **ci:** solve audit vulnerabilities and force node 24 ([1b95e6f](https://github.com/andrewtryder/sunsethue-helper/commit/1b95e6f36621763860f790d95969e37b86b5b4b4))
+* **worker:** bypass dns.lookup in restricted edge runtime ([c0046c0](https://github.com/andrewtryder/sunsethue-helper/commit/c0046c0c8b994ececdd7a47ada5d6da65026e3b0))
+
 ## [1.11.0](https://github.com/andrewtryder/sunsethue-helper/compare/sunsethue-helper-v1.10.3...sunsethue-helper-v1.11.0) (2026-06-14)
 
 

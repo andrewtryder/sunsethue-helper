@@ -4,7 +4,7 @@ const {
   normalizeQualityToUnit,
   qualityToPercent,
   selectNextSunEvents
-} = require("../functions/lib/helpers");
+} = require("../worker/helpers.js");
 
 function printUsage() {
   console.error("Usage: node scripts/verify-forecast-quality.js <latitude> <longitude>");

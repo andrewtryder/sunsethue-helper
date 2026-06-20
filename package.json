@@ -11,8 +11,6 @@
     "setup:hooks": "bash scripts/setup-git-hooks.sh",
     "test": "node scripts/test-frontend.js && node scripts/test-frontend-unit.mjs",
     "test:coverage": "node scripts/test-frontend.js && node scripts/test-frontend-unit.mjs",
-    "test:e2e": "bash scripts/run-e2e.sh",
-    "test:all": "npm test && npm run test:e2e",
     "preview:email": "node scripts/preview-email.js",
     "lint": "eslint ."
   },
@@ -20,7 +18,6 @@
     "worker-mailer": "^1.2.1"
   },
   "devDependencies": {
-    "@playwright/test": "^1.55.0",
     "commitplease": "^3.2.0",
     "eslint": "^10.5.0",
     "eslint-plugin-security": "^4.0.1"

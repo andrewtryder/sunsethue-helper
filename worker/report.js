@@ -11,6 +11,53 @@ import {
   buildEmailSubject
 } from "./helpers.js";
 
+async function resolveSmtpIp(hostname) {
+  const parts = hostname.split(".");
+  const isIP = parts.length === 4 && parts.every(part => {
+    const num = Number(part);
+    return !isNaN(num) && num >= 0 && num <= 255 && String(num) === part;
+  });
+  if (isIP) {
+    return hostname;
+  }
+  try {
+    const res = await fetch(`https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(hostname)}&type=A`, {
+      headers: { accept: "application/dns-json" }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.Answer && data.Answer.length > 0) {
+        const aRecord = data.Answer.find(record => record.type === 1);
+        if (aRecord) {
+          return aRecord.data;
+        }
+      }
+    }
+  } catch (err) {
+    console.error(`Cloudflare DoH failed for ${hostname}:`, err);
+  }
+
+  try {
+    const res = await fetch(`https://dns.google/resolve?name=${encodeURIComponent(hostname)}&type=A`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.Answer && data.Answer.length > 0) {
+        const aRecord = data.Answer.find(record => record.type === 1);
+        if (aRecord) {
+          return aRecord.data;
+        }
+      }
+    }
+  } catch (err) {
+    console.error(`Google DoH failed for ${hostname}:`, err);
+  }
+
+  if (hostname === "smtp.gmail.com") {
+    return "74.125.134.108";
+  }
+  throw new Error(`Failed to resolve hostname: ${hostname}`);
+}
+
 function getHeaderEventTimes(results) {
   for (const result of results) {
     if (result.error) {
@@ -228,11 +275,25 @@ export async function runAndSendReport(triggerType, env) {
     const webappUrl = env.WEBAPP_URL || "https://sunsethue-helper.pages.dev";
     const htmlEmail = buildHtmlEmail(results, triggerType, reportTimeText, webappUrl);
     
+    let smtpHost = "smtp.gmail.com";
+    try {
+      console.log("Resolving smtp.gmail.com IP via DNS-over-HTTPS...");
+      smtpHost = await resolveSmtpIp("smtp.gmail.com");
+      console.log(`Resolved smtp.gmail.com to: ${smtpHost}`);
+    } catch (resolveError) {
+      console.error("DNS-over-HTTPS resolution failed, falling back to hostname:", resolveError);
+    }
+
     const transporter = nodemailer.createTransport({
-      service: "gmail",
+      host: smtpHost,
+      port: 465,
+      secure: true,
       auth: {
         user: env.GMAIL_USER,
         pass: env.GMAIL_APP_PASSWORD
+      },
+      tls: {
+        servername: "smtp.gmail.com"
       }
     });
 

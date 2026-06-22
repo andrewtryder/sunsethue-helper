@@ -56,7 +56,7 @@
 
         <div id="forecast-cards-container">
           <div class="empty-state" id="forecast-empty-state">
-            <span class="material-symbols-outlined">location_off</span>
+            <span class="material-symbols-outlined" aria-hidden="true">location_off</span>
             <p>No locations added yet.<br>Go to <strong>Manage Locations</strong> to add your first spot.</p>
           </div>
         </div>
@@ -72,7 +72,7 @@
 
             <div class="locations-list-container" id="locations-list-container">
               <div class="empty-state" id="empty-state-view">
-                <span class="material-symbols-outlined">add_location_alt</span>
+                <span class="material-symbols-outlined" aria-hidden="true">add_location_alt</span>
                 <p>No locations yet.<br>Use the form to add up to 10 coordinates.</p>
               </div>
             </div>
@@ -89,8 +89,8 @@
                   <label for="search-address">Search Address / City</label>
                   <div class="search-row" style="position: relative;">
                     <input type="text" id="search-address" class="form-input" placeholder="e.g. Venice Beach, CA" autocomplete="off">
-                    <button type="button" id="search-address-btn" class="search-btn" title="Search Coordinates">
-                      <span class="material-symbols-outlined" style="font-size:20px;">search</span>
+                    <button type="button" id="search-address-btn" class="search-btn" title="Search Coordinates" aria-label="Search Coordinates">
+                      <span class="material-symbols-outlined" aria-hidden="true" style="font-size:20px;">search</span>
                     </button>
                     <div id="search-suggestions" class="suggestions-dropdown hidden"></div>
                   </div>
@@ -119,7 +119,7 @@
                 <div class="form-actions">
                   <button type="button" id="cancel-edit-btn" class="btn btn-secondary hidden" style="flex:1;">Cancel</button>
                   <button type="submit" id="save-location-btn" class="btn btn-primary" style="flex:2;">
-                    <span class="material-symbols-outlined" style="font-size:18px;">save</span>
+                    <span class="material-symbols-outlined" aria-hidden="true" style="font-size:18px;">save</span>
                     <span>Save Location</span>
                   </button>
                 </div>
@@ -138,7 +138,7 @@
 
         <div class="logs-container" id="logs-list-container">
           <div class="empty-state">
-            <span class="material-symbols-outlined">history</span>
+            <span class="material-symbols-outlined" aria-hidden="true">history</span>
             <p>No execution logs found yet.</p>
           </div>
         </div>
@@ -159,15 +159,15 @@
 
     <nav id="bottom-nav" aria-label="Bottom navigation">
       <button class="bottom-nav-item active" data-tab="main">
-        <span class="material-symbols-outlined">wb_sunny</span>
+        <span class="material-symbols-outlined" aria-hidden="true">wb_sunny</span>
         <span>Forecast</span>
       </button>
       <button class="bottom-nav-item" data-tab="locations">
-        <span class="material-symbols-outlined">location_on</span>
+        <span class="material-symbols-outlined" aria-hidden="true">location_on</span>
         <span>Locations</span>
       </button>
       <button class="bottom-nav-item" data-tab="logs">
-        <span class="material-symbols-outlined">assignment</span>
+        <span class="material-symbols-outlined" aria-hidden="true">assignment</span>
         <span>Logs</span>
       </button>
     </nav>
@@ -178,7 +178,7 @@
       <button type="button" id="email-success-modal-close" class="modal-close" aria-label="Close">&times;</button>
       <div class="modal-header-row">
         <div class="modal-icon" aria-hidden="true">
-          <span class="material-symbols-outlined">check_circle</span>
+          <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>
         </div>
         <div>
           <h2 id="email-success-modal-title" class="modal-title">Email sent</h2>

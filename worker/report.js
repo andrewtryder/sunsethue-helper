@@ -10,6 +10,12 @@ import {
   buildEmailSubject
 } from "./helpers.js";
 
+const reportTimeFormatter = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/New_York",
+  dateStyle: "full",
+  timeStyle: "short"
+});
+
 function parseEmailAddress(addressString) {
   const clean = addressString.trim();
   if (clean.includes("<") && clean.endsWith(">")) {
@@ -240,11 +246,7 @@ export async function runAndSendReport(triggerType, env) {
       });
     }
 
-    const reportTimeText = new Date(now).toLocaleString("en-US", {
-      timeZone: "America/New_York",
-      dateStyle: "full",
-      timeStyle: "short"
-    });
+    const reportTimeText = reportTimeFormatter.format(new Date(now));
 
     const webappUrl = env.WEBAPP_URL || "https://sunsethue-helper.pages.dev";
     const htmlEmail = buildHtmlEmail(results, triggerType, reportTimeText, webappUrl);

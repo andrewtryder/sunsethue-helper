@@ -11,6 +11,27 @@ import {
   mapGeolocationError
 } from "./lib/helpers.js";
 
+const timeFormatter = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/New_York",
+  hour: "numeric",
+  minute: "2-digit"
+});
+const dateFormatter = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/New_York",
+  weekday: "short",
+  month: "short",
+  day: "numeric"
+});
+const dateTimeFormatterMedium = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/New_York",
+  dateStyle: "medium",
+  timeStyle: "short"
+});
+const timeFormatterShort = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/New_York",
+  timeStyle: "short"
+});
+
 const DEBUG = typeof window !== "undefined" && (
   window.location.search.includes("debug=true") || 
   localStorage.getItem("debug") === "true"
@@ -219,10 +240,10 @@ function renderLocations() {
       const sunsetBadge = getForecastBadgeHtml(location.latestSunsetQuality, location.latestSunsetText);
       
       const sunriseTimeText = location.latestSunriseTime 
-        ? new Date(location.latestSunriseTime).toLocaleTimeString("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" })
+        ? timeFormatter.format(new Date(location.latestSunriseTime))
         : "—";
       const sunsetTimeText = location.latestSunsetTime 
-        ? new Date(location.latestSunsetTime).toLocaleTimeString("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" })
+        ? timeFormatter.format(new Date(location.latestSunsetTime))
         : "—";
 
       let errorSection = "";
@@ -279,12 +300,7 @@ function renderLocations() {
 // Render Forecast Dashboard
 function formatForecastColumnDate(isoTime) {
   if (!isoTime) return "";
-  const formatted = new Date(isoTime).toLocaleDateString("en-US", {
-    timeZone: "America/New_York",
-    weekday: "short",
-    month: "short",
-    day: "numeric"
-  });
+  const formatted = dateFormatter.format(new Date(isoTime));
   return `(${formatted})`;
 }
 
@@ -364,10 +380,10 @@ function renderForecastDashboard() {
       const sunsetBadge = getForecastBadgeHtml(location.latestSunsetQuality, location.latestSunsetText);
 
       const sunriseTimeText = location.latestSunriseTime
-        ? new Date(location.latestSunriseTime).toLocaleTimeString("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" })
+        ? timeFormatter.format(new Date(location.latestSunriseTime))
         : null;
       const sunsetTimeText = location.latestSunsetTime
-        ? new Date(location.latestSunsetTime).toLocaleTimeString("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" })
+        ? timeFormatter.format(new Date(location.latestSunsetTime))
         : null;
 
       let sunriseColHtml;
@@ -411,11 +427,7 @@ function renderForecastDashboard() {
 
     if (dashboardLastUpdated) {
       if (maxTimestamp > 0) {
-        const timeStr = new Date(maxTimestamp).toLocaleString("en-US", {
-          timeZone: "America/New_York",
-          dateStyle: "medium",
-          timeStyle: "short"
-        });
+        const timeStr = dateTimeFormatterMedium.format(new Date(maxTimestamp));
         dashboardLastUpdated.textContent = `Last Run: ${timeStr} ET`;
       } else {
         dashboardLastUpdated.textContent = "Last Run: Never";
@@ -797,10 +809,7 @@ function formatApiCreditsLabel(credits) {
   let label = `Requests remaining: ${credits.remaining}${limitPart}`;
 
   if (credits.resetAt) {
-    const resetText = new Date(credits.resetAt).toLocaleTimeString("en-US", {
-      timeZone: "America/New_York",
-      timeStyle: "short"
-    });
+    const resetText = timeFormatterShort.format(new Date(credits.resetAt));
     label += ` · resets ${resetText} ET`;
   }
 
@@ -839,11 +848,7 @@ function renderLogs(logs) {
     const logItem = document.createElement("div");
     logItem.className = "log-item";
     
-    const dateText = new Date(log.timestamp).toLocaleString("en-US", {
-      timeZone: "America/New_York",
-      dateStyle: "medium",
-      timeStyle: "short"
-    });
+    const dateText = dateTimeFormatterMedium.format(new Date(log.timestamp));
     
     let statusClass = getLogStatusClass(log.status);
     const statusText = log.status.toUpperCase();

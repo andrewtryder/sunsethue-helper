@@ -31,6 +31,9 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
+      - name: Sync fix scripts from main
+        run: git checkout origin/main -- scripts/wrap-commit-message.js scripts/fix-commit-messages.sh package.json package-lock.json
+
       - name: Fix and push commit messages
         run: |
           bash scripts/fix-commit-messages.sh \

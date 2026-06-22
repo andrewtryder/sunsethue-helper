@@ -162,76 +162,83 @@ export async function runAndSendReport(triggerType, env) {
 
     const activeLocations = locations.slice(0, 10);
 
-    // ⚡ Bolt: Run forecast queries and database updates concurrently
-    // This eliminates O(n) API latency blockages when processing multiple locations.
-    const results = await Promise.all(
-      activeLocations.map(async (loc) => {
-        try {
-          console.log(`Fetching forecast for location: ${loc.name} (${loc.latitude}, ${loc.longitude})`);
+    const fetchPromises = activeLocations.map(async (loc) => {
+      try {
+        console.log(`Fetching forecast for location: ${loc.name} (${loc.latitude}, ${loc.longitude})`);
 
-          const cleanApiKey = String(env.SUNSETHUE_API_KEY).trim();
-          const response = await fetch(
-            `https://api.sunsethue.com/forecast?latitude=${loc.latitude}&longitude=${loc.longitude}&days=2&key=${cleanApiKey}`
-          );
+        const cleanApiKey = String(env.SUNSETHUE_API_KEY).trim();
+        const response = await fetch(
+          `https://api.sunsethue.com/forecast?latitude=${loc.latitude}&longitude=${loc.longitude}&days=2&key=${cleanApiKey}`
+        );
 
-          if (!response.ok) {
-            throw new Error(`API returned HTTP status ${response.status}`);
-          }
-
-          const json = await response.json();
-          if (!json || !json.data) {
-            throw new Error("Invalid API response format");
-          }
-
-          const { nextSunrise, nextSunset } = selectNextSunEvents(json.data, now);
-          const sunrise = normalizeForecastEvent(nextSunrise);
-          const sunset = normalizeForecastEvent(nextSunset);
-
-          console.log(`Forecast selected for ${loc.name}:`, JSON.stringify({
-            latitude: loc.latitude,
-            longitude: loc.longitude,
-            sunrise: buildForecastEventSnapshot(nextSunrise),
-            sunset: buildForecastEventSnapshot(nextSunset)
-          }));
-
-          await db.updateLocationForecast(env, loc.id, {
-            latestSunriseTime: sunrise ? sunrise.time : null,
-            latestSunriseQuality: sunrise ? sunrise.quality : null,
-            latestSunriseText: sunrise ? sunrise.quality_text : null,
-            latestSunsetTime: sunset ? sunset.time : null,
-            latestSunsetQuality: sunset ? sunset.quality : null,
-            latestSunsetText: sunset ? sunset.quality_text : null,
-            lastForecastUpdate: now,
-            forecastError: null
-          });
-
-          return {
-            name: loc.name,
-            latitude: loc.latitude,
-            longitude: loc.longitude,
-            sunrise,
-            sunset,
-            error: null
-          };
-        } catch (error) {
-          console.error(`Error querying Sunsethue API for ${loc.name}:`, error);
-
-          await db.updateLocationForecast(env, loc.id, {
-            lastForecastUpdate: now,
-            forecastError: error.message
-          });
-
-          return {
-            name: loc.name,
-            latitude: loc.latitude,
-            longitude: loc.longitude,
-            sunrise: null,
-            sunset: null,
-            error: error.message
-          };
+        if (!response.ok) {
+          throw new Error(`API returned HTTP status ${response.status}`);
         }
-      })
-    );
+
+        const json = await response.json();
+        if (!json || !json.data) {
+          throw new Error("Invalid API response format");
+        }
+
+        const { nextSunrise, nextSunset } = selectNextSunEvents(json.data, now);
+        const sunrise = normalizeForecastEvent(nextSunrise);
+        const sunset = normalizeForecastEvent(nextSunset);
+
+        console.log(`Forecast selected for ${loc.name}:`, JSON.stringify({
+          latitude: loc.latitude,
+          longitude: loc.longitude,
+          sunrise: buildForecastEventSnapshot(nextSunrise),
+          sunset: buildForecastEventSnapshot(nextSunset)
+        }));
+
+        return {
+          loc,
+          sunrise,
+          sunset,
+          error: null
+        };
+      } catch (error) {
+        console.error(`Error querying Sunsethue API for ${loc.name}:`, error);
+        return {
+          loc,
+          sunrise: null,
+          sunset: null,
+          error: error.message
+        };
+      }
+    });
+
+    const apiResults = await Promise.all(fetchPromises);
+    const results = [];
+
+    for (const res of apiResults) {
+      if (!res.error) {
+        await db.updateLocationForecast(env, res.loc.id, {
+          latestSunriseTime: res.sunrise ? res.sunrise.time : null,
+          latestSunriseQuality: res.sunrise ? res.sunrise.quality : null,
+          latestSunriseText: res.sunrise ? res.sunrise.quality_text : null,
+          latestSunsetTime: res.sunset ? res.sunset.time : null,
+          latestSunsetQuality: res.sunset ? res.sunset.quality : null,
+          latestSunsetText: res.sunset ? res.sunset.quality_text : null,
+          lastForecastUpdate: now,
+          forecastError: null
+        });
+      } else {
+        await db.updateLocationForecast(env, res.loc.id, {
+          lastForecastUpdate: now,
+          forecastError: res.error
+        });
+      }
+
+      results.push({
+        name: res.loc.name,
+        latitude: res.loc.latitude,
+        longitude: res.loc.longitude,
+        sunrise: res.sunrise,
+        sunset: res.sunset,
+        error: res.error
+      });
+    }
 
     const reportTimeText = new Date(now).toLocaleString("en-US", {
       timeZone: "America/New_York",

@@ -6,6 +6,10 @@ compatibility_flags = [ "nodejs_compat" ]
 [vars]
 AUTHORIZED_EMAIL = "owner@example.com"
 
+[triggers]
+# Hourly UTC; worker/cron.js filters for 6am, 12pm, and 6pm Eastern.
+crons = ["0 * * * *"]
+
 [[d1_databases]]
 binding = "DB"
 database_name = "sunsethue-db"

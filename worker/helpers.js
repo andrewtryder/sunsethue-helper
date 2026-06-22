@@ -1,16 +1,31 @@
+const timeFormatterET = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/New_York",
+  weekday: "short",
+  month: "short",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+  hour12: true
+});
+
+const timeOnlyFormatterET = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/New_York",
+  hour: "numeric",
+  minute: "2-digit"
+});
+
+const columnDateFormatterET = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/New_York",
+  weekday: "short",
+  month: "short",
+  day: "numeric"
+});
+
 export function formatTimeET(utcString) {
   if (!utcString) return "N/A";
   try {
     const date = new Date(utcString);
-    return date.toLocaleString("en-US", {
-      timeZone: "America/New_York",
-      weekday: "short",
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true
-    });
+    return timeFormatterET.format(date);
   } catch (error) {
     console.error("Error formatting date:", error);
     return "Invalid Date";
@@ -86,23 +101,14 @@ export function formatTimeOnlyET(utcString) {
   if (!utcString) {
     return "N/A";
   }
-  return new Date(utcString).toLocaleTimeString("en-US", {
-    timeZone: "America/New_York",
-    hour: "numeric",
-    minute: "2-digit"
-  });
+  return timeOnlyFormatterET.format(new Date(utcString));
 }
 
 export function formatColumnDateET(utcString) {
   if (!utcString) {
     return "";
   }
-  const formatted = new Date(utcString).toLocaleDateString("en-US", {
-    timeZone: "America/New_York",
-    weekday: "short",
-    month: "short",
-    day: "numeric"
-  });
+  const formatted = columnDateFormatterET.format(new Date(utcString));
   return `(${formatted})`;
 }
 

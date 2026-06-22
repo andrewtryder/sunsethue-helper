@@ -40,7 +40,7 @@
     ],
     "limits": {
       "firstLine": "72",
-      "otherLine": "80"
+      "otherLine": "100"
     }
   }
 }

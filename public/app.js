@@ -557,9 +557,11 @@ triggerTestBtn.addEventListener("click", async () => {
     }
     
     showEmailSuccessModal();
-    await fetchApiCreditsStatus();
-    await fetchRuns();
-    await fetchLocations();
+    await Promise.all([
+      fetchApiCreditsStatus(),
+      fetchRuns(),
+      fetchLocations()
+    ]);
   } catch (error) {
     console.error(error);
     showBanner(dbErrorBanner, "Trigger Failed: " + error.message);

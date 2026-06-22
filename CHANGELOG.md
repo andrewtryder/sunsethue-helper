@@ -4,6 +4,20 @@ All notable changes to this project are documented in this file.
 
 This changelog follows [Conventional Commits](https://www.conventionalcommits.org/) and is maintained by [release-please](https://github.com/googleapis/release-please). Release sections group changes by commit type (`feat`, `fix`, etc.). Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.13.0](https://github.com/andrewtryder/sunsethue-helper/compare/sunsethue-helper-v1.12.1...sunsethue-helper-v1.13.0) (2026-06-22)
+
+
+### Features
+
+* **ui:** improve screen reader accessibility for icon buttons ([#22](https://github.com/andrewtryder/sunsethue-helper/issues/22)) ([036ac36](https://github.com/andrewtryder/sunsethue-helper/commit/036ac3652d4f3be590b523fdc418bda5377309c4))
+
+
+### Performance Improvements
+
+* **formatting:** cache Intl.DateTimeFormat for date/time parsing ([#24](https://github.com/andrewtryder/sunsethue-helper/issues/24)) ([af52872](https://github.com/andrewtryder/sunsethue-helper/commit/af528722b0a11f35022939731b605da60c05e9e9))
+* **report:** parallelize api fetches and sequence db writes ([#23](https://github.com/andrewtryder/sunsethue-helper/issues/23)) ([5c770e3](https://github.com/andrewtryder/sunsethue-helper/commit/5c770e351e503f4f2935a38f1daad7f416a1de9d))
+* **worker:** run forecast API queries concurrently ([#21](https://github.com/andrewtryder/sunsethue-helper/issues/21)) ([a0b4a1f](https://github.com/andrewtryder/sunsethue-helper/commit/a0b4a1ff51cf92944fdef2a64ec93b1037c8a320))
+
 ## [1.12.1](https://github.com/andrewtryder/sunsethue-helper/compare/sunsethue-helper-v1.12.0...sunsethue-helper-v1.12.1) (2026-06-20)
 
 

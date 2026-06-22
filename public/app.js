@@ -235,17 +235,17 @@ function renderLocations() {
           <h3>${escapeHtml(location.name)}</h3>
           <div class="location-coords">${formatCoordinateDisplay(location.latitude, location.longitude)}</div>
           <div class="location-badges">
-            <span class="location-badge-chip"><span class="material-symbols-outlined" style="font-size:14px;font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 20;">wb_twilight</span> ${sunriseTimeText} ${sunriseBadge}</span>
-            <span class="location-badge-chip"><span class="material-symbols-outlined" style="font-size:14px;font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 20;">wb_sunny</span> ${sunsetTimeText} ${sunsetBadge}</span>
+            <span class="location-badge-chip"><span class="material-symbols-outlined" aria-hidden="true" style="font-size:14px;font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 20;">wb_twilight</span> ${sunriseTimeText} ${sunriseBadge}</span>
+            <span class="location-badge-chip"><span class="material-symbols-outlined" aria-hidden="true" style="font-size:14px;font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 20;">wb_sunny</span> ${sunsetTimeText} ${sunsetBadge}</span>
           </div>
           ${errorSection}
         </div>
         <div class="location-actions">
-          <button class="btn-icon edit-btn" data-id="${location.id}" title="Edit">
-            <span class="material-symbols-outlined" style="font-size:18px;">edit</span>
+          <button class="btn-icon edit-btn" data-id="${location.id}" title="Edit" aria-label="Edit location ${escapeHtml(location.name)}">
+            <span class="material-symbols-outlined" aria-hidden="true" style="font-size:18px;">edit</span>
           </button>
-          <button class="btn-icon btn-icon-danger delete-btn" data-id="${location.id}" title="Delete">
-            <span class="material-symbols-outlined" style="font-size:18px;">delete</span>
+          <button class="btn-icon btn-icon-danger delete-btn" data-id="${location.id}" title="Delete" aria-label="Delete location ${escapeHtml(location.name)}">
+            <span class="material-symbols-outlined" aria-hidden="true" style="font-size:18px;">delete</span>
           </button>
         </div>
       `;

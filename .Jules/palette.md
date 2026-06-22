@@ -1,0 +1,3 @@
+## 2024-06-25 - Added aria labels to icon buttons and hid decorative icons
+**Learning:** Google Material Icons (`material-symbols-outlined`) render text within the element (e.g. `wb_sunny`, `search`). Without `aria-hidden="true"`, screen readers might read the literal text instead of identifying it as a decorative icon. Also, icon-only buttons need descriptive `aria-label` attributes for accessibility.
+**Action:** When adding or working with material icons, always use `aria-hidden="true"` and pair them with `aria-label` on interactive parent elements.

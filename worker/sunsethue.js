@@ -70,13 +70,16 @@ export function normalizeCreditsJson(json) {
   };
 }
 
+// Cache expensive Intl.DateTimeFormat instance globally to improve execution speed
+const probeDateFormatterET = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "America/New_York",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit"
+});
+
 function getProbeDateET() {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/New_York",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  }).format(new Date());
+  return probeDateFormatterET.format(new Date());
 }
 
 async function fetchCreditsFromEndpoint(fetchFn, apiKey, path) {

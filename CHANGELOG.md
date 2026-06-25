@@ -4,6 +4,20 @@ All notable changes to this project are documented in this file.
 
 This changelog follows [Conventional Commits](https://www.conventionalcommits.org/) and is maintained by [release-please](https://github.com/googleapis/release-please). Release sections group changes by commit type (`feat`, `fix`, etc.). Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.15.0](https://github.com/andrewtryder/sunsethue-helper/compare/v1.14.0...v1.15.0) (2026-06-25)
+
+
+### Features
+
+* **a11y:** add aria-live to notification banners ([#30](https://github.com/andrewtryder/sunsethue-helper/issues/30)) ([e82d410](https://github.com/andrewtryder/sunsethue-helper/commit/e82d410c342f45808a4f3be7f9806eaecbeca07a))
+* **ui:** add save button loading state and banner a11y roles ([#28](https://github.com/andrewtryder/sunsethue-helper/issues/28)) ([fdfd8d0](https://github.com/andrewtryder/sunsethue-helper/commit/fdfd8d07db2ab04c4f061735081b73e52c528efc))
+
+
+### Performance Improvements
+
+* **backend:** cache Intl.DateTimeFormat instances ([#29](https://github.com/andrewtryder/sunsethue-helper/issues/29)) ([4887117](https://github.com/andrewtryder/sunsethue-helper/commit/4887117349c7f4affd2222798405d18fe712e9a3))
+* **worker:** cache Intl.DateTimeFormat instances ([#31](https://github.com/andrewtryder/sunsethue-helper/issues/31)) ([0ae09cb](https://github.com/andrewtryder/sunsethue-helper/commit/0ae09cb12fa298f24a2e811beab6bd6c4f00960b))
+
 ## [1.14.0](https://github.com/andrewtryder/sunsethue-helper/compare/v1.13.0...v1.14.0) (2026-06-22)
 
 

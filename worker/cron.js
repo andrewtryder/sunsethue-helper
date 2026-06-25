@@ -1,19 +1,25 @@
 import { runAndSendReport } from "./report.js";
 
+// ⚡ Bolt Performance Optimization:
+// Caching Intl.DateTimeFormat instances at the module level prevents the V8 engine
+// from expensively re-initializing them on every single cron invocation.
+const hourFormatterET = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/New_York",
+  hour: "numeric",
+  hour12: false
+});
+
+const minuteFormatterET = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/New_York",
+  minute: "numeric"
+});
+
 export async function handleScheduledReport(event, env) {
   const now = new Date();
   
   // Format to Eastern Time hour and minute
-  const hourStr = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/New_York",
-    hour: "numeric",
-    hour12: false
-  }).format(now);
-
-  const minuteStr = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/New_York",
-    minute: "numeric"
-  }).format(now);
+  const hourStr = hourFormatterET.format(now);
+  const minuteStr = minuteFormatterET.format(now);
 
   const currentHour = parseInt(hourStr, 10);
   const currentMinute = parseInt(minuteStr, 10);

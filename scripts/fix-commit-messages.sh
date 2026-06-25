@@ -25,9 +25,9 @@ fi
 echo "Rewriting commit messages in range ${BASE_SHA}..${HEAD_SHA}"
 
 export FILTER_BRANCH_SQUELCH_WARNING=1
-git filter-branch -f --msg-filter 'node scripts/wrap-commit-message.js' "${BASE_SHA}^..${HEAD_SHA}"
+git filter-branch -f --msg-filter 'node scripts/wrap-commit-message.js' "${BASE_SHA}"..${HEAD_SHA}
 
-if ! npx commitplease "${BASE_SHA}..HEAD"; then
+if ! npx commitplease "${BASE_SHA}..${HEAD_SHA}"; then
   echo "Commit messages still invalid after rewrite"
   exit 1
 fi

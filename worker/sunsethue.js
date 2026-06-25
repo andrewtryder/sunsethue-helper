@@ -70,13 +70,18 @@ export function normalizeCreditsJson(json) {
   };
 }
 
+// ⚡ Bolt Performance Optimization:
+// Caching Intl.DateTimeFormat instances at the module level prevents the V8 engine
+// from expensively re-initializing them on every single rate limit probe invocation.
+const probeDateFormatterET = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "America/New_York",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit"
+});
+
 function getProbeDateET() {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/New_York",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  }).format(new Date());
+  return probeDateFormatterET.format(new Date());
 }
 
 async function fetchCreditsFromEndpoint(fetchFn, apiKey, path) {

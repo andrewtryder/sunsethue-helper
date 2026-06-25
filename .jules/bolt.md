@@ -9,3 +9,6 @@
 ## 2025-06-23 - [Cache Intl.DateTimeFormat Instances]
 **Learning:** Instantiating `Intl.DateTimeFormat` objects inside functions that execute frequently (such as scheduled tasks or hot loops) introduces unnecessary parsing latency overhead in V8/Cloudflare Workers.
 **Action:** When using `Intl.DateTimeFormat`, cache the instance globally or at the module level. This optimizes formatting operations to near zero overhead by reusing the same engine format cache instead of re-instantiating on every tick.
+## 2025-06-25 - [Single-pass Array Filtering over Chained Methods]
+**Learning:** Chaining array methods like `.filter().sort()` containing expensive date operations (like `new Date().getTime()`) causes significant CPU overhead in backend processing paths, scaling poorly over large event sets.
+**Action:** Replace `.filter().sort()` combinations on temporal data with a single `O(N)` loop to minimize instantiations, avoid intermediate array allocations, and optimize hot path performance in the worker.

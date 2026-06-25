@@ -1,6 +1,8 @@
 import { runAndSendReport } from "./report.js";
 
-// Cache expensive Intl.DateTimeFormat instances globally to improve execution speed
+// ⚡ Bolt Performance Optimization:
+// Caching Intl.DateTimeFormat instances at the module level prevents the V8 engine
+// from expensively re-initializing them on every single cron invocation.
 const hourFormatterET = new Intl.DateTimeFormat("en-US", {
   timeZone: "America/New_York",
   hour: "numeric",

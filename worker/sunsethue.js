@@ -70,7 +70,9 @@ export function normalizeCreditsJson(json) {
   };
 }
 
-// Cache expensive Intl.DateTimeFormat instance globally to improve execution speed
+// ⚡ Bolt Performance Optimization:
+// Caching Intl.DateTimeFormat instances at the module level prevents the V8 engine
+// from expensively re-initializing them on every single rate limit probe invocation.
 const probeDateFormatterET = new Intl.DateTimeFormat("en-CA", {
   timeZone: "America/New_York",
   year: "numeric",

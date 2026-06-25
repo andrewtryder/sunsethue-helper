@@ -455,6 +455,10 @@ locationForm.addEventListener("submit", async (e) => {
     return;
   }
   
+  saveLocationBtn.disabled = true;
+  const originalSaveText = saveLocationBtn.innerHTML;
+  saveLocationBtn.innerHTML = '<span class="spinner" style="width: 18px; height: 18px; border-width: 2px;"></span><span>Saving...</span>';
+
   try {
     if (id) {
       // Edit mode via API
@@ -489,6 +493,9 @@ locationForm.addEventListener("submit", async (e) => {
   } catch (error) {
     console.error(error);
     showBanner(dbErrorBanner, "Database Error: " + error.message);
+  } finally {
+    saveLocationBtn.disabled = false;
+    saveLocationBtn.innerHTML = originalSaveText;
   }
 });
 

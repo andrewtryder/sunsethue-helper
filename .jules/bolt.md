@@ -6,3 +6,6 @@
 - Use Conventional Commits: `type(scope): imperative subject` (max 72 characters on the subject line).
 - Wrap body lines at 80 characters; do not write single-line body paragraphs.
 - Allowed types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert.
+## 2025-06-23 - [Cache Intl.DateTimeFormat Instances]
+**Learning:** Instantiating `Intl.DateTimeFormat` objects inside functions that execute frequently (such as scheduled tasks or hot loops) introduces unnecessary parsing latency overhead in V8/Cloudflare Workers.
+**Action:** When using `Intl.DateTimeFormat`, cache the instance globally or at the module level. This optimizes formatting operations to near zero overhead by reusing the same engine format cache instead of re-instantiating on every tick.

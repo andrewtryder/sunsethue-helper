@@ -175,18 +175,32 @@ export function normalizeForecastEvent(event) {
   };
 }
 
+// ⚡ Bolt Performance Optimization:
+// Replaced O(n log n) filter+sort chain with a single O(n) pass.
+// This reduces CPU cycles when parsing multiple forecast events for multiple locations
+// by finding the minimum future time directly without array allocation and sorting overhead.
 export function selectNextSunEvents(events, nowMs = Date.now()) {
-  const sunriseEvents = events
-    .filter((event) => event.type === "sunrise" && new Date(event.time).getTime() > nowMs)
-    .sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
+  let nextSunrise = null;
+  let nextSunset = null;
+  let minSunriseTime = Infinity;
+  let minSunsetTime = Infinity;
 
-  const sunsetEvents = events
-    .filter((event) => event.type === "sunset" && new Date(event.time).getTime() > nowMs)
-    .sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
+  for (const event of events) {
+    const timeMs = new Date(event.time).getTime();
+    if (timeMs > nowMs) {
+      if (event.type === "sunrise" && timeMs < minSunriseTime) {
+        minSunriseTime = timeMs;
+        nextSunrise = event;
+      } else if (event.type === "sunset" && timeMs < minSunsetTime) {
+        minSunsetTime = timeMs;
+        nextSunset = event;
+      }
+    }
+  }
 
   return {
-    nextSunrise: sunriseEvents[0] || null,
-    nextSunset: sunsetEvents[0] || null
+    nextSunrise,
+    nextSunset
   };
 }
 

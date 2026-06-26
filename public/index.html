@@ -27,10 +27,10 @@
           <span class="logo-subtitle">Helper</span>
         </div>
 
-        <nav class="desktop-nav" aria-label="Main navigation">
-          <button class="nav-tab active" data-tab="main" id="nav-main">Main Forecast</button>
-          <button class="nav-tab" data-tab="locations" id="nav-locations">Manage Locations</button>
-          <button class="nav-tab" data-tab="logs" id="nav-logs">Execution Logs</button>
+        <nav class="desktop-nav" aria-label="Main navigation" role="tablist">
+          <button class="nav-tab active" data-tab="main" id="nav-main" role="tab" aria-selected="true" aria-controls="pane-main">Main Forecast</button>
+          <button class="nav-tab" data-tab="locations" id="nav-locations" role="tab" aria-selected="false" aria-controls="pane-locations">Manage Locations</button>
+          <button class="nav-tab" data-tab="logs" id="nav-logs" role="tab" aria-selected="false" aria-controls="pane-logs">Execution Logs</button>
         </nav>
       </div>
     </header>
@@ -39,13 +39,13 @@
     <div id="db-error-banner" class="notification-banner error" role="alert" aria-live="assertive"></div>
 
     <main id="app-main-canvas">
-      <nav class="mobile-segment-nav" aria-label="Main navigation mobile">
-        <button class="nav-tab active" data-tab="main">Main Forecast</button>
-        <button class="nav-tab" data-tab="locations">Manage Locations</button>
-        <button class="nav-tab" data-tab="logs">Execution Logs</button>
+      <nav class="mobile-segment-nav" aria-label="Main navigation mobile" role="tablist">
+        <button class="nav-tab active" data-tab="main" role="tab" aria-selected="true" aria-controls="pane-main">Main Forecast</button>
+        <button class="nav-tab" data-tab="locations" role="tab" aria-selected="false" aria-controls="pane-locations">Manage Locations</button>
+        <button class="nav-tab" data-tab="logs" role="tab" aria-selected="false" aria-controls="pane-logs">Execution Logs</button>
       </nav>
 
-      <div id="pane-main" class="tab-pane active">
+      <div id="pane-main" class="tab-pane active" role="tabpanel" aria-labelledby="nav-main">
         <div class="pane-header">
           <h2>Forecast Dashboard</h2>
           <span class="last-updated-badge" id="dashboard-last-updated">Last Run: N/A</span>
@@ -62,7 +62,7 @@
         </div>
       </div>
 
-      <div id="pane-locations" class="tab-pane">
+      <div id="pane-locations" class="tab-pane" role="tabpanel" aria-labelledby="nav-locations">
         <div class="locations-grid">
           <section>
             <div class="section-header">
@@ -129,7 +129,7 @@
         </div>
       </div>
 
-      <div id="pane-logs" class="tab-pane">
+      <div id="pane-logs" class="tab-pane" role="tabpanel" aria-labelledby="nav-logs">
         <div class="pane-header">
           <h2>Execution Logs</h2>
           <span id="api-credits-status" class="api-credits-badge">Loading API credits…</span>
@@ -157,16 +157,16 @@
       </div>
     </footer>
 
-    <nav id="bottom-nav" aria-label="Bottom navigation">
-      <button class="bottom-nav-item active" data-tab="main">
+    <nav id="bottom-nav" aria-label="Bottom navigation" role="tablist">
+      <button class="bottom-nav-item active" data-tab="main" role="tab" aria-selected="true" aria-controls="pane-main">
         <span class="material-symbols-outlined" aria-hidden="true">wb_sunny</span>
         <span>Forecast</span>
       </button>
-      <button class="bottom-nav-item" data-tab="locations">
+      <button class="bottom-nav-item" data-tab="locations" role="tab" aria-selected="false" aria-controls="pane-locations">
         <span class="material-symbols-outlined" aria-hidden="true">location_on</span>
         <span>Locations</span>
       </button>
-      <button class="bottom-nav-item" data-tab="logs">
+      <button class="bottom-nav-item" data-tab="logs" role="tab" aria-selected="false" aria-controls="pane-logs">
         <span class="material-symbols-outlined" aria-hidden="true">assignment</span>
         <span>Logs</span>
       </button>

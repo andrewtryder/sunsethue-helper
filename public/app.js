@@ -894,8 +894,10 @@ function switchTab(targetTab) {
   allNavButtons.forEach(b => {
     if (b.getAttribute("data-tab") === targetTab) {
       b.classList.add("active");
+      b.setAttribute("aria-selected", "true");
     } else {
       b.classList.remove("active");
+      b.setAttribute("aria-selected", "false");
     }
   });
   tabPanes.forEach(p => p.classList.remove("active"));

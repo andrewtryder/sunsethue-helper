@@ -246,10 +246,10 @@ function renderLocations() {
       const sunsetBadge = getForecastBadgeHtml(location.latestSunsetQuality, location.latestSunsetText);
       
       const sunriseTimeText = location.latestSunriseTime 
-        ? timeFormatter.format(new Date(location.latestSunriseTime))
+        ? timeFormatter.format(Date.parse(location.latestSunriseTime))
         : "—";
       const sunsetTimeText = location.latestSunsetTime 
-        ? timeFormatter.format(new Date(location.latestSunsetTime))
+        ? timeFormatter.format(Date.parse(location.latestSunsetTime))
         : "—";
 
       let errorSection = "";
@@ -308,7 +308,7 @@ function renderLocations() {
 // Render Forecast Dashboard
 function formatForecastColumnDate(isoTime) {
   if (!isoTime) return "";
-  const formatted = dateFormatter.format(new Date(isoTime));
+  const formatted = dateFormatter.format(Date.parse(isoTime));
   return `(${formatted})`;
 }
 
@@ -362,7 +362,7 @@ function renderForecastDashboard() {
       }
     });
 
-    const isSunsetFirst = headerSunriseTime && headerSunsetTime && new Date(headerSunsetTime) < new Date(headerSunriseTime);
+    const isSunsetFirst = headerSunriseTime && headerSunsetTime && Date.parse(headerSunsetTime) < Date.parse(headerSunriseTime);
 
     const table = document.createElement("div");
     table.className = "forecast-table";
@@ -388,10 +388,10 @@ function renderForecastDashboard() {
       const sunsetBadge = getForecastBadgeHtml(location.latestSunsetQuality, location.latestSunsetText);
 
       const sunriseTimeText = location.latestSunriseTime
-        ? timeFormatter.format(new Date(location.latestSunriseTime))
+        ? timeFormatter.format(Date.parse(location.latestSunriseTime))
         : null;
       const sunsetTimeText = location.latestSunsetTime
-        ? timeFormatter.format(new Date(location.latestSunsetTime))
+        ? timeFormatter.format(Date.parse(location.latestSunsetTime))
         : null;
 
       let sunriseColHtml;
@@ -435,7 +435,7 @@ function renderForecastDashboard() {
 
     if (dashboardLastUpdated) {
       if (maxTimestamp > 0) {
-        const timeStr = dateTimeFormatterMedium.format(new Date(maxTimestamp));
+        const timeStr = dateTimeFormatterMedium.format(maxTimestamp);
         dashboardLastUpdated.textContent = `Last Run: ${timeStr} ET`;
       } else {
         dashboardLastUpdated.textContent = "Last Run: Never";
@@ -832,7 +832,7 @@ function formatApiCreditsLabel(credits) {
   let label = `Requests remaining: ${credits.remaining}${limitPart}`;
 
   if (credits.resetAt) {
-    const resetText = timeFormatterShort.format(new Date(credits.resetAt));
+    const resetText = timeFormatterShort.format(credits.resetAt);
     label += ` · resets ${resetText} ET`;
   }
 
@@ -877,7 +877,7 @@ function renderLogs(logs) {
     const logItem = document.createElement("div");
     logItem.className = "log-item";
     
-    const dateText = dateTimeFormatterMedium.format(new Date(log.timestamp));
+    const dateText = dateTimeFormatterMedium.format(log.timestamp);
     
     let statusClass = getLogStatusClass(log.status);
     const statusText = log.status.toUpperCase();

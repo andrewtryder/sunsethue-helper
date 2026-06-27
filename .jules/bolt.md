@@ -12,3 +12,6 @@
 ## 2025-06-25 - [Single-pass Array Filtering over Chained Methods]
 **Learning:** Chaining array methods like `.filter().sort()` containing expensive date operations (like `new Date().getTime()`) causes significant CPU overhead in backend processing paths, scaling poorly over large event sets.
 **Action:** Replace `.filter().sort()` combinations on temporal data with a single `O(N)` loop to minimize instantiations, avoid intermediate array allocations, and optimize hot path performance in the worker.
+## 2026-06-26 - [Use DocumentFragment to batch DOM insertions]
+**Learning:** Inserting elements into the DOM one-by-one inside a loop causes synchronous reflows and repaints in the browser, blocking the main thread and slowing down rendering.
+**Action:** Create a `DocumentFragment` using `document.createDocumentFragment()`, append all generated elements to it inside the loop, and then append the fragment to the container once outside the loop. This minimizes DOM interactions and drastically reduces reflows/repaints.

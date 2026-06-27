@@ -232,6 +232,12 @@ function renderLocations() {
     
     emptyStateView.classList.add("hidden");
     
+    // ⚡ Bolt Performance Optimization:
+    // Using a DocumentFragment avoids triggering a costly DOM reflow and repaint
+    // on every single loop iteration. Batching DOM insertions significantly reduces
+    // main thread blocking time.
+    const fragment = document.createDocumentFragment();
+
     locationsList.forEach((location) => {
       const card = document.createElement("div");
       card.className = "location-card";
@@ -271,9 +277,11 @@ function renderLocations() {
         </div>
       `;
       
-      locationsListContainer.appendChild(card);
+      fragment.appendChild(card);
     });
     
+    locationsListContainer.appendChild(fragment);
+
     // Attach event listeners to buttons
     document.querySelectorAll(".edit-btn").forEach(btn => {
       btn.addEventListener("click", (e) => {
@@ -769,6 +777,12 @@ function renderSuggestions(features) {
   activeSuggestionIndex = -1;
   currentSuggestions = features;
   
+  // ⚡ Bolt Performance Optimization:
+  // Using a DocumentFragment avoids triggering a costly DOM reflow and repaint
+  // on every single loop iteration. Batching DOM insertions significantly reduces
+  // main thread blocking time.
+  const fragment = document.createDocumentFragment();
+
   features.forEach((feature, index) => {
     const props = feature.properties;
     const coords = feature.geometry.coordinates; // [Lng, Lat]
@@ -798,8 +812,10 @@ function renderSuggestions(features) {
       locationNameInput.focus();
     });
     
-    searchSuggestions.appendChild(item);
+    fragment.appendChild(item);
   });
+
+  searchSuggestions.appendChild(fragment);
 }
 
 // Close suggestion dropdown if clicking outside
@@ -851,6 +867,12 @@ function renderLogs(logs) {
     return;
   }
   
+  // ⚡ Bolt Performance Optimization:
+  // Using a DocumentFragment avoids triggering a costly DOM reflow and repaint
+  // on every single loop iteration. Batching DOM insertions significantly reduces
+  // main thread blocking time.
+  const fragment = document.createDocumentFragment();
+
   logs.forEach((log) => {
     const logItem = document.createElement("div");
     logItem.className = "log-item";
@@ -882,8 +904,10 @@ function renderLogs(logs) {
       ${detailsHtml}
     `;
     
-    logsListContainer.appendChild(logItem);
+    fragment.appendChild(logItem);
   });
+
+  logsListContainer.appendChild(fragment);
 }
 
 // Tab Switching logic

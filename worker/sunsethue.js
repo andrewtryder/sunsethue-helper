@@ -81,7 +81,7 @@ const probeDateFormatterET = new Intl.DateTimeFormat("en-CA", {
 });
 
 function getProbeDateET() {
-  return probeDateFormatterET.format(new Date());
+  return probeDateFormatterET.format(Date.now());
 }
 
 async function fetchCreditsFromEndpoint(fetchFn, apiKey, path) {

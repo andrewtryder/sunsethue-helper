@@ -1133,3 +1133,11 @@ body.modal-open {
   text-align: right;
   max-width: 280px;
 }
+
+/* Accessibility: Keyboard focus indicators */
+button:focus-visible,
+a:focus-visible,
+[tabindex="0"]:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}

@@ -4,6 +4,24 @@ All notable changes to this project are documented in this file.
 
 This changelog follows [Conventional Commits](https://www.conventionalcommits.org/) and is maintained by [release-please](https://github.com/googleapis/release-please). Release sections group changes by commit type (`feat`, `fix`, etc.). Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.16.0](https://github.com/andrewtryder/sunsethue-helper/compare/v1.15.0...v1.16.0) (2026-06-27)
+
+
+### Features
+
+* **ui:** implement ARIA tab roles for accessibility ([b5027c1](https://github.com/andrewtryder/sunsethue-helper/commit/b5027c1c5a83e51d4efbac294e0b73cc7d2f19aa))
+
+
+### Bug Fixes
+
+* correct git filter-branch range syntax and variable reference in fix-commit-messages.sh ([eac1373](https://github.com/andrewtryder/sunsethue-helper/commit/eac1373f22a68811aee7f648f8c78100c5bba4e0))
+
+
+### Performance Improvements
+
+* **backend:** optimize selectNextSunEvents from O(n log n) to O(n) ([#34](https://github.com/andrewtryder/sunsethue-helper/issues/34)) ([2b49939](https://github.com/andrewtryder/sunsethue-helper/commit/2b49939aa205f366ce5de522e0f25d7ea4531101))
+* **frontend:** batch DOM insertions with DocumentFragment ([d00add1](https://github.com/andrewtryder/sunsethue-helper/commit/d00add124828f865b79dd8818b6c79011a818c76))
+
 ## [1.15.0](https://github.com/andrewtryder/sunsethue-helper/compare/v1.14.0...v1.15.0) (2026-06-25)
 
 

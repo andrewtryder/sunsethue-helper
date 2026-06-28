@@ -457,6 +457,11 @@ locationForm.addEventListener("submit", async (e) => {
   const name = locationNameInput.value.trim();
   const latitude = parseFloat(locationLatInput.value);
   const longitude = parseFloat(locationLngInput.value);
+
+  if (!name) {
+    showBanner(dbErrorBanner, "Location Name is required.");
+    return;
+  }
   
   if (!validateCoordinates(latitude, longitude)) {
     showBanner(dbErrorBanner, "Latitude and Longitude must be valid numbers.");

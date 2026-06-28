@@ -88,11 +88,11 @@
                 <div class="form-group">
                   <label for="search-address">Search Address / City</label>
                   <div class="search-row" style="position: relative;">
-                    <input type="text" id="search-address" class="form-input" placeholder="e.g. Venice Beach, CA" autocomplete="off">
+                    <input type="text" id="search-address" class="form-input" placeholder="e.g. Venice Beach, CA" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="search-suggestions">
                     <button type="button" id="search-address-btn" class="search-btn" title="Search Coordinates" aria-label="Search Coordinates">
                       <span class="material-symbols-outlined" aria-hidden="true" style="font-size:20px;">search</span>
                     </button>
-                    <div id="search-suggestions" class="suggestions-dropdown hidden"></div>
+                    <div id="search-suggestions" class="suggestions-dropdown hidden" role="listbox" aria-label="Address suggestions"></div>
                   </div>
                 </div>
 

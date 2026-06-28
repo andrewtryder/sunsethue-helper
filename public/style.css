@@ -808,6 +808,12 @@ input:disabled {
   margin-bottom: var(--space-unit);
 }
 
+.required-indicator {
+  color: var(--error);
+  margin-left: 4px;
+  font-weight: bold;
+}
+
 .form-input {
   width: 100%;
   background: transparent;

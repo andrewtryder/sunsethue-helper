@@ -24,7 +24,7 @@ const columnDateFormatterET = new Intl.DateTimeFormat("en-US", {
 export function formatTimeET(utcString) {
   if (!utcString) return "N/A";
   try {
-    const date = new Date(utcString);
+    const date = Date.parse(utcString);
     return timeFormatterET.format(date);
   } catch (error) {
     console.error("Error formatting date:", error);
@@ -101,14 +101,14 @@ export function formatTimeOnlyET(utcString) {
   if (!utcString) {
     return "N/A";
   }
-  return timeOnlyFormatterET.format(new Date(utcString));
+  return timeOnlyFormatterET.format(Date.parse(utcString));
 }
 
 export function formatColumnDateET(utcString) {
   if (!utcString) {
     return "";
   }
-  const formatted = columnDateFormatterET.format(new Date(utcString));
+  const formatted = columnDateFormatterET.format(Date.parse(utcString));
   return `(${formatted})`;
 }
 

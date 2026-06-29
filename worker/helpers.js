@@ -186,7 +186,11 @@ export function selectNextSunEvents(events, nowMs = Date.now()) {
   let minSunsetTime = Infinity;
 
   for (const event of events) {
-    const timeMs = new Date(event.time).getTime();
+    // ⚡ Bolt Performance Optimization:
+    // Using Date.parse() instead of new Date().getTime() avoids allocating a new Date
+    // object on the heap for every event, significantly reducing memory churn and CPU
+    // overhead in this hot loop.
+    const timeMs = Date.parse(event.time);
     if (timeMs > nowMs) {
       if (event.type === "sunrise" && timeMs < minSunriseTime) {
         minSunriseTime = timeMs;

@@ -19,3 +19,7 @@
 ## 2024-10-27 - Visual Required Indicators and Validation Feedback
 **Learning:** Adding the `required` attribute to HTML inputs alone isn't always enough for good UX, especially if `novalidate` might be used on the form (preventing native popups) or if users don't use screen readers. Visual indicators (like a red asterisk) make required fields immediately clear. Additionally, explicit front-end validation checks that produce clear, accessible error banners are vital for actionable feedback when a user submits an empty required field.
 **Action:** When creating forms, include explicit visual cues (e.g. `<span class="required-indicator" aria-hidden="true" title="required">*</span>`) for required fields. Ensure custom JavaScript submission handlers provide immediate, friendly error messages if required data is missing.
+
+## 2026-06-29 - Combobox Accessibility
+**Learning:** The autocomplete component lacked the `role="combobox"` pattern, which makes it opaque to screen readers. Adding the `combobox` role, `aria-expanded`, `aria-controls`, and `aria-autocomplete` to the input, `role="listbox"` to the dropdown, `role="option"` and `aria-selected` to suggestions, and dynamically updating `aria-activedescendant` on the input provides a robust, accessible autocomplete experience.
+**Action:** Always implement the full ARIA combobox pattern for autocomplete inputs to ensure they are accessible to screen reader users.

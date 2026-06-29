@@ -8,38 +8,41 @@ import {
   buildPhotonDisplayName,
   moveSuggestionIndex,
   shouldSearchAutocomplete,
-  mapGeolocationError
+  mapGeolocationError,
 } from "./lib/helpers.js";
 
 const timeFormatter = new Intl.DateTimeFormat("en-US", {
   timeZone: "America/New_York",
   hour: "numeric",
-  minute: "2-digit"
+  minute: "2-digit",
 });
 const dateFormatter = new Intl.DateTimeFormat("en-US", {
   timeZone: "America/New_York",
   weekday: "short",
   month: "short",
-  day: "numeric"
+  day: "numeric",
 });
 const dateTimeFormatterMedium = new Intl.DateTimeFormat("en-US", {
   timeZone: "America/New_York",
   dateStyle: "medium",
-  timeStyle: "short"
+  timeStyle: "short",
 });
 const timeFormatterShort = new Intl.DateTimeFormat("en-US", {
   timeZone: "America/New_York",
-  timeStyle: "short"
+  timeStyle: "short",
 });
 
-const DEBUG = typeof window !== "undefined" && (
-  window.location.search.includes("debug=true") || 
-  localStorage.getItem("debug") === "true"
-);
+const DEBUG =
+  typeof window !== "undefined" &&
+  (window.location.search.includes("debug=true") ||
+    localStorage.getItem("debug") === "true");
 
-const API_BASE = (typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"))
-  ? "http://localhost:8789"
-  : "https://sunsethue-helper-worker.mrcoffee.workers.dev";
+const API_BASE =
+  typeof window !== "undefined" &&
+  (window.location.hostname === "localhost" ||
+    window.location.hostname === "127.0.0.1")
+    ? "http://localhost:8789"
+    : "https://sunsethue-helper-worker.mrcoffee.workers.dev";
 
 // DOM Elements
 const appContainer = document.getElementById("app-container");
@@ -54,15 +57,21 @@ const formTitle = document.getElementById("form-title");
 
 const searchAddressInput = document.getElementById("search-address");
 const searchAddressBtn = document.getElementById("search-address-btn");
-const useCurrentLocationBtn = document.getElementById("use-current-location-btn");
+const useCurrentLocationBtn = document.getElementById(
+  "use-current-location-btn",
+);
 const searchSuggestions = document.getElementById("search-suggestions");
 
 const logsListContainer = document.getElementById("logs-list-container");
 
-const locationsListContainer = document.getElementById("locations-list-container");
+const locationsListContainer = document.getElementById(
+  "locations-list-container",
+);
 const emptyStateView = document.getElementById("empty-state-view");
 const locationsCountBadge = document.getElementById("locations-count-badge");
-const forecastCardsContainer = document.getElementById("forecast-cards-container");
+const forecastCardsContainer = document.getElementById(
+  "forecast-cards-container",
+);
 const forecastEmptyState = document.getElementById("forecast-empty-state");
 const dashboardLastUpdated = document.getElementById("dashboard-last-updated");
 
@@ -74,9 +83,15 @@ const triggerStatus = document.getElementById("trigger-status");
 const triggerStatusText = document.getElementById("trigger-status-text");
 
 const emailSuccessModal = document.getElementById("email-success-modal");
-const emailSuccessModalMessage = document.getElementById("email-success-modal-message");
-const emailSuccessModalClose = document.getElementById("email-success-modal-close");
-const emailSuccessModalDone = document.getElementById("email-success-modal-done");
+const emailSuccessModalMessage = document.getElementById(
+  "email-success-modal-message",
+);
+const emailSuccessModalClose = document.getElementById(
+  "email-success-modal-close",
+);
+const emailSuccessModalDone = document.getElementById(
+  "email-success-modal-done",
+);
 
 const apiCreditsStatus = document.getElementById("api-credits-status");
 
@@ -94,7 +109,7 @@ function showBanner(bannerElement, message, duration = 5000) {
   bannerElement.textContent = message;
   bannerElement.classList.add("show");
   bannerElement.style.display = "block";
-  
+
   if (duration > 0) {
     const timeoutId = setTimeout(() => {
       bannerElement.classList.remove("show");
@@ -149,7 +164,10 @@ if (emailSuccessModal) {
   });
 }
 document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && emailSuccessModal?.classList.contains("is-open")) {
+  if (
+    event.key === "Escape" &&
+    emailSuccessModal?.classList.contains("is-open")
+  ) {
     hideEmailSuccessModal();
   }
 });
@@ -160,7 +178,7 @@ async function initApp() {
   try {
     appContainer.classList.remove("hidden");
     document.body.classList.add("app-visible");
-    
+
     // Load config
     try {
       const configResponse = await fetch(`${API_BASE}/api/config`);
@@ -173,10 +191,7 @@ async function initApp() {
     }
 
     // Load locations and runs
-    await Promise.all([
-      fetchLocations(),
-      fetchRuns()
-    ]);
+    await Promise.all([fetchLocations(), fetchRuns()]);
   } catch (error) {
     console.error("Initialization failed: ", error);
     showBanner(dbErrorBanner, `Initialization Error: ${error.message}`, 0);
@@ -219,19 +234,20 @@ async function fetchRuns() {
 // Render Locations Card List
 function renderLocations() {
   try {
-    if (DEBUG) console.log("renderLocations called. locationsList:", locationsList);
+    if (DEBUG)
+      console.log("renderLocations called. locationsList:", locationsList);
     locationsCountBadge.textContent = `${locationsList.length} / 10`;
     locationsListContainer.innerHTML = "";
-    
+
     if (locationsList.length === 0) {
       locationsListContainer.appendChild(emptyStateView);
       emptyStateView.classList.remove("hidden");
       renderForecastDashboard();
       return;
     }
-    
+
     emptyStateView.classList.add("hidden");
-    
+
     // ⚡ Bolt Performance Optimization:
     // Using a DocumentFragment avoids triggering a costly DOM reflow and repaint
     // on every single loop iteration. Batching DOM insertions significantly reduces
@@ -241,14 +257,20 @@ function renderLocations() {
     locationsList.forEach((location) => {
       const card = document.createElement("div");
       card.className = "location-card";
-      
-      const sunriseBadge = getForecastBadgeHtml(location.latestSunriseQuality, location.latestSunriseText);
-      const sunsetBadge = getForecastBadgeHtml(location.latestSunsetQuality, location.latestSunsetText);
-      
-      const sunriseTimeText = location.latestSunriseTime 
+
+      const sunriseBadge = getForecastBadgeHtml(
+        location.latestSunriseQuality,
+        location.latestSunriseText,
+      );
+      const sunsetBadge = getForecastBadgeHtml(
+        location.latestSunsetQuality,
+        location.latestSunsetText,
+      );
+
+      const sunriseTimeText = location.latestSunriseTime
         ? timeFormatter.format(Date.parse(location.latestSunriseTime))
         : "—";
-      const sunsetTimeText = location.latestSunsetTime 
+      const sunsetTimeText = location.latestSunsetTime
         ? timeFormatter.format(Date.parse(location.latestSunsetTime))
         : "—";
 
@@ -276,21 +298,21 @@ function renderLocations() {
           </button>
         </div>
       `;
-      
+
       fragment.appendChild(card);
     });
-    
+
     locationsListContainer.appendChild(fragment);
 
     // Attach event listeners to buttons
-    document.querySelectorAll(".edit-btn").forEach(btn => {
+    document.querySelectorAll(".edit-btn").forEach((btn) => {
       btn.addEventListener("click", (e) => {
         const locId = e.currentTarget.getAttribute("data-id");
         startEditLocation(locId);
       });
     });
-    
-    document.querySelectorAll(".delete-btn").forEach(btn => {
+
+    document.querySelectorAll(".delete-btn").forEach((btn) => {
       btn.addEventListener("click", (e) => {
         const locId = e.currentTarget.getAttribute("data-id");
         deleteLocation(locId);
@@ -312,7 +334,13 @@ function formatForecastColumnDate(isoTime) {
   return `(${formatted})`;
 }
 
-function buildForecastEventColumnHtml({ timeText, badgeHtml, mobileLabel, errorHtml, emptyHtml }) {
+function buildForecastEventColumnHtml({
+  timeText,
+  badgeHtml,
+  mobileLabel,
+  errorHtml,
+  emptyHtml,
+}) {
   if (errorHtml) {
     return `<div class="forecast-event-col">${errorHtml}</div>`;
   }
@@ -331,16 +359,21 @@ function buildForecastEventColumnHtml({ timeText, badgeHtml, mobileLabel, errorH
 
 function renderForecastDashboard() {
   try {
-    if (DEBUG) console.log("renderForecastDashboard called. locationsList:", locationsList);
+    if (DEBUG)
+      console.log(
+        "renderForecastDashboard called. locationsList:",
+        locationsList,
+      );
     if (!forecastCardsContainer) return;
 
-    Array.from(forecastCardsContainer.children).forEach(child => {
+    Array.from(forecastCardsContainer.children).forEach((child) => {
       if (child !== forecastEmptyState) child.remove();
     });
 
     if (locationsList.length === 0) {
       if (forecastEmptyState) forecastEmptyState.classList.remove("hidden");
-      if (dashboardLastUpdated) dashboardLastUpdated.textContent = "Last Run: N/A";
+      if (dashboardLastUpdated)
+        dashboardLastUpdated.textContent = "Last Run: N/A";
       return;
     }
 
@@ -351,7 +384,10 @@ function renderForecastDashboard() {
     let headerSunsetTime = null;
 
     locationsList.forEach((location) => {
-      if (location.lastForecastUpdate && location.lastForecastUpdate > maxTimestamp) {
+      if (
+        location.lastForecastUpdate &&
+        location.lastForecastUpdate > maxTimestamp
+      ) {
         maxTimestamp = location.lastForecastUpdate;
       }
       if (!headerSunriseTime && location.latestSunriseTime) {
@@ -362,7 +398,10 @@ function renderForecastDashboard() {
       }
     });
 
-    const isSunsetFirst = headerSunriseTime && headerSunsetTime && Date.parse(headerSunsetTime) < Date.parse(headerSunriseTime);
+    const isSunsetFirst =
+      headerSunriseTime &&
+      headerSunsetTime &&
+      Date.parse(headerSunsetTime) < Date.parse(headerSunriseTime);
 
     const table = document.createElement("div");
     table.className = "forecast-table";
@@ -372,10 +411,11 @@ function renderForecastDashboard() {
     header.innerHTML = `
       <div class="forecast-table-header-location">Location</div>
       <div class="forecast-table-header-events">
-        ${isSunsetFirst
-          ? `<div class="forecast-table-header-col">Next Sunset ${formatForecastColumnDate(headerSunsetTime)}</div>
+        ${
+          isSunsetFirst
+            ? `<div class="forecast-table-header-col">Next Sunset ${formatForecastColumnDate(headerSunsetTime)}</div>
              <div class="forecast-table-header-col">Next Sunrise ${formatForecastColumnDate(headerSunriseTime)}</div>`
-          : `<div class="forecast-table-header-col">Next Sunrise ${formatForecastColumnDate(headerSunriseTime)}</div>
+            : `<div class="forecast-table-header-col">Next Sunrise ${formatForecastColumnDate(headerSunriseTime)}</div>
              <div class="forecast-table-header-col">Next Sunset ${formatForecastColumnDate(headerSunsetTime)}</div>`
         }
       </div>
@@ -383,9 +423,17 @@ function renderForecastDashboard() {
     table.appendChild(header);
 
     locationsList.forEach((location) => {
-      const hasForecast = location.latestSunriseTime !== undefined && location.latestSunriseTime !== null;
-      const sunriseBadge = getForecastBadgeHtml(location.latestSunriseQuality, location.latestSunriseText);
-      const sunsetBadge = getForecastBadgeHtml(location.latestSunsetQuality, location.latestSunsetText);
+      const hasForecast =
+        location.latestSunriseTime !== undefined &&
+        location.latestSunriseTime !== null;
+      const sunriseBadge = getForecastBadgeHtml(
+        location.latestSunriseQuality,
+        location.latestSunriseText,
+      );
+      const sunsetBadge = getForecastBadgeHtml(
+        location.latestSunsetQuality,
+        location.latestSunsetText,
+      );
 
       const sunriseTimeText = location.latestSunriseTime
         ? timeFormatter.format(Date.parse(location.latestSunriseTime))
@@ -409,12 +457,12 @@ function renderForecastDashboard() {
         sunriseColHtml = buildForecastEventColumnHtml({
           timeText: sunriseTimeText,
           badgeHtml: sunriseBadge,
-          mobileLabel: "Sunrise"
+          mobileLabel: "Sunrise",
         });
         sunsetColHtml = buildForecastEventColumnHtml({
           timeText: sunsetTimeText,
           badgeHtml: sunsetBadge,
-          mobileLabel: "Sunset"
+          mobileLabel: "Sunset",
         });
       }
 
@@ -452,7 +500,7 @@ function renderForecastDashboard() {
 // CRUD Actions
 locationForm.addEventListener("submit", async (e) => {
   e.preventDefault();
-  
+
   const id = locationIdInput.value;
   const name = locationNameInput.value.trim();
   const latitude = parseFloat(locationLatInput.value);
@@ -462,15 +510,16 @@ locationForm.addEventListener("submit", async (e) => {
     showBanner(dbErrorBanner, "Location Name is required.");
     return;
   }
-  
+
   if (!validateCoordinates(latitude, longitude)) {
     showBanner(dbErrorBanner, "Latitude and Longitude must be valid numbers.");
     return;
   }
-  
+
   saveLocationBtn.disabled = true;
   const originalSaveText = saveLocationBtn.innerHTML;
-  saveLocationBtn.innerHTML = '<span class="spinner" style="width: 18px; height: 18px; border-width: 2px;"></span><span>Saving...</span>';
+  saveLocationBtn.innerHTML =
+    '<span class="spinner" style="width: 18px; height: 18px; border-width: 2px;"></span><span>Saving...</span>';
 
   try {
     if (id) {
@@ -478,7 +527,7 @@ locationForm.addEventListener("submit", async (e) => {
       const response = await fetch(`${API_BASE}/api/locations/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, latitude, longitude })
+        body: JSON.stringify({ name, latitude, longitude }),
       });
       if (!response.ok) {
         throw new Error(await response.text());
@@ -488,13 +537,16 @@ locationForm.addEventListener("submit", async (e) => {
     } else {
       // Create mode via API
       if (!canAddLocation(locationsList.length)) {
-        showBanner(dbErrorBanner, "Limit reached: You can monitor a maximum of 10 locations.");
+        showBanner(
+          dbErrorBanner,
+          "Limit reached: You can monitor a maximum of 10 locations.",
+        );
         return;
       }
       const response = await fetch(`${API_BASE}/api/locations`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, latitude, longitude })
+        body: JSON.stringify({ name, latitude, longitude }),
       });
       if (!response.ok) {
         throw new Error(await response.text());
@@ -513,16 +565,17 @@ locationForm.addEventListener("submit", async (e) => {
 });
 
 function startEditLocation(id) {
-  const loc = locationsList.find(l => l.id === id);
+  const loc = locationsList.find((l) => l.id === id);
   if (!loc) return;
-  
+
   locationIdInput.value = loc.id;
   locationNameInput.value = loc.name;
   locationLatInput.value = loc.latitude;
   locationLngInput.value = loc.longitude;
-  
+
   formTitle.textContent = "Edit Location";
-  saveLocationBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;">save</span><span>Update Location</span>';
+  saveLocationBtn.innerHTML =
+    '<span class="material-symbols-outlined" style="font-size:18px;">save</span><span>Update Location</span>';
   cancelEditBtn.classList.remove("hidden");
   locationNameInput.focus();
 }
@@ -532,22 +585,23 @@ function resetForm() {
   locationNameInput.value = "";
   locationLatInput.value = "";
   locationLngInput.value = "";
-  
+
   formTitle.textContent = "Add Location";
-  saveLocationBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;">save</span><span>Save Location</span>';
+  saveLocationBtn.innerHTML =
+    '<span class="material-symbols-outlined" style="font-size:18px;">save</span><span>Save Location</span>';
   cancelEditBtn.classList.add("hidden");
 }
 
 cancelEditBtn.addEventListener("click", resetForm);
 
 async function deleteLocation(id) {
-  const loc = locationsList.find(l => l.id === id);
+  const loc = locationsList.find((l) => l.id === id);
   if (!loc) return;
-  
+
   if (confirm(`Are you sure you want to delete "${loc.name}"?`)) {
     try {
       const response = await fetch(`${API_BASE}/api/locations/${id}`, {
-        method: "DELETE"
+        method: "DELETE",
       });
       if (!response.ok) {
         throw new Error(await response.text());
@@ -567,7 +621,10 @@ async function deleteLocation(id) {
 // Test Trigger for Daily Email Functions
 triggerTestBtn.addEventListener("click", async () => {
   if (locationsList.length === 0) {
-    showBanner(dbErrorBanner, "Cannot trigger test: You need to add at least 1 location.");
+    showBanner(
+      dbErrorBanner,
+      "Cannot trigger test: You need to add at least 1 location.",
+    );
     return;
   }
 
@@ -577,23 +634,19 @@ triggerTestBtn.addEventListener("click", async () => {
     triggerTestBtn.disabled = true;
     triggerTestBtn.textContent = "Sending…";
     triggerStatus.classList.remove("hidden");
-    
+
     const reportResponse = await fetch(`${API_BASE}/api/triggerReport`, {
-      method: "POST"
+      method: "POST",
     });
-    
+
     const result = await reportResponse.json();
-    
+
     if (!reportResponse.ok) {
       throw new Error(result.error || "Failed to trigger email report.");
     }
-    
+
     showEmailSuccessModal();
-    await Promise.all([
-      fetchApiCreditsStatus(),
-      fetchRuns(),
-      fetchLocations()
-    ]);
+    await Promise.all([fetchApiCreditsStatus(), fetchRuns(), fetchLocations()]);
   } catch (error) {
     console.error(error);
     showBanner(dbErrorBanner, "Trigger Failed: " + error.message);
@@ -610,11 +663,11 @@ useCurrentLocationBtn.addEventListener("click", () => {
     showBanner(dbErrorBanner, "Geolocation is not supported by your browser.");
     return;
   }
-  
+
   useCurrentLocationBtn.disabled = true;
   const originalText = useCurrentLocationBtn.textContent;
   useCurrentLocationBtn.textContent = "📍 Locating...";
-  
+
   navigator.geolocation.getCurrentPosition(
     (position) => {
       locationLatInput.value = position.coords.latitude.toFixed(6);
@@ -622,7 +675,7 @@ useCurrentLocationBtn.addEventListener("click", () => {
       showBanner(dbSuccessBanner, "Current location loaded.");
       useCurrentLocationBtn.disabled = false;
       useCurrentLocationBtn.textContent = originalText;
-      
+
       if (!locationNameInput.value) {
         locationNameInput.value = "Current Location";
       }
@@ -634,7 +687,7 @@ useCurrentLocationBtn.addEventListener("click", () => {
       useCurrentLocationBtn.disabled = false;
       useCurrentLocationBtn.textContent = originalText;
     },
-    { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
+    { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 },
   );
 });
 
@@ -645,49 +698,61 @@ async function performAddressSearch() {
     showBanner(dbErrorBanner, "Please enter an address or city to search.");
     return;
   }
-  
+
   searchAddressBtn.disabled = true;
-  const searchIcon = searchAddressBtn.querySelector(".material-symbols-outlined");
+  const searchIcon = searchAddressBtn.querySelector(
+    ".material-symbols-outlined",
+  );
   if (searchIcon) searchIcon.textContent = "hourglass_empty";
-  
+
   try {
     const response = await fetch(`${API_BASE}/api/searchCoordinates`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query: queryText })
+      body: JSON.stringify({ query: queryText }),
     });
-    
+
     if (!response.ok) {
       const errorJson = await response.json();
       throw new Error(errorJson.error || "Search service failed.");
     }
     const results = await response.json();
-    
+
     if (results && results.length > 0) {
       const match = results[0];
       const lat = parseFloat(match.lat);
       const lon = parseFloat(match.lon);
-      
+
       locationLatInput.value = lat.toFixed(6);
       locationLngInput.value = lon.toFixed(6);
-      
-      if (!locationNameInput.value || locationNameInput.value === "Current Location") {
+
+      if (
+        !locationNameInput.value ||
+        locationNameInput.value === "Current Location"
+      ) {
         const shortName = match.display_name.split(",")[0].trim();
         locationNameInput.value = shortName;
       }
-      
+
       showBanner(dbSuccessBanner, `Found: ${match.display_name}`);
       searchAddressInput.value = "";
       searchSuggestions.classList.add("hidden");
+      searchAddressInput.setAttribute("aria-expanded", "false");
+      searchAddressInput.removeAttribute("aria-activedescendant");
     } else {
-      showBanner(dbErrorBanner, "No locations found. Try a different search term.");
+      showBanner(
+        dbErrorBanner,
+        "No locations found. Try a different search term.",
+      );
     }
   } catch (error) {
     console.error(error);
     showBanner(dbErrorBanner, "Search failed: " + error.message);
   } finally {
     searchAddressBtn.disabled = false;
-    const searchIcon = searchAddressBtn.querySelector(".material-symbols-outlined");
+    const searchIcon = searchAddressBtn.querySelector(
+      ".material-symbols-outlined",
+    );
     if (searchIcon) searchIcon.textContent = "search";
   }
 }
@@ -701,7 +766,7 @@ let currentSuggestions = [];
 
 searchAddressInput.addEventListener("keydown", (e) => {
   const items = searchSuggestions.querySelectorAll(".suggestion-item");
-  
+
   if (items.length === 0) {
     if (e.key === "Enter") {
       e.preventDefault();
@@ -712,11 +777,19 @@ searchAddressInput.addEventListener("keydown", (e) => {
 
   if (e.key === "ArrowDown") {
     e.preventDefault();
-    activeSuggestionIndex = moveSuggestionIndex(activeSuggestionIndex, 1, items.length);
+    activeSuggestionIndex = moveSuggestionIndex(
+      activeSuggestionIndex,
+      1,
+      items.length,
+    );
     updateActiveSuggestion(items);
   } else if (e.key === "ArrowUp") {
     e.preventDefault();
-    activeSuggestionIndex = moveSuggestionIndex(activeSuggestionIndex, -1, items.length);
+    activeSuggestionIndex = moveSuggestionIndex(
+      activeSuggestionIndex,
+      -1,
+      items.length,
+    );
     updateActiveSuggestion(items);
   } else if (e.key === "Enter") {
     e.preventDefault();
@@ -728,6 +801,8 @@ searchAddressInput.addEventListener("keydown", (e) => {
   } else if (e.key === "Escape") {
     e.preventDefault();
     searchSuggestions.classList.add("hidden");
+    searchAddressInput.setAttribute("aria-expanded", "false");
+    searchAddressInput.removeAttribute("aria-activedescendant");
     activeSuggestionIndex = -1;
   }
 });
@@ -736,36 +811,47 @@ function updateActiveSuggestion(items) {
   items.forEach((item, index) => {
     if (index === activeSuggestionIndex) {
       item.classList.add("active");
+      item.setAttribute("aria-selected", "true");
+      searchAddressInput.setAttribute("aria-activedescendant", item.id);
       item.scrollIntoView({ block: "nearest" });
     } else {
       item.classList.remove("active");
+      item.setAttribute("aria-selected", "false");
     }
   });
+
+  if (activeSuggestionIndex === -1) {
+    searchAddressInput.removeAttribute("aria-activedescendant");
+  }
 }
 
 searchAddressInput.addEventListener("input", () => {
   clearTimeout(autocompleteTimeout);
-  
+
   const queryText = searchAddressInput.value.trim();
   if (!shouldSearchAutocomplete(queryText)) {
     searchSuggestions.classList.add("hidden");
+    searchAddressInput.setAttribute("aria-expanded", "false");
+    searchAddressInput.removeAttribute("aria-activedescendant");
     searchSuggestions.innerHTML = "";
     currentSuggestions = [];
     activeSuggestionIndex = -1;
     return;
   }
-  
+
   autocompleteTimeout = setTimeout(async () => {
     try {
       const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(queryText)}&limit=5`;
       const response = await fetch(url);
       if (!response.ok) return;
       const data = await response.json();
-      
+
       if (data && data.features && data.features.length > 0) {
         renderSuggestions(data.features);
       } else {
         searchSuggestions.classList.add("hidden");
+        searchAddressInput.setAttribute("aria-expanded", "false");
+        searchAddressInput.removeAttribute("aria-activedescendant");
         searchSuggestions.innerHTML = "";
         currentSuggestions = [];
         activeSuggestionIndex = -1;
@@ -779,9 +865,10 @@ searchAddressInput.addEventListener("input", () => {
 function renderSuggestions(features) {
   searchSuggestions.innerHTML = "";
   searchSuggestions.classList.remove("hidden");
+  searchAddressInput.setAttribute("aria-expanded", "true");
   activeSuggestionIndex = -1;
   currentSuggestions = features;
-  
+
   // ⚡ Bolt Performance Optimization:
   // Using a DocumentFragment avoids triggering a costly DOM reflow and repaint
   // on every single loop iteration. Batching DOM insertions significantly reduces
@@ -791,32 +878,37 @@ function renderSuggestions(features) {
   features.forEach((feature, index) => {
     const props = feature.properties;
     const coords = feature.geometry.coordinates; // [Lng, Lat]
-    
+
     const displayName = buildPhotonDisplayName(props);
-    
+
     const item = document.createElement("div");
     item.className = "suggestion-item";
     item.textContent = displayName;
     item.setAttribute("data-index", index);
-    
+    item.setAttribute("role", "option");
+    item.setAttribute("aria-selected", "false");
+    item.id = `suggestion-item-${index}`;
+
     item.addEventListener("click", () => {
       const lon = coords[0];
       const lat = coords[1];
-      
+
       locationLatInput.value = lat.toFixed(6);
       locationLngInput.value = lon.toFixed(6);
       locationNameInput.value = props.name;
-      
+
       searchAddressInput.value = "";
       searchSuggestions.classList.add("hidden");
+      searchAddressInput.setAttribute("aria-expanded", "false");
+      searchAddressInput.removeAttribute("aria-activedescendant");
       searchSuggestions.innerHTML = "";
       currentSuggestions = [];
       activeSuggestionIndex = -1;
-      
+
       showBanner(dbSuccessBanner, `Selected location: ${displayName}`);
       locationNameInput.focus();
     });
-    
+
     fragment.appendChild(item);
   });
 
@@ -825,8 +917,13 @@ function renderSuggestions(features) {
 
 // Close suggestion dropdown if clicking outside
 document.addEventListener("click", (e) => {
-  if (!searchAddressInput.contains(e.target) && !searchSuggestions.contains(e.target)) {
+  if (
+    !searchAddressInput.contains(e.target) &&
+    !searchSuggestions.contains(e.target)
+  ) {
     searchSuggestions.classList.add("hidden");
+    searchAddressInput.setAttribute("aria-expanded", "false");
+    searchAddressInput.removeAttribute("aria-activedescendant");
     activeSuggestionIndex = -1;
   }
 });
@@ -866,12 +963,13 @@ async function fetchApiCreditsStatus() {
 
 function renderLogs(logs) {
   logsListContainer.innerHTML = "";
-  
+
   if (logs.length === 0) {
-    logsListContainer.innerHTML = '<div class="empty-state">No execution logs found yet.</div>';
+    logsListContainer.innerHTML =
+      '<div class="empty-state">No execution logs found yet.</div>';
     return;
   }
-  
+
   // ⚡ Bolt Performance Optimization:
   // Using a DocumentFragment avoids triggering a costly DOM reflow and repaint
   // on every single loop iteration. Batching DOM insertions significantly reduces
@@ -881,23 +979,25 @@ function renderLogs(logs) {
   logs.forEach((log) => {
     const logItem = document.createElement("div");
     logItem.className = "log-item";
-    
+
     const dateText = dateTimeFormatterMedium.format(log.timestamp);
-    
+
     let statusClass = getLogStatusClass(log.status);
     const statusText = log.status.toUpperCase();
-    
+
     let detailsHtml = "";
     if (log.error) {
       detailsHtml = `<div class="log-details" style="color: var(--error);">Error: ${escapeHtml(log.error)}</div>`;
     } else if (log.results && log.results.length > 0) {
-      const resultsText = log.results.map(r => {
-        const dot = r.status === "error" ? "🔴" : "🟢";
-        return `${dot} ${escapeHtml(r.name)} (${r.status === "error" ? "Failed" : "Success"})`;
-      }).join("<br>");
+      const resultsText = log.results
+        .map((r) => {
+          const dot = r.status === "error" ? "🔴" : "🟢";
+          return `${dot} ${escapeHtml(r.name)} (${r.status === "error" ? "Failed" : "Success"})`;
+        })
+        .join("<br>");
       detailsHtml = `<div class="log-details">${resultsText}</div>`;
     }
-    
+
     logItem.innerHTML = `
       <div class="log-item-header">
         <span class="log-time">${dateText}</span>
@@ -908,7 +1008,7 @@ function renderLogs(logs) {
       </div>
       ${detailsHtml}
     `;
-    
+
     fragment.appendChild(logItem);
   });
 
@@ -920,7 +1020,7 @@ const allNavButtons = document.querySelectorAll(".nav-tab, .bottom-nav-item");
 const tabPanes = document.querySelectorAll(".tab-pane");
 
 function switchTab(targetTab) {
-  allNavButtons.forEach(b => {
+  allNavButtons.forEach((b) => {
     if (b.getAttribute("data-tab") === targetTab) {
       b.classList.add("active");
       b.setAttribute("aria-selected", "true");
@@ -929,7 +1029,7 @@ function switchTab(targetTab) {
       b.setAttribute("aria-selected", "false");
     }
   });
-  tabPanes.forEach(p => p.classList.remove("active"));
+  tabPanes.forEach((p) => p.classList.remove("active"));
   const activePane = document.getElementById(`pane-${targetTab}`);
   if (activePane) activePane.classList.add("active");
 
@@ -938,7 +1038,7 @@ function switchTab(targetTab) {
   }
 }
 
-allNavButtons.forEach(btn => {
+allNavButtons.forEach((btn) => {
   btn.addEventListener("click", () => {
     const targetTab = btn.getAttribute("data-tab");
     if (targetTab) switchTab(targetTab);

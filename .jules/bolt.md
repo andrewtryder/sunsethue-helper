@@ -15,3 +15,6 @@
 ## 2026-06-26 - [Use DocumentFragment to batch DOM insertions]
 **Learning:** Inserting elements into the DOM one-by-one inside a loop causes synchronous reflows and repaints in the browser, blocking the main thread and slowing down rendering.
 **Action:** Create a `DocumentFragment` using `document.createDocumentFragment()`, append all generated elements to it inside the loop, and then append the fragment to the container once outside the loop. This minimizes DOM interactions and drastically reduces reflows/repaints.
+## 2026-06-30 - [Use Date.parse() instead of new Date().getTime() in hot loops]
+**Learning:** Instantiating new `Date` objects in a loop to extract the timestamp with `.getTime()` creates unnecessary memory churn and heap allocation, which increases CPU overhead from garbage collection.
+**Action:** Use `Date.parse(dateString)` instead, which directly parses the ISO date string to a timestamp integer without allocating an intermediate object, making hot paths measurably faster.

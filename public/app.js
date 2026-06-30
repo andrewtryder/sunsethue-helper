@@ -679,6 +679,8 @@ async function performAddressSearch() {
       showBanner(dbSuccessBanner, `Found: ${match.display_name}`);
       searchAddressInput.value = "";
       searchSuggestions.classList.add("hidden");
+      searchAddressInput.setAttribute('aria-expanded', 'false');
+      searchAddressInput.removeAttribute('aria-activedescendant');
     } else {
       showBanner(dbErrorBanner, "No locations found. Try a different search term.");
     }
@@ -728,6 +730,8 @@ searchAddressInput.addEventListener("keydown", (e) => {
   } else if (e.key === "Escape") {
     e.preventDefault();
     searchSuggestions.classList.add("hidden");
+    searchAddressInput.setAttribute('aria-expanded', 'false');
+    searchAddressInput.removeAttribute('aria-activedescendant');
     activeSuggestionIndex = -1;
   }
 });
@@ -736,9 +740,12 @@ function updateActiveSuggestion(items) {
   items.forEach((item, index) => {
     if (index === activeSuggestionIndex) {
       item.classList.add("active");
+      item.setAttribute("aria-selected", "true");
+      searchAddressInput.setAttribute('aria-activedescendant', item.id);
       item.scrollIntoView({ block: "nearest" });
     } else {
       item.classList.remove("active");
+      item.setAttribute("aria-selected", "false");
     }
   });
 }
@@ -749,6 +756,8 @@ searchAddressInput.addEventListener("input", () => {
   const queryText = searchAddressInput.value.trim();
   if (!shouldSearchAutocomplete(queryText)) {
     searchSuggestions.classList.add("hidden");
+    searchAddressInput.setAttribute('aria-expanded', 'false');
+    searchAddressInput.removeAttribute('aria-activedescendant');
     searchSuggestions.innerHTML = "";
     currentSuggestions = [];
     activeSuggestionIndex = -1;
@@ -766,6 +775,8 @@ searchAddressInput.addEventListener("input", () => {
         renderSuggestions(data.features);
       } else {
         searchSuggestions.classList.add("hidden");
+        searchAddressInput.setAttribute('aria-expanded', 'false');
+        searchAddressInput.removeAttribute('aria-activedescendant');
         searchSuggestions.innerHTML = "";
         currentSuggestions = [];
         activeSuggestionIndex = -1;
@@ -779,6 +790,7 @@ searchAddressInput.addEventListener("input", () => {
 function renderSuggestions(features) {
   searchSuggestions.innerHTML = "";
   searchSuggestions.classList.remove("hidden");
+  searchAddressInput.setAttribute('aria-expanded', 'true');
   activeSuggestionIndex = -1;
   currentSuggestions = features;
   
@@ -796,6 +808,9 @@ function renderSuggestions(features) {
     
     const item = document.createElement("div");
     item.className = "suggestion-item";
+    item.id = `suggestion-${index}`;
+    item.setAttribute("role", "option");
+    item.setAttribute("aria-selected", "false");
     item.textContent = displayName;
     item.setAttribute("data-index", index);
     
@@ -809,6 +824,8 @@ function renderSuggestions(features) {
       
       searchAddressInput.value = "";
       searchSuggestions.classList.add("hidden");
+      searchAddressInput.setAttribute('aria-expanded', 'false');
+      searchAddressInput.removeAttribute('aria-activedescendant');
       searchSuggestions.innerHTML = "";
       currentSuggestions = [];
       activeSuggestionIndex = -1;
@@ -827,6 +844,8 @@ function renderSuggestions(features) {
 document.addEventListener("click", (e) => {
   if (!searchAddressInput.contains(e.target) && !searchSuggestions.contains(e.target)) {
     searchSuggestions.classList.add("hidden");
+    searchAddressInput.setAttribute('aria-expanded', 'false');
+    searchAddressInput.removeAttribute('aria-activedescendant');
     activeSuggestionIndex = -1;
   }
 });

@@ -179,6 +179,8 @@ export function normalizeForecastEvent(event) {
 // Replaced O(n log n) filter+sort chain with a single O(n) pass.
 // This reduces CPU cycles when parsing multiple forecast events for multiple locations
 // by finding the minimum future time directly without array allocation and sorting overhead.
+// Also using Date.parse() instead of new Date().getTime() in this hot loop
+// to avoid instantiating unnecessary Date objects on the heap, reducing memory churn and CPU overhead.
 export function selectNextSunEvents(events, nowMs = Date.now()) {
   let nextSunrise = null;
   let nextSunset = null;
@@ -186,7 +188,7 @@ export function selectNextSunEvents(events, nowMs = Date.now()) {
   let minSunsetTime = Infinity;
 
   for (const event of events) {
-    const timeMs = new Date(event.time).getTime();
+    const timeMs = Date.parse(event.time);
     if (timeMs > nowMs) {
       if (event.type === "sunrise" && timeMs < minSunriseTime) {
         minSunriseTime = timeMs;

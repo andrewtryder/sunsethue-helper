@@ -4,6 +4,19 @@ All notable changes to this project are documented in this file.
 
 This changelog follows [Conventional Commits](https://www.conventionalcommits.org/) and is maintained by [release-please](https://github.com/googleapis/release-please). Release sections group changes by commit type (`feat`, `fix`, etc.). Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.17.0](https://github.com/andrewtryder/sunsethue-helper/compare/v1.16.0...v1.17.0) (2026-07-01)
+
+
+### Features
+
+* **ui:** add visual required indicators and client validation to form ([bd65cfb](https://github.com/andrewtryder/sunsethue-helper/commit/bd65cfbff63145d9530dc59eaffcc9ee848f18f1))
+
+
+### Performance Improvements
+
+* **bolt:** optimize date parsing in forecast event loop ([c6d20f9](https://github.com/andrewtryder/sunsethue-helper/commit/c6d20f9ced75aa47c3566cddd766d4a741b09cc7))
+* **format:** avoid new Date() allocations in Intl formatting ([1774742](https://github.com/andrewtryder/sunsethue-helper/commit/1774742fd12a884a6d2d579c220c1af021f8d199))
+
 ## [1.16.0](https://github.com/andrewtryder/sunsethue-helper/compare/v1.15.0...v1.16.0) (2026-06-27)
 
 

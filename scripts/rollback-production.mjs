@@ -4,8 +4,8 @@
  *
  * Never guesses a target: the caller supplies an exact Worker version id and/or
  * Pages deployment id, and both are validated against this application before
- * anything changes. Database migrations are deliberately out of scope; see
- * docs/rollback.md for the D1 procedure.
+ * anything changes. D1 schema changes are deliberately out of scope; see
+ * docs/rollback.md for Time Travel and schema.sql recovery.
  */
 import { spawnSync } from "node:child_process";
 import {
@@ -139,7 +139,7 @@ async function main() {
       "",
       ...actions.map((action) => `- ${action}`),
       "",
-      "D1 schema was not modified. A migration is only reversed with a reviewed down-migration; see docs/rollback.md."
+      "D1 schema was not modified. Recovery uses D1 Time Travel or schema.sql; see docs/rollback.md."
     ].join("\n")
   );
 

@@ -1,11 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import * as db from "../../worker/db.js";
-import { createLocalD1, readMigrationFiles } from "../support/local-d1.mjs";
+import { createLocalD1, readSchemaSql } from "../support/local-d1.mjs";
 
 /**
  * Runs the real SQL from worker/db.js against a throwaway in-memory SQLite
- * database built from the real migrations/ files. Never touches production D1.
+ * database built from schema.sql. Never touches production D1.
  */
 async function withDatabase(fn) {
   const local = await createLocalD1();
@@ -16,22 +16,11 @@ async function withDatabase(fn) {
   }
 }
 
-test("migrations are ordered, versioned, and non-empty", async () => {
-  const migrations = await readMigrationFiles();
-  assert.ok(migrations.length >= 1, "expected at least one migration");
-
-  const names = migrations.map((migration) => migration.name);
-  assert.deepEqual(names, [...names].sort(), "migrations must sort into apply order");
-
-  for (const migration of migrations) {
-    assert.match(migration.name, /^\d{4}_[a-z0-9_]+\.sql$/, `bad migration name: ${migration.name}`);
-    assert.ok(migration.sql.trim().length > 0, `${migration.name} is empty`);
-  }
-});
-
-test("migrations create the schema the Worker queries", async () => {
+test("schema.sql creates the tables and indexes the Worker queries", async () => {
   await withDatabase(async (env, local) => {
-    assert.ok(local.appliedMigrations.includes("0001_initial_schema.sql"));
+    const schema = await readSchemaSql();
+    assert.ok(schema.includes("CREATE TABLE IF NOT EXISTS locations"));
+    assert.ok(schema.includes("CREATE TABLE IF NOT EXISTS runs"));
 
     const tables = local.database
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
@@ -44,19 +33,14 @@ test("migrations create the schema the Worker queries", async () => {
       .all()
       .map((row) => row.name);
     assert.deepEqual(indexes, ["idx_locations_createdAt", "idx_runs_timestamp"]);
-  });
-});
 
-test("migrations are idempotent when reapplied", async () => {
-  await withDatabase(async (env, local) => {
-    const migrations = await readMigrationFiles();
-    for (const migration of migrations) {
-      local.database.exec(migration.sql);
-    }
-    const count = local.database
-      .prepare("SELECT COUNT(*) AS total FROM sqlite_master WHERE type = 'table'")
-      .get().total;
-    assert.equal(count, 2);
+    // IF NOT EXISTS makes re-application safe for local resets.
+    local.database.exec(schema);
+    assert.equal(
+      local.database.prepare("SELECT COUNT(*) AS total FROM sqlite_master WHERE type = 'table'").get()
+        .total,
+      2
+    );
   });
 });
 

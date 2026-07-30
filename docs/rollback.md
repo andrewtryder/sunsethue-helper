@@ -4,7 +4,7 @@
 
 1. Never guess a rollback target. Use the exact Worker version id and Pages deployment id recorded in the deployment job summary.
 2. Validate that every identifier belongs to this application before mutating anything.
-3. Treat D1 separately. Destructive schema reversal is not safe by default.
+3. Treat D1 separately. Schema recovery uses Time Travel or re-applying `schema.sql`, not an automated reverse migration.
 4. Share the `sunsethue-production` concurrency group so a rollback can never overlap a deployment.
 
 ## Automated rollback workflow
@@ -20,7 +20,7 @@ Trigger **Rollback production** (`.github/workflows/rollback.yml`) with:
 
 The workflow:
 
-1. Verifies the Cloudflare deploy token.
+1. Verifies the Cloudflare API token.
 2. Looks up the Worker version and/or Pages deployment and refuses anything that does not belong to this application, or any Pages deployment that is not `production`.
 3. Rolls the Worker back first (the Pages Function calls it through the service binding).
 4. Rolls Pages back second.
@@ -72,23 +72,21 @@ Roll back to a pair of deployments that were known to work together. Prefer the 
 
 ## D1
 
-The rollback workflow does **not** reverse migrations.
+The rollback workflow does **not** modify the database.
 
 Options, in preferred order:
 
-1. Deploy a reviewed forward migration that restores a safe schema, then redeploy code.
-2. Use [D1 Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/) to restore a bookmark taken before the bad migration. Document the bookmark in the incident notes.
-3. Only as a last resort, and only with a reviewed down-migration that has been tested against a non-production database.
+1. Use [D1 Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/) to restore a bookmark taken before the incident. Document the bookmark in the incident notes.
+2. Re-apply the committed `schema.sql` against a local or recovered database when only missing tables/indexes need restoring (`npm run db:schema:local` for local D1; use Wrangler `--remote` only with explicit owner approval).
 
-See [d1-migrations.md](d1-migrations.md).
+Confirm current Wrangler flags with `npx wrangler d1 time-travel --help` before touching production.
 
 ## Access / Zero Trust
 
-Do not roll Access back through the application rollback workflow. Access changes are a separate trust domain:
+Do not roll Access back through the application rollback workflow.
 
-1. Prefer the sanitized snapshot under `.tmp/cloudflare-access/rollback-snapshot.json`.
-2. Or run the Zero Trust workflow with `action: plan`, then `action: apply` after review.
-3. Deleting the Access application is a last-resort, owner-approved action.
+1. Prefer the sanitized snapshot under `.tmp/cloudflare-access/rollback-snapshot.json` with `npm run access:plan` / `access:apply`.
+2. Deleting the Access application is a last-resort, owner-approved action.
 
 ## workers.dev
 

@@ -1,7 +1,6 @@
--- Migration number: 0001 	 2026-07-30T00:00:00.000Z
--- Baseline schema. Written with IF NOT EXISTS so it is safe to apply to the
--- already-provisioned production database, where these tables were created by
--- the pre-migrations schema.sql.
+-- Schema for sunsethue-db.
+-- Safe to re-run: all statements use IF NOT EXISTS.
+-- Apply locally with: npm run db:schema:local
 
 CREATE TABLE IF NOT EXISTS locations (
   id TEXT PRIMARY KEY,
@@ -28,3 +27,6 @@ CREATE TABLE IF NOT EXISTS runs (
   results TEXT NOT NULL, -- JSON string representation of locations run status
   error TEXT
 );
+
+CREATE INDEX IF NOT EXISTS idx_locations_createdAt ON locations (createdAt ASC);
+CREATE INDEX IF NOT EXISTS idx_runs_timestamp ON runs (timestamp DESC);

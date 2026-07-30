@@ -63,8 +63,8 @@ Copy `.dev.vars.example` to `.dev.vars` and fill placeholders only. Never commit
 | File | Role |
 | --- | --- |
 | `wrangler.toml` | Pages project (`pages_build_output_dir`, `API_SERVICE` binding) |
-| `wrangler.worker.toml` | Private API Worker (`workers_dev = false`, cron, D1, migrations) |
-| `migrations/` | Versioned D1 migrations applied by the production pipeline |
+| `wrangler.worker.toml` | Private API Worker (`workers_dev = false`, cron, D1) |
+| `schema.sql` | D1 schema for local setup and tests (`npm run db:schema:local`) |
 | `public/_routes.json` | Invoke Functions only for `/api/*` |
 | `functions/api/[[path]].js` | Same-origin API proxy |
 | `scripts/cloudflare-access.mjs` | Idempotent Access automation (`plan`/`apply`/`verify`) |
@@ -82,24 +82,22 @@ npm run test:coverage    # real coverage with enforced thresholds
 npm run ci               # everything above
 ```
 
-JWT tests use generated RSA keys and a local JWKS fixture. They never use a real Access token. SMTP, Sunsethue, Nominatim, Photon, and Cloudflare JWKS are all faked. D1 tests run against an in-memory SQLite database built from `migrations/`.
+JWT tests use generated RSA keys and a local JWKS fixture. They never use a real Access token. SMTP, Sunsethue, Nominatim, Photon, and Cloudflare JWKS are all faked. D1 tests run against an in-memory SQLite database built from `schema.sql`.
 
 ## CI/CD overview
 
 | Workflow | Trigger | Purpose |
 | --- | --- | --- |
 | `validate.yml` | Pull requests to `main`, and reusable `workflow_call` | Lint, audit, tests, coverage, Wrangler dry-run. No production secrets. |
-| `production.yml` | Push to `main`, or manual dispatch | Validate → prepare → migrate → deploy Worker → deploy Pages → verify → release |
+| `production.yml` | Push to `main`, or manual dispatch | Validate → prepare → deploy Worker → deploy Pages → verify → release |
 | `rollback.yml` | Manual dispatch | Restore an exact prior Worker version and/or Pages deployment |
-| `zero-trust.yml` | Manual dispatch | Plan / verify / apply the Access application. Separate token. |
 
 Details:
 
 - [docs/deployment.md](docs/deployment.md) — production pipeline, secrets, verification
 - [docs/rollback.md](docs/rollback.md) — exact-identifier rollback
 - [docs/branch-protection.md](docs/branch-protection.md) — recommended `main` settings
-- [docs/cloudflare-credentials.md](docs/cloudflare-credentials.md) — deploy vs Zero Trust tokens
-- [docs/d1-migrations.md](docs/d1-migrations.md) — versioned migrations and Time Travel
+- [docs/cloudflare-credentials.md](docs/cloudflare-credentials.md) — single API token and one-time Access setup
 
 ## Worker secrets
 
@@ -120,18 +118,19 @@ All production credentials live in the GitHub `production` environment. See [doc
 
 | Name | Scope |
 | --- | --- |
-| `CLOUDFLARE_DEPLOY_API_TOKEN` | Workers, Pages, and D1 only. No Access write. |
-| `CLOUDFLARE_ZEROTRUST_API_TOKEN` | Access Apps and Policies only. Never used by routine deploys. |
+| `CLOUDFLARE_API_TOKEN` | Workers, Pages, D1, and Access (for rare local Access setup) |
 | `CLOUDFLARE_ACCOUNT_ID` | Account identifier |
 | Worker secrets listed above | Passed into the Worker deploy step |
 
-Rotate any Cloudflare token from the Cloudflare dashboard if it is ever exposed. Prefer a scoped API token over a Global API Key. Do not reuse one token for both application deployment and Zero Trust administration.
+Rotate the Cloudflare token from the Cloudflare dashboard if it is ever exposed. Prefer a scoped API token over a Global API Key.
 
 ## Access automation
 
+Access is initialization-only. Run these locally with `CLOUDFLARE_API_TOKEN` set; they are not part of the production pipeline.
+
 ```bash
 npm run access:snapshot   # sanitized rollback snapshot under .tmp/cloudflare-access/
-npm run access:plan       # read-only plan (default of the Zero Trust workflow)
+npm run access:plan       # read-only plan
 npm run access:apply      # idempotent create/update
 npm run access:verify     # assert exact policy shape
 ```
@@ -141,7 +140,7 @@ Snapshots omit API tokens, JWTs, cookies, IdP secrets, and service-token secrets
 ### Recreate the Access application
 
 1. Run `npm run access:snapshot`.
-2. Create/update with `npm run access:apply` (or the Zero Trust workflow with `action: apply`).
+2. Create/update with `npm run access:apply`.
 3. Copy the new Audience tag into the Worker `POLICY_AUD` secret.
 4. Redeploy the Worker and verify with `npm run access:verify`.
 
@@ -167,7 +166,7 @@ Expect a non-200 failure (for example connection/error page), never application 
 
 Use the **Rollback production** workflow with the exact Worker version id and Pages deployment id recorded in the deployment job summary. See [docs/rollback.md](docs/rollback.md).
 
-Do not automatically reverse a D1 migration. A schema reversal needs a reviewed down-migration or D1 Time Travel.
+D1 recovery uses Time Travel or re-applying `schema.sql`; the rollback workflow does not modify the database.
 
 ## Manual browser verification
 

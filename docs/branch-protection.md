@@ -30,7 +30,7 @@ Create a GitHub Environment named `production`.
 | Wait timer | Optional |
 | Environment secrets | See [cloudflare-credentials.md](cloudflare-credentials.md) |
 
-Every Cloudflare-touching job in `production.yml`, `rollback.yml`, and `zero-trust.yml` references this environment. Untrusted branches therefore cannot read production credentials.
+Every Cloudflare-touching job in `production.yml` and `rollback.yml` references this environment. Untrusted branches therefore cannot read production credentials.
 
 ## Why the commit-message fixer was removed
 

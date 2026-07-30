@@ -14,24 +14,24 @@ It is serialized by the `sunsethue-production` concurrency group with `cancel-in
 ```text
 validate
   -> prepare
-    -> migrate
-      -> deploy-worker
-        -> deploy-pages
-          -> verify
-            -> release
+    -> deploy-worker
+      -> deploy-pages
+        -> verify
+          -> release
 ```
 
 | Job | What it does |
 | --- | --- |
 | `validate` | Calls the reusable `validate.yml` workflow. Lint, audit, tests, coverage, Wrangler dry-run. No production secrets. |
 | `prepare` | Records the commit SHA, the current Worker version, and the current Pages production deployment. Confirms the repository, branch, account, project, bindings, and cron. Writes a sanitized job summary. |
-| `migrate` | Lists and applies pending D1 migrations. Succeeds without changes when nothing is pending. Fails loudly if state cannot be determined. |
 | `deploy-worker` | Deploys the Worker first. Must stay backward compatible with the still-running previous Pages frontend. |
 | `deploy-pages` | Deploys the Pages frontend and the `/api/*` Function with the `API_SERVICE` binding. |
 | `verify` | Unauthenticated negative checks (Access gate, workers.dev bypass, Pages commit, bindings, cron). Records exact rollback identifiers. |
 | `release` | Runs Release Please **after** verification, so a GitHub release cannot be published ahead of a working deployment. |
 
-A dry-run dispatch stops after `prepare`. Nothing is migrated, deployed, or released.
+A dry-run dispatch stops after `prepare`. Nothing is deployed or released.
+
+The production pipeline does not apply D1 schema changes. The personal database schema is maintained via `schema.sql` when needed locally (`npm run db:schema:local`). Access (Zero Trust) setup is also outside this pipeline; use the local `access:*` scripts.
 
 ## GitHub environment
 
@@ -51,7 +51,7 @@ All of these live in the `production` environment. Values are never logged.
 
 | Secret | Used by |
 | --- | --- |
-| `CLOUDFLARE_DEPLOY_API_TOKEN` | prepare, migrate, deploy, verify, rollback |
+| `CLOUDFLARE_API_TOKEN` | prepare, deploy, verify, rollback |
 | `CLOUDFLARE_ACCOUNT_ID` | same |
 | `AUTHORIZED_EMAIL` | Worker secret during deploy |
 | `TEAM_DOMAIN` | Worker secret during deploy |
@@ -62,7 +62,7 @@ All of these live in the `production` environment. Values are never logged.
 | `EMAIL_TO` | Worker secret during deploy |
 | `EMAIL_FROM` | Worker secret during deploy |
 
-`CLOUDFLARE_ZEROTRUST_API_TOKEN` is **not** used by this workflow. Access changes go through the separate [Zero Trust workflow](cloudflare-credentials.md#zero-trust-workflow).
+Access policy changes are not part of this workflow. See [cloudflare-credentials.md](cloudflare-credentials.md) for one-time Access setup with the same token.
 
 ## Post-deployment checks
 
@@ -87,7 +87,6 @@ Release runs are themselves serialized by the `sunsethue-release` concurrency gr
 ## Failure behaviour
 
 - A failed `validate` or `prepare` job stops the pipeline before any mutation.
-- A failed `migrate` job stops before any code deploy.
 - A failed `deploy-pages` after a successful Worker deploy fails the workflow, records the Worker version, and publishes the exact prior identifiers for rollback. It never claims the release succeeded.
 - The `release` job does not run when any earlier job fails.
 

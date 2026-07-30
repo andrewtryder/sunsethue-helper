@@ -1,26 +1,17 @@
 /**
  * A D1-compatible binding backed by an in-memory SQLite database.
  *
- * Tests exercise the real SQL in worker/db.js against the real migration files,
+ * Tests exercise the real SQL in worker/db.js against the repository schema.sql,
  * so schema drift is caught without ever pointing a test at production D1.
  */
 import { DatabaseSync } from "node:sqlite";
-import { readdir, readFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
-const MIGRATIONS_DIR = new URL("../../migrations/", import.meta.url);
+const SCHEMA_PATH = new URL("../../schema.sql", import.meta.url);
 
-export async function readMigrationFiles(dir = MIGRATIONS_DIR) {
-  const entries = await readdir(dir);
-  const files = entries.filter((entry) => entry.endsWith(".sql")).sort();
-  const contents = [];
-  for (const file of files) {
-    contents.push({
-      name: file,
-      sql: await readFile(fileURLToPath(new URL(file, dir)), "utf8")
-    });
-  }
-  return contents;
+export async function readSchemaSql() {
+  return readFile(fileURLToPath(SCHEMA_PATH), "utf8");
 }
 
 function statement(database, sql, boundArgs) {
@@ -53,17 +44,12 @@ function statement(database, sql, boundArgs) {
 }
 
 /**
- * @returns {Promise<{ DB: object, database: DatabaseSync, appliedMigrations: string[], close: () => void }>}
+ * @returns {Promise<{ DB: object, database: DatabaseSync, close: () => void }>}
  */
 export async function createLocalD1() {
   const database = new DatabaseSync(":memory:");
-  const migrations = await readMigrationFiles();
-  const appliedMigrations = [];
-
-  for (const migration of migrations) {
-    database.exec(migration.sql);
-    appliedMigrations.push(migration.name);
-  }
+  const schema = await readSchemaSql();
+  database.exec(schema);
 
   return {
     DB: {
@@ -72,7 +58,6 @@ export async function createLocalD1() {
       }
     },
     database,
-    appliedMigrations,
     close() {
       database.close();
     }

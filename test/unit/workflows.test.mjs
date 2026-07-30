@@ -25,7 +25,7 @@ test("every workflow passes the repository security policy", () => {
 test("the expected workflow set is present", () => {
   assert.deepEqual(
     workflows.map((entry) => entry.name).sort(),
-    ["production.yml", "rollback.yml", "validate.yml", "zero-trust.yml"]
+    ["production.yml", "rollback.yml", "validate.yml"]
   );
 });
 
@@ -56,14 +56,14 @@ test("production deploys on main pushes and manual dispatch, serialized and neve
   assert.deepEqual(production.permissions, { contents: "read" });
 });
 
-test("production job order enforces validate, migrate, worker, pages, verify, release", () => {
+test("production job order enforces validate, prepare, worker, pages, verify, release", () => {
   const production = workflow("production.yml");
   const jobs = production.jobs;
 
   assert.equal(jobs.validate.uses, "./.github/workflows/validate.yml");
   assert.deepEqual([].concat(jobs.prepare.needs), ["validate"]);
-  assert.deepEqual([].concat(jobs.migrate.needs), ["prepare"]);
-  assert.ok([].concat(jobs["deploy-worker"].needs).includes("migrate"));
+  assert.equal(jobs.migrate, undefined, "D1 migrations are not part of the pipeline");
+  assert.deepEqual([].concat(jobs["deploy-worker"].needs), ["prepare"]);
   assert.ok([].concat(jobs["deploy-pages"].needs).includes("deploy-worker"));
   assert.ok([].concat(jobs.verify.needs).includes("deploy-pages"));
   assert.deepEqual([].concat(jobs.release.needs), ["verify"]);
@@ -84,7 +84,7 @@ test("only the release job holds write permissions, and only what Release Please
 
 test("every production job that touches Cloudflare uses the production environment", () => {
   const production = workflow("production.yml");
-  const cloudflareJobs = ["prepare", "migrate", "deploy-worker", "deploy-pages", "verify"];
+  const cloudflareJobs = ["prepare", "deploy-worker", "deploy-pages", "verify"];
   for (const name of cloudflareJobs) {
     assert.equal(
       production.jobs[name].environment?.name,
@@ -94,34 +94,20 @@ test("every production job that touches Cloudflare uses the production environme
   }
 });
 
-test("application deployment and Zero Trust administration use different tokens", () => {
-  const production = workflows.find((entry) => entry.name === "production.yml").text;
-  const rollback = workflows.find((entry) => entry.name === "rollback.yml").text;
-  const zeroTrust = workflows.find((entry) => entry.name === "zero-trust.yml").text;
-
-  for (const [name, text] of [
-    ["production.yml", production],
-    ["rollback.yml", rollback]
-  ]) {
-    assert.match(text, /secrets\.CLOUDFLARE_DEPLOY_API_TOKEN/, `${name} must use the deploy token`);
-    assert.doesNotMatch(
-      text,
-      /secrets\.CLOUDFLARE_ZEROTRUST_API_TOKEN/,
-      `${name} must not use the Zero Trust token`
+test("every Cloudflare-touching workflow uses the single CLOUDFLARE_API_TOKEN", () => {
+  for (const entry of workflows) {
+    if (entry.name === "validate.yml") {
+      assert.doesNotMatch(entry.text, /secrets\.CLOUDFLARE_/);
+      continue;
+    }
+    assert.match(
+      entry.text,
+      /secrets\.CLOUDFLARE_API_TOKEN/,
+      `${entry.name} must use CLOUDFLARE_API_TOKEN`
     );
+    assert.doesNotMatch(entry.text, /CLOUDFLARE_DEPLOY_API_TOKEN/);
+    assert.doesNotMatch(entry.text, /CLOUDFLARE_ZEROTRUST_API_TOKEN/);
   }
-
-  assert.match(zeroTrust, /secrets\.CLOUDFLARE_ZEROTRUST_API_TOKEN/);
-  assert.doesNotMatch(zeroTrust, /secrets\.CLOUDFLARE_DEPLOY_API_TOKEN/);
-});
-
-test("the Zero Trust workflow is manual only and defaults to a read-only plan", () => {
-  const zeroTrust = workflow("zero-trust.yml");
-  assert.deepEqual(triggers(zeroTrust), ["workflow_dispatch"]);
-  const action = zeroTrust.on.workflow_dispatch.inputs.action;
-  assert.equal(action.default, "plan");
-  assert.deepEqual(action.options, ["plan", "verify", "apply"]);
-  assert.equal(zeroTrust.jobs["zero-trust"].environment.name, "production");
 });
 
 test("rollback is manual, requires a reason, and shares the production concurrency group", () => {

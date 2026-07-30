@@ -22,6 +22,6 @@ needs to be reverted:
 | \`worker_version_id\` | \`${WORKER_VERSION_BEFORE}\` |
 | \`pages_deployment_id\` | \`${PAGES_DEPLOYMENT_BEFORE}\` |
 
-Database migrations are not reverted automatically. See docs/rollback.md.
+Database schema is not modified by rollback. See docs/rollback.md.
 EOF
 fi

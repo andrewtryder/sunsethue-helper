@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Validate both Wrangler configurations without deploying anything.
 #
-# Uses the Wrangler version pinned in package.json so local, CI, migration, and
-# deployment runs all agree.
+# Uses the Wrangler version pinned in package.json so local, CI, deployment, and
+# rollback runs all agree.
 set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -44,7 +44,6 @@ require_line "$WORKER_CONFIG" '^workers_dev[[:space:]]*=[[:space:]]*false' 'work
 require_line "$WORKER_CONFIG" '^preview_urls[[:space:]]*=[[:space:]]*false' 'preview_urls is disabled' || failures=1
 require_line "$WORKER_CONFIG" '^crons[[:space:]]*=' 'cron trigger is configured' || failures=1
 require_line "$WORKER_CONFIG" '^binding[[:space:]]*=[[:space:]]*"DB"' 'D1 binding DB is declared' || failures=1
-require_line "$WORKER_CONFIG" '^migrations_dir[[:space:]]*=[[:space:]]*"migrations"' 'D1 migrations_dir is set' || failures=1
 require_line "$PAGES_CONFIG" '^pages_build_output_dir[[:space:]]*=' 'Pages output directory is set' || failures=1
 require_line "$PAGES_CONFIG" '^binding[[:space:]]*=[[:space:]]*"API_SERVICE"' 'API_SERVICE binding is declared' || failures=1
 require_line "$PAGES_CONFIG" '^service[[:space:]]*=[[:space:]]*"sunsethue-helper-worker"' 'API_SERVICE targets the Worker' || failures=1

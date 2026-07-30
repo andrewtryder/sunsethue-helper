@@ -50,8 +50,8 @@ updates:
         update-types:
           - minor
     ignore:
-      # Wrangler is pinned exactly and shared by local dev, CI, migrations,
-      # deployment, and rollback. Bump it deliberately, not automatically.
+      # Wrangler is pinned exactly and shared by local dev, CI, deployment,
+      # and rollback. Bump it deliberately, not automatically.
       - dependency-name: wrangler
         update-types:
           - version-update:semver-major

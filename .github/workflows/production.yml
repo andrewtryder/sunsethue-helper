@@ -59,45 +59,14 @@ jobs:
       - name: Record deployment state and validate bindings
         id: state
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npm run deploy:prepare
 
-  migrate:
-    name: D1 migrations
-    needs: prepare
-    if: ${{ inputs.dry_run != true }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    environment:
-      name: production
-      url: https://sunsethue-helper.pages.dev
-    steps:
-      - name: Check out the repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Set up Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      # Fails loudly when migration state cannot be determined, and succeeds
-      # without changes when nothing is pending.
-      - name: List and apply pending migrations
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: bash scripts/apply-migrations.sh
 
   deploy-worker:
     name: Deploy Worker API
-    needs: [prepare, migrate]
+    needs: [prepare]
     if: ${{ inputs.dry_run != true }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -126,7 +95,7 @@ jobs:
       - name: Deploy Worker
         uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
         with:
-          apiToken: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           packageManager: npm
           wranglerVersion: "4.115.0"
@@ -153,7 +122,7 @@ jobs:
       - name: Record the deployed Worker version
         id: worker_state
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: node scripts/record-worker-version.mjs
 
@@ -185,7 +154,7 @@ jobs:
         id: pages
         uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
         with:
-          apiToken: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           packageManager: npm
           wranglerVersion: "4.115.0"
@@ -226,7 +195,7 @@ jobs:
       # cookie or a real Access JWT.
       - name: Verify Access gating, origin bypass, bindings, and cron
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           EXPECTED_COMMIT_SHA: ${{ needs.prepare.outputs.commit_sha }}
         run: npm run verify:production

@@ -15,7 +15,7 @@ test("the Worker stays private and keeps its cron trigger", async () => {
   assert.match(config, /^preview_urls\s*=\s*false$/m, "Worker preview URLs must stay disabled");
   assert.match(config, /^crons\s*=\s*\[/m);
   assert.match(config, /^binding\s*=\s*"DB"$/m);
-  assert.match(config, /^migrations_dir\s*=\s*"migrations"$/m);
+  assert.doesNotMatch(config, /migrations_dir/, "versioned migrations are not used");
 });
 
 test("the Pages project binds the Worker as a private service", async () => {
@@ -73,8 +73,7 @@ test("no tracked source or config references a public workers.dev API origin", a
     "scripts/validate-wrangler.sh",
     ".github/workflows/validate.yml",
     ".github/workflows/production.yml",
-    ".github/workflows/rollback.yml",
-    ".github/workflows/zero-trust.yml"
+    ".github/workflows/rollback.yml"
   ];
 
   for (const file of files) {
@@ -91,7 +90,7 @@ test("the Node version is consistent across the toolchain", async () => {
   assert.equal(nvmrc, nodeVersion, ".nvmrc and .node-version must agree");
   assert.equal(pkg.engines.node, `>=${nvmrc}`, "package.json engines must match .nvmrc");
 
-  for (const workflow of ["validate.yml", "production.yml", "rollback.yml", "zero-trust.yml"]) {
+  for (const workflow of ["validate.yml", "production.yml", "rollback.yml"]) {
     const contents = await read(`.github/workflows/${workflow}`);
     assert.match(
       contents,
@@ -144,12 +143,10 @@ test("the commit-message fixer and its scripts are gone", async () => {
   }
 });
 
-test("versioned migrations replaced the unrestricted schema script", async () => {
+test("schema.sql is the single source of schema truth", async () => {
   const rootEntries = await readdir(fileURLToPath(ROOT));
-  assert.equal(rootEntries.includes("schema.sql"), false, "schema.sql must not be reintroduced");
-
-  const migrations = await readdir(fileURLToPath(new URL("migrations/", ROOT)));
-  assert.ok(migrations.some((entry) => entry.endsWith(".sql")));
+  assert.ok(rootEntries.includes("schema.sql"), "schema.sql must exist at the repository root");
+  assert.equal(rootEntries.includes("migrations"), false, "migrations/ must not remain");
 });
 
 test("the local development example uses placeholders only", async () => {

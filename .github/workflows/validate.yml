@@ -116,7 +116,7 @@ jobs:
       - name: Worker unit, Access JWT, cron, and workflow policy tests
         run: npm run test:worker
 
-      # Isolated in-memory SQLite built from migrations/. Never production D1.
+      # Isolated in-memory SQLite built from schema.sql. Never production D1.
       # SMTP, Sunsethue, Nominatim, and JWKS are all faked.
       - name: API, Pages proxy, report, and D1 integration tests
         run: npm run test:integration

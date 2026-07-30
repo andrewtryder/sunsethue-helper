@@ -550,6 +550,92 @@ async function apply() {
   return summary;
 }
 
+/**
+ * Read-only plan. Makes no write calls at all — not even the write-permission probe —
+ * so it is safe to run with a read-scoped Zero Trust token and as the default action
+ * of the manually triggered infrastructure workflow.
+ */
+async function plan() {
+  const accountId = requireEnv("CLOUDFLARE_ACCOUNT_ID");
+  await verifyToken();
+
+  const organization = await getOrganization(accountId);
+  const identityProviders = await listIdentityProviders(accountId);
+  const idpChoice = chooseIdentityProvider(identityProviders);
+  const apps = await listAllApps(accountId);
+  const exactApps = apps.filter(matchesExactHost);
+  const wildcardApps = apps.filter(matchesWildcardHost);
+  const existing = exactApps[0] || null;
+  const policies = existing ? await listPolicies(accountId, existing.id) : [];
+
+  const changes = [];
+
+  if (!existing) {
+    changes.push(`CREATE self-hosted Access application "${APP_NAME}" protecting ${HOSTNAME}`);
+  } else {
+    if (existing.name !== APP_NAME) {
+      changes.push(`UPDATE application name: "${existing.name}" -> "${APP_NAME}"`);
+    }
+    if (existing.type !== "self_hosted") {
+      changes.push(`UPDATE application type: "${existing.type}" -> "self_hosted"`);
+    }
+    const desiredSession = desiredSessionDuration(existing);
+    if (existing.session_duration !== desiredSession) {
+      changes.push(
+        `UPDATE session duration: "${existing.session_duration}" -> "${desiredSession}"`
+      );
+    }
+    if (idpChoice.provider && !(existing.allowed_idps || []).includes(idpChoice.provider.id)) {
+      changes.push(`UPDATE allowed identity provider to the ${idpChoice.provider.type} provider`);
+    }
+  }
+
+  if (policies.length === 0) {
+    changes.push(`CREATE allow policy "${POLICY_NAME}" for the single authorized email`);
+  } else {
+    const primary = policies.find((policy) => policy.name === POLICY_NAME) || policies[0];
+    const failures = assertPolicyShape(primary, AUTHORIZED_EMAIL);
+    for (const failure of failures) {
+      changes.push(`UPDATE policy "${primary.name}": ${failure}`);
+    }
+    for (const extra of policies) {
+      if (extra.id !== primary.id) {
+        changes.push(`DELETE extra policy "${extra.name}" on this application only`);
+      }
+    }
+  }
+
+  if (wildcardApps.length > 0) {
+    changes.push(
+      "BLOCKED: a wildcard Access application exists; apply refuses to repurpose it. Resolve manually."
+    );
+  }
+  if (exactApps.length > 1) {
+    changes.push(`BLOCKED: ${exactApps.length} applications protect ${HOSTNAME}; resolve manually.`);
+  }
+  if (!idpChoice.provider) {
+    changes.push("BLOCKED: no usable Cloudflare or One-time PIN identity provider is configured.");
+  }
+
+  const summary = {
+    mode: "plan",
+    readOnly: true,
+    hostname: HOSTNAME,
+    allowedEmail: AUTHORIZED_EMAIL,
+    teamDomainPresent: Boolean(organization?.auth_domain),
+    identityProvider: idpChoice.provider ? sanitizeIdp(idpChoice.provider) : null,
+    existingApplicationId: existing?.id || null,
+    existingPolicyIds: policies.map((policy) => policy.id),
+    audienceRedacted: redactedAud(existing?.aud),
+    wildcardApplicationCount: wildcardApps.length,
+    changes,
+    inSync: changes.length === 0
+  };
+
+  log("Access plan", summary);
+  return summary;
+}
+
 async function verifyState({ organization, app, policies, identityProvider }) {
   const failures = [];
   if (!app) failures.push("Access application missing");
@@ -693,6 +779,9 @@ async function main() {
     case "snapshot":
       await snapshot();
       break;
+    case "plan":
+      await plan();
+      break;
     case "apply":
       await apply();
       break;
@@ -704,7 +793,9 @@ async function main() {
       break;
     default:
       console.error(`Unknown command: ${command}`);
-      console.error("Usage: node scripts/cloudflare-access.mjs <snapshot|apply|verify|rollback>");
+      console.error(
+        "Usage: node scripts/cloudflare-access.mjs <snapshot|plan|apply|verify|rollback>"
+      );
       process.exitCode = 1;
   }
 }

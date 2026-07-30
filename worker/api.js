@@ -9,8 +9,16 @@ import {
   logSafe
 } from "./http.js";
 
-export async function handleHttpRequest(request, env, authContext = null) {
+/**
+ * @param {Request} request
+ * @param {object} env
+ * @param {object | null} [authContext]
+ * @param {{ fetch?: typeof fetch, loadMailer?: () => Promise<object> }} [deps]
+ *   Injection seam so route tests never contact Sunsethue, Nominatim, or SMTP.
+ */
+export async function handleHttpRequest(request, env, authContext = null, deps = {}) {
   const requestId = createRequestId();
+  const fetchImpl = deps.fetch || fetch;
   const url = new URL(request.url);
   const path = url.pathname;
 
@@ -19,7 +27,7 @@ export async function handleHttpRequest(request, env, authContext = null) {
     if (path === "/api/getApiCredits") {
       if (request.method !== "GET") return methodNotAllowed("GET", requestId);
       const apiKey = env.SUNSETHUE_API_KEY;
-      const credits = await fetchApiCredits({ fetch, apiKey });
+      const credits = await fetchApiCredits({ fetch: fetchImpl, apiKey });
       return jsonResponse(credits, 200, requestId);
     }
 
@@ -34,7 +42,7 @@ export async function handleHttpRequest(request, env, authContext = null) {
       const userAgentEmail = env.EMAIL_TO || "user@example.com";
       const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`;
 
-      const response = await fetch(nominatimUrl, {
+      const response = await fetchImpl(nominatimUrl, {
         headers: {
           "User-Agent": `SunsethueHelper/1.0 (${userAgentEmail})`,
           Accept: "application/json"
@@ -58,7 +66,7 @@ export async function handleHttpRequest(request, env, authContext = null) {
     // 3. POST /api/triggerReport
     if (path === "/api/triggerReport") {
       if (request.method !== "POST") return methodNotAllowed("POST", requestId);
-      await runAndSendReport("Manual Test", env);
+      await runAndSendReport("Manual Test", env, deps);
       return jsonResponse(
         { success: true, message: "Report processed and email sent." },
         200,

@@ -1,0 +1,262 @@
+name: Production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Run validation and preflight only; do not deploy or release.
+        type: boolean
+        default: false
+
+# One production pipeline at a time. Never cancel a run mid-deploy: a cancelled
+# deploy can leave the Worker and Pages on different versions.
+concurrency:
+  group: sunsethue-production
+  cancel-in-progress: false
+
+# Read-only by default. Only the release job raises its own permissions.
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  # Lint and test definitions live in exactly one place.
+  validate:
+    name: Validate
+    uses: ./.github/workflows/validate.yml
+
+  prepare:
+    name: Preflight and rollback capture
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: production
+      url: https://sunsethue-helper.pages.dev
+    outputs:
+      commit_sha: ${{ steps.state.outputs.commit_sha }}
+      worker_version_before: ${{ steps.state.outputs.worker_version_before }}
+      pages_deployment_before: ${{ steps.state.outputs.pages_deployment_before }}
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Record deployment state and validate bindings
+        id: state
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npm run deploy:prepare
+
+  migrate:
+    name: D1 migrations
+    needs: prepare
+    if: ${{ inputs.dry_run != true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: production
+      url: https://sunsethue-helper.pages.dev
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Fails loudly when migration state cannot be determined, and succeeds
+      # without changes when nothing is pending.
+      - name: List and apply pending migrations
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: bash scripts/apply-migrations.sh
+
+  deploy-worker:
+    name: Deploy Worker API
+    needs: [prepare, migrate]
+    if: ${{ inputs.dry_run != true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: production
+      url: https://sunsethue-helper.pages.dev
+    outputs:
+      worker_version_after: ${{ steps.worker_state.outputs.worker_version }}
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # The Worker deploys first and must stay backward compatible, because the
+      # previous Pages frontend keeps calling it until the next job finishes.
+      - name: Deploy Worker
+        uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          packageManager: npm
+          wranglerVersion: "4.115.0"
+          command: deploy --minify --keep-vars --config wrangler.worker.toml
+          secrets: |
+            AUTHORIZED_EMAIL
+            TEAM_DOMAIN
+            POLICY_AUD
+            SUNSETHUE_API_KEY
+            GMAIL_USER
+            GMAIL_APP_PASSWORD
+            EMAIL_TO
+            EMAIL_FROM
+        env:
+          AUTHORIZED_EMAIL: ${{ secrets.AUTHORIZED_EMAIL }}
+          TEAM_DOMAIN: ${{ secrets.TEAM_DOMAIN }}
+          POLICY_AUD: ${{ secrets.POLICY_AUD }}
+          SUNSETHUE_API_KEY: ${{ secrets.SUNSETHUE_API_KEY }}
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+
+      - name: Record the deployed Worker version
+        id: worker_state
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scripts/record-worker-version.mjs
+
+  deploy-pages:
+    name: Deploy Pages frontend and API proxy
+    needs: [prepare, deploy-worker]
+    if: ${{ inputs.dry_run != true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: production
+      url: https://sunsethue-helper.pages.dev
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Deploy Pages project
+        id: pages
+        uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          packageManager: npm
+          wranglerVersion: "4.115.0"
+          command: pages deploy --project-name=sunsethue-helper --branch=main
+
+      - name: Report the Pages deployment result
+        env:
+          PAGES_URL: ${{ steps.pages.outputs.deployment-url }}
+          WORKER_VERSION_BEFORE: ${{ needs.prepare.outputs.worker_version_before }}
+          WORKER_VERSION_AFTER: ${{ needs.deploy-worker.outputs.worker_version_after }}
+        run: bash scripts/summarize-deployment.sh
+
+  verify:
+    name: Post-deployment verification
+    needs: [prepare, deploy-worker, deploy-pages]
+    if: ${{ inputs.dry_run != true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: production
+      url: https://sunsethue-helper.pages.dev
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Unauthenticated negative checks only. CI never presents a human Access
+      # cookie or a real Access JWT.
+      - name: Verify Access gating, origin bypass, bindings, and cron
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          EXPECTED_COMMIT_SHA: ${{ needs.prepare.outputs.commit_sha }}
+        run: npm run verify:production
+
+      - name: Record rollback targets
+        if: always()
+        env:
+          WORKER_VERSION_BEFORE: ${{ needs.prepare.outputs.worker_version_before }}
+          PAGES_DEPLOYMENT_BEFORE: ${{ needs.prepare.outputs.pages_deployment_before }}
+        run: bash scripts/summarize-rollback-targets.sh
+
+  # Release Please still maintains its release pull request on every push to main,
+  # but it only runs after production has deployed and verified, so a GitHub release
+  # can never be published ahead of a working deployment.
+  release:
+    name: Release Please
+    needs: verify
+    if: ${{ github.event_name == 'push' && inputs.dry_run != true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: sunsethue-release
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Create or publish the release
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json

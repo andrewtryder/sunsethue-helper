@@ -4,9 +4,12 @@ import {
   authenticateRequest,
   AuthError,
   createTestJwks,
+  getRemoteJwks,
   isDevAuthBypassEnabled,
-  isLoopbackHostname
-} from "../worker/auth.js";
+  isLoopbackHostname,
+  normalizeTeamDomain,
+  readAccessJwt
+} from "../../worker/auth.js";
 import {
   AUTHORIZED_EMAIL,
   OTHER_EMAIL,
@@ -17,7 +20,7 @@ import {
   createForeignKeyToken,
   getLocalJwks,
   makeRequest
-} from "./helpers.mjs";
+} from "../helpers.mjs";
 
 async function authWithLocalJwks(request, env, extraDeps = {}) {
   const jwks = createTestJwks(await getLocalJwks());
@@ -266,6 +269,58 @@ test("local bypass authenticates on loopback when enabled", async () => {
   );
   assert.equal(result.bypass, true);
   assert.equal(result.authorized, true);
+});
+
+test("loopback detection handles ports, IPv6 brackets, and public hosts", () => {
+  assert.equal(isLoopbackHostname("localhost"), true);
+  assert.equal(isLoopbackHostname("LOCALHOST"), true);
+  assert.equal(isLoopbackHostname("127.0.0.1"), true);
+  assert.equal(isLoopbackHostname("127.0.0.1:8788"), true);
+  assert.equal(isLoopbackHostname("[::1]"), true);
+  assert.equal(isLoopbackHostname("::1"), true);
+  assert.equal(isLoopbackHostname(""), false);
+  assert.equal(isLoopbackHostname(null), false);
+  assert.equal(isLoopbackHostname("127.0.0.1.evil.example"), false);
+  assert.equal(isLoopbackHostname("localhost.evil.example"), false);
+});
+
+test("the Access assertion header is read case-insensitively from Headers or a plain object", () => {
+  assert.equal(readAccessJwt(new Headers({ "Cf-Access-Jwt-Assertion": "abc" })), "abc");
+  assert.equal(readAccessJwt({ "CF-ACCESS-JWT-ASSERTION": "abc" }), "abc");
+  assert.equal(readAccessJwt({ "cf-access-jwt-assertion": "abc" }), "abc");
+  assert.equal(readAccessJwt({ authorization: "Bearer abc" }), null);
+  assert.equal(readAccessJwt(new Headers()), null);
+  assert.equal(readAccessJwt(null), null);
+});
+
+test("team domain normalization accepts bare, http, and trailing-slash forms", () => {
+  assert.equal(normalizeTeamDomain("example.cloudflareaccess.com"), "https://example.cloudflareaccess.com");
+  assert.equal(normalizeTeamDomain("https://example.cloudflareaccess.com/"), "https://example.cloudflareaccess.com");
+  assert.equal(normalizeTeamDomain("http://localhost:8080"), "http://localhost:8080");
+  assert.equal(normalizeTeamDomain(""), "");
+  assert.equal(normalizeTeamDomain(undefined), "");
+});
+
+test("the remote JWKS verifier is created once per team domain and cached", () => {
+  const cache = new Map();
+  const created = [];
+  const createRemoteJWKSetFn = (url) => {
+    created.push(url.toString());
+    return { url: url.toString() };
+  };
+
+  const first = getRemoteJwks({ teamDomain: "example.cloudflareaccess.com", createRemoteJWKSetFn, cache });
+  const second = getRemoteJwks({ teamDomain: "example.cloudflareaccess.com", createRemoteJWKSetFn, cache });
+
+  assert.equal(first, second, "keys must be reused across requests");
+  assert.deepEqual(created, ["https://example.cloudflareaccess.com/cdn-cgi/access/certs"]);
+});
+
+test("an absent team domain makes the JWKS verifier fail closed", () => {
+  assert.throws(
+    () => getRemoteJwks({ teamDomain: "", cache: new Map() }),
+    (error) => error instanceof AuthError && error.code === "MISCONFIGURED"
+  );
 });
 
 test("issuer helper normalizes bare team domains", async () => {

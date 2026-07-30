@@ -144,8 +144,17 @@ function buildRunResultEntry(result) {
   };
 }
 
-export async function runAndSendReport(triggerType, env) {
-  const now = Date.now();
+/**
+ * @param {string} triggerType
+ * @param {object} env
+ * @param {{ fetch?: typeof fetch, loadMailer?: () => Promise<{ WorkerMailer: unknown }>, now?: number }} [deps]
+ *   Injection seam used by tests so SMTP delivery and the Sunsethue API are never
+ *   contacted for real. Production callers omit it.
+ */
+export async function runAndSendReport(triggerType, env, deps = {}) {
+  const fetchImpl = deps.fetch || fetch;
+  const loadMailer = deps.loadMailer || (() => import("worker-mailer"));
+  const now = deps.now ?? Date.now();
   console.log(`Starting report run. Trigger: ${triggerType}. Target Email: ${env.EMAIL_TO}`);
 
   try {
@@ -173,7 +182,7 @@ export async function runAndSendReport(triggerType, env) {
         console.log(`Fetching forecast for location: ${loc.name} (${loc.latitude}, ${loc.longitude})`);
 
         const cleanApiKey = String(env.SUNSETHUE_API_KEY).trim();
-        const response = await fetch(
+        const response = await fetchImpl(
           `https://api.sunsethue.com/forecast?latitude=${loc.latitude}&longitude=${loc.longitude}&days=2&key=${cleanApiKey}`
         );
 
@@ -251,7 +260,7 @@ export async function runAndSendReport(triggerType, env) {
     const webappUrl = env.WEBAPP_URL || "https://sunsethue-helper.pages.dev";
     const htmlEmail = buildHtmlEmail(results, triggerType, reportTimeText, webappUrl);
     
-    const { WorkerMailer } = await import("worker-mailer");
+    const { WorkerMailer } = await loadMailer();
     console.log("Connecting to SMTP server via worker-mailer...");
     const mailer = await WorkerMailer.connect({
       host: "smtp.gmail.com",

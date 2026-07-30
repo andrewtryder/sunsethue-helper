@@ -35,27 +35,6 @@ Invalid or missing tokens return `401`. A valid token for another identity retur
 
 Do not enable account-wide “Require Access protection.” Do not add wildcard, Everyone, email-domain, or bypass policies for this app.
 
-## Required deployment configuration
-
-Set these as **Worker secrets** (never commit real values):
-
-| Name | Purpose |
-| --- | --- |
-| `AUTHORIZED_EMAIL` | Exact allowed email |
-| `TEAM_DOMAIN` | `https://<team>.cloudflareaccess.com` |
-| `POLICY_AUD` | Access application Audience tag |
-| `SUNSETHUE_API_KEY` | Sunsethue API key |
-| `GMAIL_USER` / `GMAIL_APP_PASSWORD` | SMTP auth |
-| `EMAIL_TO` / `EMAIL_FROM` | Report recipients |
-
-GitHub Actions also needs:
-
-- `CLOUDFLARE_API_TOKEN` — scoped token with Access Apps/Policies write, Workers deploy, Pages deploy
-- `CLOUDFLARE_ACCOUNT_ID`
-- The Worker secrets listed above (`AUTHORIZED_EMAIL`, `TEAM_DOMAIN`, `POLICY_AUD`, …)
-
-Rotate the Cloudflare management token from the Cloudflare dashboard if it is ever exposed. Prefer a scoped API token over a Global API Key.
-
 ## Local development
 
 ```bash
@@ -77,29 +56,82 @@ It never activates from a caller-controlled header, query parameter, or localSto
 
 Local D1 is used by default. Do not point local tests at the production D1 database.
 
+Copy `.dev.vars.example` to `.dev.vars` and fill placeholders only. Never commit real tokens, JWTs, cookies, or Audience tags.
+
 ## Configuration files
 
 | File | Role |
 | --- | --- |
 | `wrangler.toml` | Pages project (`pages_build_output_dir`, `API_SERVICE` binding) |
-| `wrangler.worker.toml` | Private API Worker (`workers_dev = false`, cron, D1) |
+| `wrangler.worker.toml` | Private API Worker (`workers_dev = false`, cron, D1, migrations) |
+| `migrations/` | Versioned D1 migrations applied by the production pipeline |
 | `public/_routes.json` | Invoke Functions only for `/api/*` |
 | `functions/api/[[path]].js` | Same-origin API proxy |
-| `scripts/cloudflare-access.mjs` | Idempotent Access automation |
+| `scripts/cloudflare-access.mjs` | Idempotent Access automation (`plan`/`apply`/`verify`) |
 
-## Tests
+## Tests and CI locally
 
 ```bash
-npm test
 npm run lint
+npm run audit
+npm run lint:shell
+npm run lint:workflows
+npm run validate:wrangler
+npm test                 # frontend + worker + integration
+npm run test:coverage    # real coverage with enforced thresholds
+npm run ci               # everything above
 ```
 
-JWT tests use generated RSA keys and a local JWKS fixture. They never use a real Access token.
+JWT tests use generated RSA keys and a local JWKS fixture. They never use a real Access token. SMTP, Sunsethue, Nominatim, Photon, and Cloudflare JWKS are all faked. D1 tests run against an in-memory SQLite database built from `migrations/`.
+
+## CI/CD overview
+
+| Workflow | Trigger | Purpose |
+| --- | --- | --- |
+| `validate.yml` | Pull requests to `main`, and reusable `workflow_call` | Lint, audit, tests, coverage, Wrangler dry-run. No production secrets. |
+| `production.yml` | Push to `main`, or manual dispatch | Validate → prepare → migrate → deploy Worker → deploy Pages → verify → release |
+| `rollback.yml` | Manual dispatch | Restore an exact prior Worker version and/or Pages deployment |
+| `zero-trust.yml` | Manual dispatch | Plan / verify / apply the Access application. Separate token. |
+
+Details:
+
+- [docs/deployment.md](docs/deployment.md) — production pipeline, secrets, verification
+- [docs/rollback.md](docs/rollback.md) — exact-identifier rollback
+- [docs/branch-protection.md](docs/branch-protection.md) — recommended `main` settings
+- [docs/cloudflare-credentials.md](docs/cloudflare-credentials.md) — deploy vs Zero Trust tokens
+- [docs/d1-migrations.md](docs/d1-migrations.md) — versioned migrations and Time Travel
+
+## Worker secrets
+
+Set these as **Worker secrets** (never commit real values):
+
+| Name | Purpose |
+| --- | --- |
+| `AUTHORIZED_EMAIL` | Exact allowed email |
+| `TEAM_DOMAIN` | `https://<team>.cloudflareaccess.com` |
+| `POLICY_AUD` | Access application Audience tag |
+| `SUNSETHUE_API_KEY` | Sunsethue API key |
+| `GMAIL_USER` / `GMAIL_APP_PASSWORD` | SMTP auth |
+| `EMAIL_TO` / `EMAIL_FROM` | Report recipients |
+
+## GitHub environment secrets
+
+All production credentials live in the GitHub `production` environment. See [docs/cloudflare-credentials.md](docs/cloudflare-credentials.md).
+
+| Name | Scope |
+| --- | --- |
+| `CLOUDFLARE_DEPLOY_API_TOKEN` | Workers, Pages, and D1 only. No Access write. |
+| `CLOUDFLARE_ZEROTRUST_API_TOKEN` | Access Apps and Policies only. Never used by routine deploys. |
+| `CLOUDFLARE_ACCOUNT_ID` | Account identifier |
+| Worker secrets listed above | Passed into the Worker deploy step |
+
+Rotate any Cloudflare token from the Cloudflare dashboard if it is ever exposed. Prefer a scoped API token over a Global API Key. Do not reuse one token for both application deployment and Zero Trust administration.
 
 ## Access automation
 
 ```bash
 npm run access:snapshot   # sanitized rollback snapshot under .tmp/cloudflare-access/
+npm run access:plan       # read-only plan (default of the Zero Trust workflow)
 npm run access:apply      # idempotent create/update
 npm run access:verify     # assert exact policy shape
 ```
@@ -109,7 +141,7 @@ Snapshots omit API tokens, JWTs, cookies, IdP secrets, and service-token secrets
 ### Recreate the Access application
 
 1. Run `npm run access:snapshot`.
-2. Create/update with `npm run access:apply`.
+2. Create/update with `npm run access:apply` (or the Zero Trust workflow with `action: apply`).
 3. Copy the new Audience tag into the Worker `POLICY_AUD` secret.
 4. Redeploy the Worker and verify with `npm run access:verify`.
 
@@ -125,25 +157,31 @@ If you are locked out of the UI:
 ### Verify workers.dev stays disabled
 
 ```bash
-npx wrangler deployments list --name sunsethue-helper-worker
-# or inspect subdomain settings via API / dashboard Domains & Routes
+npx wrangler deployments list --config wrangler.worker.toml
 curl -i https://sunsethue-helper-worker.mrcoffee.workers.dev/api/locations
 ```
 
-Expect a non-200 failure (for example connection/error page), never application JSON.
+Expect a non-200 failure (for example connection/error page), never application JSON. Production verification also asserts this automatically.
 
 ## Rollback
 
-1. Restore prior Access application/policy settings from the sanitized snapshot by ID.
-2. Roll Pages back to the previous deployment.
-3. Roll the Worker back to the previous version while keeping JWT enforcement if possible.
-4. Only temporarily re-enable `workers.dev` when required for recovery, and only with JWT enforcement still active.
-5. Deleting the Access application is a last-resort, owner-approved action — not the primary rollback.
+Use the **Rollback production** workflow with the exact Worker version id and Pages deployment id recorded in the deployment job summary. See [docs/rollback.md](docs/rollback.md).
+
+Do not automatically reverse a D1 migration. A schema reversal needs a reviewed down-migration or D1 Time Travel.
 
 ## Manual browser verification
 
-After deploy:
+After deploy (CI only performs unauthenticated negative checks):
 
 1. Open `https://sunsethue-helper.pages.dev` in a private window and confirm Access challenges instead of rendering the app.
 2. Sign in as `andrewtryder@gmail.com` with the Cloudflare identity provider.
 3. Confirm locations, logs, credits, address search, and manual report still work over same-origin `/api/*`.
+
+## Toolchain
+
+| Pin | Source of truth |
+| --- | --- |
+| Node.js 24 | `.nvmrc`, `.node-version`, `package.json` engines, CI `node-version-file` |
+| Wrangler 4.115.0 | `package.json` `devDependencies.wrangler` and every `wranglerVersion:` in workflows |
+
+`FORCE_JAVASCRIPT_ACTIONS_TO_NODE24` is set on workflows so GitHub Actions that still declare Node 20 runtimes execute on Node 24. It is not an application Node-version setting. Revisit and remove it once every pinned action natively supports Node 24.

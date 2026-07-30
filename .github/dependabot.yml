@@ -1,10 +1,57 @@
 version: 2
+
 updates:
-  - package-ecosystem: "npm"
-    directory: "/"
+  # Keeps the SHA pins current. Dependabot rewrites the pinned SHA and the trailing
+  # version comment together, so pinning does not mean going stale.
+  - package-ecosystem: github-actions
+    directory: /
     schedule:
-      interval: "weekly"
-  - package-ecosystem: "github-actions"
-    directory: "/"
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci"
+      include: scope
+    labels:
+      - dependencies
+      - github-actions
+    groups:
+      actions-patch:
+        patterns:
+          - "*"
+        update-types:
+          - patch
+
+  - package-ecosystem: npm
+    directory: /
     schedule:
-      interval: "weekly"
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    versioning-strategy: increase
+    commit-message:
+      prefix: "build"
+      include: scope
+    labels:
+      - dependencies
+      - npm
+    groups:
+      # Low-risk patch bumps land together; minor and major stay separate so the
+      # Wrangler, jose, and ESLint majors get individual review.
+      npm-patch:
+        patterns:
+          - "*"
+        update-types:
+          - patch
+      npm-dev-minor:
+        dependency-type: development
+        patterns:
+          - "*"
+        update-types:
+          - minor
+    ignore:
+      # Wrangler is pinned exactly and shared by local dev, CI, migrations,
+      # deployment, and rollback. Bump it deliberately, not automatically.
+      - dependency-name: wrangler
+        update-types:
+          - version-update:semver-major

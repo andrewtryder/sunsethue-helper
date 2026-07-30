@@ -1,0 +1,125 @@
+name: Validate
+
+# The single definition of "is this change good?".
+# Pull requests run it directly; the production pipeline calls it via workflow_call
+# so lint and test commands are never duplicated.
+on:
+  workflow_call:
+  pull_request:
+    branches: [main]
+
+# Validation is untrusted-code territory: read-only, and it receives no Cloudflare,
+# SMTP, Gmail, Sunsethue, Access, or production database secrets.
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  commit-hygiene:
+    name: Commit and title conventions
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out the pull request head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Check-only. CI never rewrites or force-pushes contributor commits.
+      - name: Validate conventional commit messages
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: bash scripts/check-commit-messages.sh "$BASE_SHA" "$HEAD_SHA"
+
+      - name: Validate pull request title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: bash scripts/check-pr-title.sh "$PR_TITLE"
+
+  static-analysis:
+    name: Static analysis and configuration
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint JavaScript with ESLint security rules
+        run: npm run lint
+
+      - name: Audit dependencies
+        run: npm run audit
+
+      - name: Lint shell scripts
+        run: npm run lint:shell
+
+      - name: Check workflow structure and security policy
+        run: npm run lint:workflows
+
+      - name: Lint workflow files with actionlint
+        uses: docker://rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667 # v1.7.12
+
+      - name: Validate Wrangler configuration without deploying
+        run: npm run validate:wrangler
+
+  tests:
+    name: Tests and coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Frontend structural and unit tests
+        run: npm run test:frontend
+
+      - name: Worker unit, Access JWT, cron, and workflow policy tests
+        run: npm run test:worker
+
+      # Isolated in-memory SQLite built from migrations/. Never production D1.
+      # SMTP, Sunsethue, Nominatim, and JWKS are all faked.
+      - name: API, Pages proxy, report, and D1 integration tests
+        run: npm run test:integration
+
+      - name: Coverage with enforced thresholds
+        run: npm run test:coverage

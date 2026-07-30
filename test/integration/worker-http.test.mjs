@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import worker from "../worker/index.js";
-import { handleScheduledReport } from "../worker/cron.js";
-import { AuthError, createTestJwks, setAuthDependencies } from "../worker/auth.js";
+import worker from "../../worker/index.js";
+import { handleScheduledReport } from "../../worker/cron.js";
+import { AuthError, createTestJwks, setAuthDependencies } from "../../worker/auth.js";
 import {
   AUTHORIZED_EMAIL,
   OTHER_EMAIL,
@@ -10,7 +10,7 @@ import {
   createAccessToken,
   getLocalJwks,
   makeRequest
-} from "./helpers.mjs";
+} from "../helpers.mjs";
 
 const API_ROUTES = [
   { method: "GET", path: "/api/locations" },

@@ -19,3 +19,5 @@ crons = ["0 * * * *"]
 binding = "DB"
 database_name = "sunsethue-db"
 database_id = "77f731bf-ee92-46fa-989b-1f612ee05350"
+# Versioned migrations replace the old unrestricted schema.sql apply.
+migrations_dir = "migrations"

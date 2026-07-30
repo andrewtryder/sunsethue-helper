@@ -14,9 +14,17 @@ const minuteFormatterET = new Intl.DateTimeFormat("en-US", {
   minute: "numeric"
 });
 
-export async function handleScheduledReport(event, env) {
-  const now = new Date();
-  
+/**
+ * @param {object} event
+ * @param {object} env
+ * @param {{ now?: number | Date, runAndSendReport?: typeof runAndSendReport }} [deps]
+ *   Injection seam so tests can pin the instant and observe dispatch without
+ *   sending email. Production callers omit it.
+ */
+export async function handleScheduledReport(event, env, deps = {}) {
+  const now = deps.now === undefined ? new Date() : new Date(deps.now);
+  const runReport = deps.runAndSendReport || runAndSendReport;
+
   // Format to Eastern Time hour and minute
   const hourStr = hourFormatterET.format(now);
   const minuteStr = minuteFormatterET.format(now);
@@ -29,7 +37,7 @@ export async function handleScheduledReport(event, env) {
   // Ensure we are triggering near the top of the hour (Wrangler/Cloudflare cron is hourly on the hour)
   if (currentMinute > 10) {
     console.log("Not near top of the hour. Skipping.");
-    return;
+    return null;
   }
 
   let triggerType = null;
@@ -44,12 +52,14 @@ export async function handleScheduledReport(event, env) {
   if (triggerType) {
     console.log(`Time match: Running scheduled ${triggerType} report...`);
     try {
-      await runAndSendReport(triggerType, env);
+      await runReport(triggerType, env);
       console.log(`Scheduled ${triggerType} report run successfully completed.`);
     } catch (error) {
       console.error(`Scheduled ${triggerType} report run failed:`, error);
     }
-  } else {
-    console.log(`No scheduled report matched for hour ${currentHour} ET.`);
+    return triggerType;
   }
+
+  console.log(`No scheduled report matched for hour ${currentHour} ET.`);
+  return null;
 }

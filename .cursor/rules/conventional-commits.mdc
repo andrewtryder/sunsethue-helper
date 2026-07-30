@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Conventional Commits
 
-All commit messages must follow [Conventional Commits](https://www.conventionalcommits.org/) as validated by commitplease (Angular style).
+All commit messages must follow [Conventional Commits](https://www.conventionalcommits.org/) as validated by commitlint (Angular style).
 
 ## Format
 

@@ -1,65 +1,149 @@
-# 🌅 Sunsethue Helper
+# Sunsethue Helper
 
-Sunsethue Helper is a secure, cloud-hosted private web application built on Firebase that manages location coordinates, queries the Sunsethue forecast API, and emails daily reports summarizing the upcoming sunrise and sunset quality forecasts.
+Private sunrise/sunset quality notifier for a single authorized user.
 
----
+## Architecture
 
-## ✨ Features
+```text
+Browser
+  -> Cloudflare Access (exact host: sunsethue-helper.pages.dev)
+  -> Pages static frontend
+  -> same-origin /api/*
+  -> Pages Function
+  -> private service binding (API_SERVICE)
+  -> sunsethue-helper-worker
+  -> D1 + Sunsethue API + email
+```
 
-*   **📊 Live Forecast Dashboard**: Visualizes cached forecast quality indicators (Spectacular, Good, Muted) and timezone-adjusted event times from the previous run.
-*   **📍 Location Management (CRUD)**: Manage up to 10 coordinates with direct device geolocation ("Use Current Location") and Photon API geocoding search autocomplete.
-*   **📋 Run Execution Logs**: Timeline log showing the execution history and status of the last 20 scheduler or manual runs.
-*   **📧 Automated Email Reports**: Sends HTML reports to the configured recipient email (`EMAIL_TO`) daily at 6:00 AM and 6:00 PM Eastern Time.
-*   **🔒 Complete Privacy**: Restricts application logins and manual triggers strictly to the configured authorized email (`AUTHORIZED_EMAIL` / `EMAIL_TO`).
+Scheduled reports continue to run from the Worker cron trigger and do **not** require a browser Access JWT.
 
----
+## Authentication and authorization
 
-## 🛠️ Architecture
+1. **Cloudflare Access** admits only `andrewtryder@gmail.com` to `sunsethue-helper.pages.dev`.
+2. The Pages Function forwards `/api/*` through a private Worker service binding and preserves `Cf-Access-Jwt-Assertion`.
+3. The Worker cryptographically verifies the Access JWT (signature, issuer, audience, expiry, `nbf`, email) and authorizes the exact email again.
 
-*   **Frontend**: Single Page Application (HTML/CSS/JS) styled with a premium glassmorphic dark-mode interface, served via **Firebase Hosting**.
-*   **Database**: **Cloud Firestore** storing coordinates (`locations` collection) and logs (`runs` collection) with robust security rules.
-*   **Backend**: **Cloud Functions** v2 (Node.js 24 runtime) containing the scheduler triggers and an HTTP trigger proxy for manual runs.
-*   **SMTP Transporter**: Nodemailer configured using Gmail App Passwords to deliver reports.
+Invalid or missing tokens return `401`. A valid token for another identity returns `403`. Errors are generic JSON and never include JWTs, JWKS payloads, or verifier exception text.
 
----
+## Production vs preview
 
-## 🚀 CI/CD Automated Deployment
+| Surface | Access policy | API data access |
+| --- | --- | --- |
+| `sunsethue-helper.pages.dev` | Protected by exact-host Access app | Allowed only after Access + Worker JWT auth |
+| `*.sunsethue-helper.pages.dev` deployment aliases / previews | Not covered by the production Access app | `/api/*` fails closed without a production Access JWT |
+| `*.workers.dev` Worker URL | Disabled in Wrangler (`workers_dev = false`, `preview_urls = false`) | Not publicly reachable |
 
-Deployments are automated via **GitHub Actions**. Whenever you push to the `main` branch, the workflow:
-1. Installs Node.js dependencies.
-2. Runs unit tests inside the `functions/` directory.
-3. Automatically deploys frontend assets to Firebase Hosting and upgrades Cloud Functions to Node 24.
+Do not enable account-wide “Require Access protection.” Do not add wildcard, Everyone, email-domain, or bypass policies for this app.
 
-### Local commands:
-- Run backend tests: `npm test --prefix functions`
-- Run all unit tests: `npm test`
-- Run E2E tests (Node 24, Java 21+, Firebase emulators): `npm run test:e2e`
-- On macOS without Java on PATH: `export PATH="/opt/homebrew/opt/openjdk/bin:$PATH"`
-- Deploy manually: `npx firebase-tools deploy`
+## Required deployment configuration
 
-E2E tests must be run locally. Install Java (`brew install openjdk@21`) and run `npm run test:e2e` to execute them.
+Set these as **Worker secrets** (never commit real values):
 
----
+| Name | Purpose |
+| --- | --- |
+| `AUTHORIZED_EMAIL` | Exact allowed email |
+| `TEAM_DOMAIN` | `https://<team>.cloudflareaccess.com` |
+| `POLICY_AUD` | Access application Audience tag |
+| `SUNSETHUE_API_KEY` | Sunsethue API key |
+| `GMAIL_USER` / `GMAIL_APP_PASSWORD` | SMTP auth |
+| `EMAIL_TO` / `EMAIL_FROM` | Report recipients |
 
-## 🔧 Configuration & Debugging
+GitHub Actions also needs:
 
-### Environment Variables
-This application requires the following environment variables to be set:
-*   `SUNSETHUE_API_KEY`: The API key for queries to the Sunsethue API.
-*   `GMAIL_USER`: The Gmail address used to send out automated reports (via SMTP).
-*   `GMAIL_APP_PASSWORD`: A secure Google App Password for the SMTP server.
-*   `EMAIL_TO`: The email address where daily reports are sent (also used as the authorized login email on client and server).
-*   `EMAIL_FROM`: The `From` display/header for automated emails (e.g., `"Sunsethue Helper" <your-email@example.com>`). Defaults to `GMAIL_USER`.
+- `CLOUDFLARE_API_TOKEN` — scoped token with Access Apps/Policies write, Workers deploy, Pages deploy
+- `CLOUDFLARE_ACCOUNT_ID`
+- The Worker secrets listed above (`AUTHORIZED_EMAIL`, `TEAM_DOMAIN`, `POLICY_AUD`, …)
 
-These variables **must be configured** locally in `functions/.env.local` (and `functions/.secret.local` for emulator testing), and in production as secrets/environment variables in Google Cloud Secret Manager.
+Rotate the Cloudflare management token from the Cloudflare dashboard if it is ever exposed. Prefer a scoped API token over a Global API Key.
 
-> [!IMPORTANT]
-> Because Firestore security rules are evaluated statically on Firebase servers, the authorized email address cannot be read dynamically from environment variables at runtime within `firestore.rules`.
-> - **GitHub Actions Deployments**: The deployment workflow [firebase-deploy.yml](file:///.github/workflows/firebase-deploy.yml) automatically replaces the placeholder `YOUR_AUTHORIZED_EMAIL@example.com` in [firestore.rules](file:///firestore.rules) with the value of the `EMAIL_TO` GitHub Repository Secret at deploy-time. Make sure `EMAIL_TO` is configured in your GitHub Secrets.
-> - **Local / Manual Deployments**: If you deploy manually from your machine via `npx firebase-tools deploy`, you must either replace `YOUR_AUTHORIZED_EMAIL@example.com` in [firestore.rules](file:///firestore.rules) with your actual authorized email address beforehand, or run a similar `sed` replacement locally.
+## Local development
 
-### Client-Side Debug Mode
-By default, verbose render cycle logs (which output locations and coordinates) are disabled. To enable client-side debugging:
-*   Append `?debug=true` to the browser URL (e.g., `http://localhost:5000/?debug=true`), or
-*   Run `localStorage.setItem('debug', 'true')` in your browser's developer tools console and refresh the page.
+```bash
+npm install
+npm run dev
+```
 
+This starts:
+
+- Worker on `http://127.0.0.1:8789` via `wrangler.worker.toml`
+- Pages + Functions on `http://127.0.0.1:5010` with `API_SERVICE` bound to the local Worker
+
+Local auth bypass requires **both**:
+
+1. `DEV_AUTH_BYPASS=true`
+2. Loopback host (`localhost`, `127.0.0.1`, or `[::1]`)
+
+It never activates from a caller-controlled header, query parameter, or localStorage value, and it never activates on `pages.dev` / `workers.dev`.
+
+Local D1 is used by default. Do not point local tests at the production D1 database.
+
+## Configuration files
+
+| File | Role |
+| --- | --- |
+| `wrangler.toml` | Pages project (`pages_build_output_dir`, `API_SERVICE` binding) |
+| `wrangler.worker.toml` | Private API Worker (`workers_dev = false`, cron, D1) |
+| `public/_routes.json` | Invoke Functions only for `/api/*` |
+| `functions/api/[[path]].js` | Same-origin API proxy |
+| `scripts/cloudflare-access.mjs` | Idempotent Access automation |
+
+## Tests
+
+```bash
+npm test
+npm run lint
+```
+
+JWT tests use generated RSA keys and a local JWKS fixture. They never use a real Access token.
+
+## Access automation
+
+```bash
+npm run access:snapshot   # sanitized rollback snapshot under .tmp/cloudflare-access/
+npm run access:apply      # idempotent create/update
+npm run access:verify     # assert exact policy shape
+```
+
+Snapshots omit API tokens, JWTs, cookies, IdP secrets, and service-token secrets.
+
+### Recreate the Access application
+
+1. Run `npm run access:snapshot`.
+2. Create/update with `npm run access:apply`.
+3. Copy the new Audience tag into the Worker `POLICY_AUD` secret.
+4. Redeploy the Worker and verify with `npm run access:verify`.
+
+### Lockout recovery
+
+If you are locked out of the UI:
+
+1. Use the Cloudflare Zero Trust dashboard with an account owner session.
+2. Confirm the Allow policy still includes only your exact email.
+3. Prefer restoring from `.tmp/cloudflare-access/rollback-snapshot.json` over deleting the app.
+4. Do not add Everyone / email-domain / bypass rules to regain access.
+
+### Verify workers.dev stays disabled
+
+```bash
+npx wrangler deployments list --name sunsethue-helper-worker
+# or inspect subdomain settings via API / dashboard Domains & Routes
+curl -i https://sunsethue-helper-worker.mrcoffee.workers.dev/api/locations
+```
+
+Expect a non-200 failure (for example connection/error page), never application JSON.
+
+## Rollback
+
+1. Restore prior Access application/policy settings from the sanitized snapshot by ID.
+2. Roll Pages back to the previous deployment.
+3. Roll the Worker back to the previous version while keeping JWT enforcement if possible.
+4. Only temporarily re-enable `workers.dev` when required for recovery, and only with JWT enforcement still active.
+5. Deleting the Access application is a last-resort, owner-approved action — not the primary rollback.
+
+## Manual browser verification
+
+After deploy:
+
+1. Open `https://sunsethue-helper.pages.dev` in a private window and confirm Access challenges instead of rendering the app.
+2. Sign in as `andrewtryder@gmail.com` with the Cloudflare identity provider.
+3. Confirm locations, logs, credits, address search, and manual report still work over same-origin `/api/*`.

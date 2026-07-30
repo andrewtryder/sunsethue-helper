@@ -1,15 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  AUTHORIZED_EMAIL,
-  setAuthorizedEmail,
   escapeHtml,
   getForecastBadgeHtml,
   normalizeQualityToUnit,
   qualityToPercent,
-  isAuthorizedEmail,
-  isEmulatorHostname,
-  getFunctionUrl,
   canAddLocation,
   validateCoordinates,
   formatCoordinateDisplay,
@@ -18,7 +13,6 @@ import {
   buildPhotonDisplayName,
   moveSuggestionIndex,
   shouldSearchAutocomplete,
-  mapAuthErrorCode,
   mapGeolocationError
 } from "../public/lib/helpers.js";
 
@@ -42,10 +36,7 @@ test("frontend helpers normalize quality values", () => {
   assert.strictEqual(qualityToPercent(35), 35);
 });
 
-test("frontend helpers enforce auth and location limits", () => {
-  setAuthorizedEmail("e2e-test@gmail.com");
-  assert.strictEqual(isAuthorizedEmail("e2e-test@gmail.com"), true);
-  assert.strictEqual(isAuthorizedEmail("other@gmail.com"), false);
+test("frontend helpers enforce location limits and coordinates", () => {
   assert.strictEqual(canAddLocation(9), true);
   assert.strictEqual(canAddLocation(10), false);
   assert.strictEqual(validateCoordinates(40.1, -74.2), true);
@@ -58,14 +49,7 @@ test("frontend helpers enforce auth and location limits", () => {
   assert.strictEqual(validateCoordinates(Number("bad"), 1), false);
 });
 
-test("frontend helpers build URLs and display strings", () => {
-  assert.strictEqual(isEmulatorHostname("localhost"), true);
-  assert.strictEqual(isEmulatorHostname("sunsethue-helper.web.app"), false);
-  assert.strictEqual(
-    getFunctionUrl("triggerReport", { isEmulator: true, projectId: "demo" }),
-    "http://127.0.0.1:5001/demo/us-central1/triggerReport"
-  );
-  assert.strictEqual(getFunctionUrl("triggerReport", { isEmulator: false }), "/api/triggerReport");
+test("frontend helpers build display strings", () => {
   assert.match(formatCoordinateDisplay(40.7128, -74.006), /40\.7128° N \/ 74\.0060° W/);
   assert.match(formatDashboardCoordinateDisplay(40.7128, -74.006), /40\.71° N \/ 74\.01° W/);
   assert.match(formatCoordinateDisplay(-33.8688, 151.2093), /33\.8688° S \/ 151\.2093° E/);
@@ -87,9 +71,7 @@ test("frontend helpers support autocomplete and log rendering", () => {
   assert.strictEqual(getLogStatusClass("success"), "success");
 });
 
-test("frontend helpers map auth and geolocation errors", () => {
-  assert.match(mapAuthErrorCode("auth/wrong-password"), /Invalid email or password/);
-  assert.match(mapAuthErrorCode("auth/unknown"), /Failed to sign in/);
+test("frontend helpers map geolocation errors", () => {
   const geolocationErrors = { PERMISSION_DENIED: 1, POSITION_UNAVAILABLE: 2, TIMEOUT: 3 };
   assert.match(mapGeolocationError(1, geolocationErrors), /permission denied/i);
   assert.match(mapGeolocationError(2, geolocationErrors), /unavailable/i);

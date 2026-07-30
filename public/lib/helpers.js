@@ -1,7 +1,3 @@
-export let AUTHORIZED_EMAIL = null;
-export function setAuthorizedEmail(email) {
-  AUTHORIZED_EMAIL = email;
-}
 export const MAX_LOCATIONS = 10;
 
 export function escapeHtml(str) {
@@ -92,23 +88,6 @@ export function getForecastBadgeHtml(quality, text) {
   return `<span class="quality-indicator"><span class="quality-dot" style="background-color:${dotColor}"></span><span class="quality-text${strongClass}">${percentage}% (${label})</span></span>`;
 }
 
-export function isAuthorizedEmail(email) {
-  if (!AUTHORIZED_EMAIL) return true;
-  if (!email) return false;
-  return email.trim().toLowerCase() === AUTHORIZED_EMAIL.trim().toLowerCase();
-}
-
-export function isEmulatorHostname(hostname) {
-  return hostname === "localhost" || hostname === "127.0.0.1";
-}
-
-export function getFunctionUrl(functionName, { isEmulator, projectId }) {
-  if (isEmulator) {
-    return `http://127.0.0.1:5001/${projectId}/us-central1/${functionName}`;
-  }
-  return `/api/${functionName}`;
-}
-
 export function canAddLocation(currentCount, maxLocations = MAX_LOCATIONS) {
   return currentCount < maxLocations;
 }
@@ -160,16 +139,6 @@ export function moveSuggestionIndex(currentIndex, direction, itemCount) {
 
 export function shouldSearchAutocomplete(queryText, minLength = 3) {
   return queryText.trim().length >= minLength;
-}
-
-export function mapAuthErrorCode(code) {
-  if (code === "auth/user-not-found" || code === "auth/wrong-password") {
-    return "Invalid email or password.";
-  }
-  if (code === "auth/invalid-credential") {
-    return "Invalid credentials provided.";
-  }
-  return "Failed to sign in. Please check your credentials.";
 }
 
 export function mapGeolocationError(code, errorCodes) {

@@ -5,6 +5,10 @@ on:
     branches:
       - main
 
+concurrency:
+  group: production-cloudflare-deploy
+  cancel-in-progress: false
+
 permissions:
   contents: read
 
@@ -30,22 +34,85 @@ jobs:
       - name: Run ESLint Security Scans
         run: npm run lint
 
-      - name: Run Frontend Structural Tests
-        run: node scripts/test-frontend.js
+      - name: Run npm audit
+        run: npm audit --audit-level=high
 
-      - name: Run Frontend Unit Tests
-        run: node scripts/test-frontend-unit.mjs
+      - name: Run Tests
+        run: npm test
 
-      - name: Deploy Worker API
+      - name: Confirm target Worker exists
         uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy --minify
+          wranglerVersion: "4.115.0"
+          command: deployments list --config wrangler.worker.toml
 
-      - name: Deploy Pages Frontend
+      - name: Verify Cloudflare Access configuration
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          AUTHORIZED_EMAIL: ${{ secrets.AUTHORIZED_EMAIL }}
+        run: |
+          node scripts/cloudflare-access.mjs apply
+          node scripts/cloudflare-access.mjs verify
+
+      - name: Deploy Worker API with JWT enforcement
         uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy public --project-name=sunsethue-helper
+          wranglerVersion: "4.115.0"
+          command: deploy --minify --keep-vars --config wrangler.worker.toml
+          secrets: |
+            AUTHORIZED_EMAIL
+            TEAM_DOMAIN
+            POLICY_AUD
+            SUNSETHUE_API_KEY
+            GMAIL_USER
+            GMAIL_APP_PASSWORD
+            EMAIL_TO
+            EMAIL_FROM
+        env:
+          AUTHORIZED_EMAIL: ${{ secrets.AUTHORIZED_EMAIL }}
+          TEAM_DOMAIN: ${{ secrets.TEAM_DOMAIN }}
+          POLICY_AUD: ${{ secrets.POLICY_AUD }}
+          SUNSETHUE_API_KEY: ${{ secrets.SUNSETHUE_API_KEY }}
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+
+      - name: Deploy Pages frontend with API Function
+        uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: "4.115.0"
+          command: pages deploy --project-name=sunsethue-helper --branch=main
+
+      - name: Verify anonymous production Access block
+        run: |
+          set -euo pipefail
+          STATUS=$(curl -sS -o /tmp/access-body.txt -w "%{http_code}" -L --max-redirs 0 "https://sunsethue-helper.pages.dev/" || true)
+          LOCATION=$(curl -sS -o /dev/null -w "%{redirect_url}" "https://sunsethue-helper.pages.dev/" || true)
+          BODY=$(head -c 200 /tmp/access-body.txt || true)
+          echo "Anonymous status=${STATUS}"
+          if echo "$BODY" | grep -qi "app-container\|Sunsethue Helper"; then
+            echo "Application HTML returned to anonymous request" >&2
+            exit 1
+          fi
+          if [ "$STATUS" = "200" ] && ! echo "$LOCATION" | grep -qi "cloudflareaccess.com"; then
+            echo "Anonymous request unexpectedly returned 200 without Access redirect" >&2
+            exit 1
+          fi
+
+      - name: Verify public Worker bypass is disabled
+        run: |
+          set -euo pipefail
+          CODE=$(curl -sS -o /tmp/worker-body.txt -w "%{http_code}" "https://sunsethue-helper-worker.mrcoffee.workers.dev/api/locations" || true)
+          echo "Public worker status=${CODE}"
+          if [ "$CODE" = "200" ]; then
+            echo "Public workers.dev API still returns data" >&2
+            exit 1
+          fi

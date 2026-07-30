@@ -37,9 +37,9 @@ const DEBUG = typeof window !== "undefined" && (
   localStorage.getItem("debug") === "true"
 );
 
-const API_BASE = (typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"))
-  ? "http://localhost:8789"
-  : "https://sunsethue-helper-worker.mrcoffee.workers.dev";
+// Same-origin API through Pages Functions -> private Worker service binding.
+// Local Pages (`npm run dev`) also uses relative /api/* via the service binding.
+const API_BASE = "";
 
 // DOM Elements
 const appContainer = document.getElementById("app-container");
@@ -161,18 +161,7 @@ async function initApp() {
     appContainer.classList.remove("hidden");
     document.body.classList.add("app-visible");
     
-    // Load config
-    try {
-      const configResponse = await fetch(`${API_BASE}/api/config`);
-      if (configResponse.ok) {
-        const appConfig = await configResponse.json();
-        console.log("Config loaded:", appConfig);
-      }
-    } catch (e) {
-      console.error("Failed to load configuration:", e);
-    }
-
-    // Load locations and runs
+    // Load locations and runs through same-origin /api/*
     await Promise.all([
       fetchLocations(),
       fetchRuns()

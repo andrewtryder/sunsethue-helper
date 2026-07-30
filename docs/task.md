@@ -1,9 +1,10 @@
-# Tasks: Testing, Git Hooks, & Changelog
+# Task checklist
 
-- [x] Create frontend structural test script `scripts/test-frontend.js`
-- [x] Create pre-commit hook script `scripts/pre-commit.sh`
-- [x] Create and run git hook setup script `scripts/setup-git-hooks.sh`
-- [x] Integrate frontend test in `.github/workflows/firebase-deploy.yml`
-- [x] Create standard `CHANGELOG.md` at the root of the repository
-- [x] Verify testing scripts and pre-commit hook execution locally
-- [x] Push changes to GitHub and verify CI deployment succeeds
+- [x] Snapshot and verify Cloudflare Access write permissions
+- [x] Create/update exact-host Access application and single-email policy
+- [x] Route browser API calls through same-origin Pages Function service binding
+- [x] Enforce Access JWT validation in the Worker
+- [x] Disable public `workers.dev` / preview URLs after private path verification
+- [x] Replace Firebase-era documentation and helpers
+- [x] Add automated auth/proxy tests
+- [ ] Owner completes manual authenticated browser verification after deploy

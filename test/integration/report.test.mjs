@@ -15,7 +15,7 @@ function reportEnv(overrides = {}) {
     GMAIL_APP_PASSWORD: "fake-app-password",
     EMAIL_TO: "owner@example.com",
     EMAIL_FROM: '"Sunsethue Helper" <reports@example.com>',
-    WEBAPP_URL: "https://sunsethue-helper.pages.dev",
+    WEBAPP_URL: "https://app.example.com",
     ...overrides
   };
 }

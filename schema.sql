@@ -1,4 +1,4 @@
--- Schema for sunsethue-db.
+-- Local and production D1 schema.
 -- Safe to re-run: all statements use IF NOT EXISTS.
 -- Apply locally with: npm run db:schema:local
 

@@ -15,7 +15,7 @@ test("/api/* is forwarded through the service binding", async () => {
   let captured = null;
 
   const response = await onRequest({
-    request: new Request("https://sunsethue-helper.pages.dev/api/locations?limit=1", {
+    request: new Request("https://app.example.com/api/locations?limit=1", {
       method: "GET",
       headers: {
         "Cf-Access-Jwt-Assertion": token,
@@ -60,7 +60,7 @@ test("method path query and body are preserved", async () => {
   let captured = null;
 
   await onRequest({
-    request: new Request("https://sunsethue-helper.pages.dev/api/searchCoordinates?x=1", {
+    request: new Request("https://app.example.com/api/searchCoordinates?x=1", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -93,7 +93,7 @@ test("method path query and body are preserved", async () => {
 test("missing Access assertion is rejected outside local bypass", async () => {
   const { onRequest } = await loadPagesProxy();
   const response = await onRequest({
-    request: new Request("https://sunsethue-helper.pages.dev/api/locations"),
+    request: new Request("https://app.example.com/api/locations"),
     env: {
       API_SERVICE: {
         async fetch() {
@@ -118,7 +118,7 @@ test("a missing service binding fails closed with 503 and reveals no configurati
   let response;
   try {
     response = await onRequest({
-      request: new Request("https://sunsethue-helper.pages.dev/api/locations", {
+      request: new Request("https://app.example.com/api/locations", {
         headers: { "Cf-Access-Jwt-Assertion": token }
       }),
       env: {},
@@ -145,7 +145,7 @@ test("a downstream failure becomes a generic 502", async () => {
   let response;
   try {
     response = await onRequest({
-      request: new Request("https://sunsethue-helper.pages.dev/api/locations", {
+      request: new Request("https://app.example.com/api/locations", {
         headers: { "Cf-Access-Jwt-Assertion": token }
       }),
       env: {
@@ -188,7 +188,7 @@ test("the local bypass forwards without an assertion only on loopback", async ()
   assert.equal(loopback.status, 200);
   assert.equal(forwarded, 1);
 
-  for (const host of ["sunsethue-helper.pages.dev", "sunsethue-helper-worker.example.workers.dev", "evil.example"]) {
+  for (const host of ["app.example.com", "worker.example.workers.dev", "evil.example"]) {
     const response = await onRequest({
       request: new Request(`https://${host}/api/locations`),
       env,
@@ -205,7 +205,7 @@ test("a nested path with no params still targets /api", async () => {
   let capturedUrl = null;
 
   await onRequest({
-    request: new Request("https://sunsethue-helper.pages.dev/api/locations/abc", {
+    request: new Request("https://app.example.com/api/locations/abc", {
       method: "DELETE",
       headers: { "Cf-Access-Jwt-Assertion": token }
     }),

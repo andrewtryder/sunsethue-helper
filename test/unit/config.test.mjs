@@ -1,39 +1,77 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFile, readdir } from "node:fs/promises";
+import { readFile, readdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { generateWranglerConfig } from "../../scripts/generate-wrangler-config.mjs";
 
 const ROOT = new URL("../../", import.meta.url);
+const ROOT_PATH = fileURLToPath(ROOT);
 
 async function read(relativePath) {
   return readFile(fileURLToPath(new URL(relativePath, ROOT)), "utf8");
 }
 
-test("the Worker stays private and keeps its cron trigger", async () => {
-  const config = await read("wrangler.worker.toml");
+test("the Worker template keeps the Worker private with a cron and D1 binding", async () => {
+  const config = await read("wrangler.worker.example.toml");
   assert.match(config, /^workers_dev\s*=\s*false$/m, "workers.dev must stay disabled");
   assert.match(config, /^preview_urls\s*=\s*false$/m, "Worker preview URLs must stay disabled");
   assert.match(config, /^crons\s*=\s*\[/m);
   assert.match(config, /^binding\s*=\s*"DB"$/m);
+  assert.match(config, /database_id\s*=\s*"\{\{D1_DATABASE_ID\}\}"/);
   assert.doesNotMatch(config, /migrations_dir/, "versioned migrations are not used");
+  assert.doesNotMatch(config, /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
 });
 
-test("the Pages project binds the Worker as a private service", async () => {
-  const config = await read("wrangler.toml");
+test("the Pages template binds the Worker as a private service", async () => {
+  const config = await read("wrangler.example.toml");
   assert.match(config, /^pages_build_output_dir\s*=/m);
   assert.match(config, /^binding\s*=\s*"API_SERVICE"$/m);
-  assert.match(config, /^service\s*=\s*"sunsethue-helper-worker"$/m);
+  assert.match(config, /^service\s*=\s*"\{\{WORKER_NAME\}\}"$/m);
   assert.match(config, /\[env\.preview\]/, "preview keeps its own binding so /api fails closed");
 });
 
+test("generated Wrangler configs satisfy privacy and binding invariants", async () => {
+  const temp = await mkdtemp(join(tmpdir(), "sunsethue-config-"));
+  try {
+    await writeFile(
+      join(temp, "wrangler.example.toml"),
+      await read("wrangler.example.toml")
+    );
+    await writeFile(
+      join(temp, "wrangler.worker.example.toml"),
+      await read("wrangler.worker.example.toml")
+    );
+
+    await generateWranglerConfig({ strict: false, root: temp });
+    const pages = await readFile(join(temp, "wrangler.toml"), "utf8");
+    const worker = await readFile(join(temp, "wrangler.worker.toml"), "utf8");
+
+    assert.match(worker, /^workers_dev\s*=\s*false$/m);
+    assert.match(worker, /^preview_urls\s*=\s*false$/m);
+    assert.match(worker, /^binding\s*=\s*"DB"$/m);
+    assert.match(pages, /^binding\s*=\s*"API_SERVICE"$/m);
+    assert.match(pages, /^service\s*=\s*"sunsethue-helper-worker"$/m);
+    assert.doesNotMatch(pages + worker, /\{\{[A-Z0-9_]+\}\}/);
+  } finally {
+    await rm(temp, { recursive: true, force: true });
+  }
+});
+
 test("no secret is committed as a plaintext Wrangler var", async () => {
-  const configs = await Promise.all([read("wrangler.toml"), read("wrangler.worker.toml")]);
+  const configs = await Promise.all([
+    read("wrangler.example.toml"),
+    read("wrangler.worker.example.toml")
+  ]);
   const forbidden = [
     "SUNSETHUE_API_KEY",
     "GMAIL_USER",
     "GMAIL_APP_PASSWORD",
     "EMAIL_TO",
     "AUTHORIZED_EMAIL",
+    "CONTACT_EMAIL",
     "TEAM_DOMAIN",
     "POLICY_AUD"
   ];
@@ -65,10 +103,11 @@ test("no tracked source or config references a public workers.dev API origin", a
   const files = [
     "public/app.js",
     "public/_routes.json",
-    "wrangler.toml",
-    "wrangler.worker.toml",
+    "wrangler.example.toml",
+    "wrangler.worker.example.toml",
     "package.json",
     ".dev.vars.example",
+    ".env.example",
     "scripts/dev.sh",
     "scripts/validate-wrangler.sh",
     ".github/workflows/validate.yml",
@@ -144,14 +183,113 @@ test("the commit-message fixer and its scripts are gone", async () => {
 });
 
 test("schema.sql is the single source of schema truth", async () => {
-  const rootEntries = await readdir(fileURLToPath(ROOT));
+  const rootEntries = await readdir(ROOT_PATH);
   assert.ok(rootEntries.includes("schema.sql"), "schema.sql must exist at the repository root");
   assert.equal(rootEntries.includes("migrations"), false, "migrations/ must not remain");
 });
 
-test("the local development example uses placeholders only", async () => {
+test("the local development example is fail-closed and uses placeholders only", async () => {
   const example = await read(".dev.vars.example");
-  assert.match(example, /DEV_AUTH_BYPASS/);
+  assert.match(example, /^DEV_AUTH_BYPASS=false$/m);
+  assert.match(example, /AUTHORIZED_EMAIL=owner@example\.com/);
   assert.doesNotMatch(example, /eyJ[A-Za-z0-9_-]{10,}\./, "no JWT may be committed");
   assert.doesNotMatch(example, /[0-9a-f]{32,}/, "no real audience tag or token may be committed");
+});
+
+test("generated Wrangler configs are gitignored and not tracked", async () => {
+  const gitignore = await read(".gitignore");
+  assert.match(gitignore, /^wrangler\.toml$/m);
+  assert.match(gitignore, /^wrangler\.worker\.toml$/m);
+
+  const tracked = execFileSync("git", ["ls-files", "wrangler.toml", "wrangler.worker.toml"], {
+    cwd: ROOT_PATH,
+    encoding: "utf8"
+  }).trim();
+  assert.equal(tracked, "", "generated Wrangler configs must not be tracked");
+
+  const templates = execFileSync(
+    "git",
+    ["ls-files", "wrangler.example.toml", "wrangler.worker.example.toml"],
+    { cwd: ROOT_PATH, encoding: "utf8" }
+  )
+    .trim()
+    .split("\n")
+    .filter(Boolean)
+    .sort();
+  assert.deepEqual(templates, ["wrangler.example.toml", "wrangler.worker.example.toml"]);
+});
+
+test("gitignore ignores secrets and preserves intentional examples", async () => {
+  const gitignore = await read(".gitignore");
+  for (const pattern of [
+    ".env*",
+    "!.env.example",
+    ".dev.vars*",
+    "!.dev.vars.example",
+    "*.pem",
+    "*.key",
+    "*.sqlite",
+    "cloudflare-state/",
+    "rollback-snapshots/"
+  ]) {
+    assert.match(
+      gitignore,
+      new RegExp(`^${pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "m"),
+      `missing gitignore pattern: ${pattern}`
+    );
+  }
+
+  const ignored = execFileSync("git", ["check-ignore", "-v", ".env", ".dev.vars", "secret.pem"], {
+    cwd: ROOT_PATH,
+    encoding: "utf8"
+  });
+  assert.match(ignored, /\.env\*/);
+  assert.match(ignored, /\.dev\.vars\*/);
+  assert.match(ignored, /\*\.pem/);
+
+  let exampleExit = 0;
+  try {
+    execFileSync("git", ["check-ignore", "-v", ".env.example", ".dev.vars.example"], {
+      cwd: ROOT_PATH,
+      encoding: "utf8"
+    });
+  } catch (error) {
+    exampleExit = error.status ?? 1;
+  }
+  assert.equal(exampleExit, 1, "example env files must not be ignored");
+});
+
+test("production generates Wrangler config strictly and keeps the D1 id in secrets", async () => {
+  const production = await read(".github/workflows/production.yml");
+  assert.match(production, /npm run config:generate:strict/);
+  assert.match(production, /secrets\.D1_DATABASE_ID/);
+  assert.doesNotMatch(production, /vars\.D1_DATABASE_ID/);
+  assert.match(production, /vars\.PAGES_PROJECT_NAME/);
+  assert.match(production, /vars\.PRODUCTION_URL/);
+});
+
+test("tracked sources do not embed personal emails or a committed D1 UUID", async () => {
+  const tracked = execFileSync("git", ["ls-files"], { cwd: ROOT_PATH, encoding: "utf8" })
+    .trim()
+    .split("\n")
+    .filter((path) => path && path !== "CHANGELOG.md");
+
+  const personalEmail = /[A-Za-z0-9._%+-]+@(?!example\.(?:com|org)\b)[A-Za-z0-9.-]+\.[A-Za-z]{2,}/;
+  const committedDatabaseId = /^\s*database_id\s*=\s*"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"/im;
+
+  for (const path of tracked) {
+    // Binary / lock files and package metadata are skipped for the email scan.
+    if (
+      path.endsWith(".png") ||
+      path.endsWith(".lock") ||
+      path === "package-lock.json"
+    ) {
+      continue;
+    }
+    const contents = await readFile(join(ROOT_PATH, path), "utf8");
+    assert.doesNotMatch(contents, committedDatabaseId, path);
+    // smtp.gmail.com is a service host, not a personal mailbox.
+    const withoutServiceHosts = contents.replace(/smtp\.gmail\.com/g, "smtp.example.com");
+    assert.doesNotMatch(withoutServiceHosts, personalEmail, path);
+  }
 });

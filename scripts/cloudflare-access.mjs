@@ -1,27 +1,25 @@
 #!/usr/bin/env node
 /**
- * Idempotent Cloudflare Access automation for sunsethue-helper production.
+ * Idempotent Cloudflare Access automation for this application's production host.
  * Never prints tokens, JWTs, cookies, IdP secrets, or raw private API payloads.
  */
 import { mkdir, writeFile, readFile } from "node:fs/promises";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolveProject } from "./lib/project-config.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, "..");
 const SNAPSHOT_DIR = resolve(ROOT, ".tmp/cloudflare-access");
 const SNAPSHOT_FILE = resolve(SNAPSHOT_DIR, "rollback-snapshot.json");
 
-const HOSTNAME = "sunsethue-helper.pages.dev";
-const WILDCARD_HOST = "*.sunsethue-helper.pages.dev";
-const APP_NAME = "Sunsethue Helper Production";
-const POLICY_NAME = "Allow Andrew Ryder";
+const project = resolveProject({ strict: true });
+const HOSTNAME = project.accessHostname;
+const WILDCARD_HOST = `*.${HOSTNAME}`;
+const APP_NAME = process.env.ACCESS_APP_NAME?.trim() || "Sunsethue Helper Production";
+const POLICY_NAME = process.env.ACCESS_POLICY_NAME?.trim() || "Allow authorized user";
 const DEFAULT_SESSION = "24h";
-const AUTHORIZED_EMAIL = (
-  process.env.AUTHORIZED_EMAIL ||
-  process.env.ACCESS_AUTHORIZED_EMAIL ||
-  "owner@example.com"
-).trim().toLowerCase();
+const AUTHORIZED_EMAIL = project.authorizedEmail;
 
 const API_BASE = "https://api.cloudflare.com/client/v4";
 

@@ -2,7 +2,8 @@
 # Validate both Wrangler configurations without deploying anything.
 #
 # Uses the Wrangler version pinned in package.json so local, CI, deployment, and
-# rollback runs all agree.
+# rollback runs all agree. Generates configs from templates first so a fresh
+# clone with placeholder defaults still validates.
 set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -11,6 +12,17 @@ cd "$PROJECT_ROOT"
 WORKER_CONFIG="wrangler.worker.toml"
 PAGES_CONFIG="wrangler.toml"
 DRY_RUN_OUT=".wrangler/validate-dry-run"
+
+echo "==> Generating Wrangler configs from templates"
+npm run config:generate
+
+# Resolve the expected Worker service name without printing secrets.
+EXPECTED_WORKER="$(
+  node --input-type=module -e '
+    import { resolveProject } from "./scripts/lib/project-config.mjs";
+    process.stdout.write(resolveProject({ strict: false }).workerName);
+  '
+)"
 
 echo "Wrangler version: $(npx --no -- wrangler --version | tail -n 1)"
 
@@ -46,15 +58,21 @@ require_line "$WORKER_CONFIG" '^crons[[:space:]]*=' 'cron trigger is configured'
 require_line "$WORKER_CONFIG" '^binding[[:space:]]*=[[:space:]]*"DB"' 'D1 binding DB is declared' || failures=1
 require_line "$PAGES_CONFIG" '^pages_build_output_dir[[:space:]]*=' 'Pages output directory is set' || failures=1
 require_line "$PAGES_CONFIG" '^binding[[:space:]]*=[[:space:]]*"API_SERVICE"' 'API_SERVICE binding is declared' || failures=1
-require_line "$PAGES_CONFIG" '^service[[:space:]]*=[[:space:]]*"sunsethue-helper-worker"' 'API_SERVICE targets the Worker' || failures=1
+require_line "$PAGES_CONFIG" "^service[[:space:]]*=[[:space:]]*\"${EXPECTED_WORKER}\"" "API_SERVICE targets ${EXPECTED_WORKER}" || failures=1
 
 # Secrets must never be committed as plaintext vars.
-for forbidden in SUNSETHUE_API_KEY GMAIL_APP_PASSWORD GMAIL_USER POLICY_AUD TEAM_DOMAIN AUTHORIZED_EMAIL; do
+for forbidden in SUNSETHUE_API_KEY GMAIL_APP_PASSWORD GMAIL_USER POLICY_AUD TEAM_DOMAIN AUTHORIZED_EMAIL CONTACT_EMAIL; do
   if grep -Eq "^[[:space:]]*${forbidden}[[:space:]]*=" "$WORKER_CONFIG" "$PAGES_CONFIG"; then
     echo "FORBIDDEN: ${forbidden} is set as a plaintext var; it must be a Worker secret" >&2
     failures=1
   fi
 done
+
+# Generated configs must never retain template tokens.
+if grep -Eq '\{\{[A-Z0-9_]+\}\}' "$WORKER_CONFIG" "$PAGES_CONFIG"; then
+  echo "FORBIDDEN: unresolved template tokens remain in generated Wrangler configs" >&2
+  failures=1
+fi
 
 if [ "$failures" -ne 0 ]; then
   echo

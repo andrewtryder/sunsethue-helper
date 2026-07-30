@@ -2,14 +2,40 @@
 
 This repository uses a single scoped Cloudflare API token for application deployment, D1 access, and one-time Access (Zero Trust) setup.
 
-## Token
+Instance-specific values (project names, hostnames, D1 id) are **not** committed. They are supplied as GitHub environment configuration and rendered into local Wrangler files by `npm run config:generate`.
 
-| GitHub secret | Used by | Must be able to |
+## GitHub `production` environment
+
+### Variables (non-secret)
+
+| Variable | Example | Purpose |
 | --- | --- | --- |
-| `CLOUDFLARE_API_TOKEN` | `production.yml`, `rollback.yml`, and local `npm run access:*` | Deploy the Worker, deploy the Pages project, read verification metadata, and (when needed) manage the Access application for `sunsethue-helper.pages.dev` |
-| `CLOUDFLARE_ACCOUNT_ID` | Same | Identify the account |
+| `PAGES_PROJECT_NAME` | `your-pages-project` | Cloudflare Pages project name |
+| `WORKER_NAME` | `your-worker-name` | Private Worker script name |
+| `D1_DATABASE_NAME` | `your-d1-database` | D1 database name |
+| `PRODUCTION_HOSTNAME` | `your-pages-project.pages.dev` | Exact Access / production host |
+| `PRODUCTION_URL` | `https://your-pages-project.pages.dev` | Environment URL and Worker `WEBAPP_URL` |
+| `ACCESS_HOSTNAME` | `your-pages-project.pages.dev` | Access application hostname (defaults to production hostname when unset locally) |
+| `DEPLOY_REPOSITORY` | `your-github-org/your-repo` | Repository the deploy scripts will accept |
 
-The token must be a **scoped API token**, never a Global API Key.
+### Secrets
+
+| Secret | Used by | Must be able to / purpose |
+| --- | --- | --- |
+| `CLOUDFLARE_API_TOKEN` | `production.yml`, `rollback.yml`, local `npm run access:*` | Deploy Worker and Pages, read verification metadata, manage Access when needed |
+| `CLOUDFLARE_ACCOUNT_ID` | Same | Identify the account |
+| `D1_DATABASE_ID` | Config generation before deploy | Bind the Worker to the correct D1 database (stored as a secret so GitHub masks it in logs) |
+| `AUTHORIZED_EMAIL` | Worker secret | Exact allowed Access identity |
+| `CONTACT_EMAIL` | Worker secret | Public Nominatim User-Agent contact |
+| `TEAM_DOMAIN` | Worker secret | `https://<team>.cloudflareaccess.com` |
+| `POLICY_AUD` | Worker secret | Access application Audience tag |
+| `SUNSETHUE_API_KEY` | Worker secret | Sunsethue API key |
+| `GMAIL_USER` / `GMAIL_APP_PASSWORD` | Worker secret | SMTP auth |
+| `EMAIL_TO` / `EMAIL_FROM` | Worker secret | Report recipients |
+
+The Cloudflare API token must be a **scoped API token**, never a Global API Key.
+
+If `D1_DATABASE_ID` (or any other required value) is missing, `npm run config:generate:strict` fails with the **name** of the missing variable and does not print the identifier.
 
 ## Suggested Cloudflare permission set
 
@@ -22,14 +48,25 @@ The token must be a **scoped API token**, never a Global API Key.
 
 Access write is only needed for rare initialization or repair via the local `access:*` scripts. Routine production deploys do not mutate Access policies.
 
+## Local configuration
+
+```bash
+cp .env.example .env
+# fill instance values and secrets
+npm run config:generate          # placeholders allowed for local dry-runs
+npm run config:generate:strict   # required before real deploy / Access apply
+```
+
+Generated `wrangler.toml` and `wrangler.worker.toml` are gitignored. Edit the tracked `*.example.toml` templates only.
+
 ## One-time Access setup
 
 Access is not part of the production pipeline. Configure it locally when initializing or repairing the application:
 
 ```bash
-# Requires CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID in the environment
+# Requires the variables and secrets above in .env
 npm run access:plan      # read-only summary of intended changes
-npm run access:apply     # idempotent create/update for sunsethue-helper.pages.dev only
+npm run access:apply     # idempotent create/update for ACCESS_HOSTNAME only
 npm run access:verify    # assert the exact single-email policy shape
 ```
 
@@ -42,6 +79,8 @@ See the README Access automation section for lockout recovery and Audience tag h
 3. Confirm a dry-run of `production.yml` and a local `npm run access:verify`.
 4. Revoke the previous token in Cloudflare.
 
+Rotate `D1_DATABASE_ID` only when you intentionally point the Worker at a different database; treat a leaked id as an inventory disclosure, not a credential, but prefer keeping it out of public logs.
+
 ## Incident: leaked token
 
 1. Revoke the token immediately in the Cloudflare dashboard.
@@ -51,3 +90,16 @@ See the README Access automation section for lockout recovery and Audience tag h
 5. Search git history for the leaked value. If it was ever committed, treat the commit as compromised and rotate again after rewriting or isolating that history.
 
 Never paste a token into chat, a pull request, documentation, a test fixture, or a workflow log.
+
+## Secret scanning
+
+Scan the local repository (including history) with TruffleHog:
+
+```bash
+brew install trufflehog   # once
+npm run security:scan
+```
+
+`security:scan` is intentionally **not** part of `npm run ci`, because TruffleHog is not installed on the GitHub-hosted runners.
+
+A one-time history rewrite removed personal email addresses and the previously committed production D1 database id from every reachable commit. Treat that D1 id as previously disclosed inventory: it is not a credential, but it must live only in the `D1_DATABASE_ID` GitHub environment secret going forward. GitHub may keep unreachable objects addressable by SHA until its own garbage collection runs; contact GitHub Support if a complete purge of cached views is required.

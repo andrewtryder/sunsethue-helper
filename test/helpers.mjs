@@ -76,7 +76,7 @@ export function baseEnv(overrides = {}) {
   };
 }
 
-export function makeRequest(path, { method = "GET", headers = {}, body, host = "sunsethue-helper.pages.dev" } = {}) {
+export function makeRequest(path, { method = "GET", headers = {}, body, host = "app.example.com" } = {}) {
   const init = { method, headers: new Headers(headers) };
   if (body !== undefined) {
     init.body = typeof body === "string" ? body : JSON.stringify(body);

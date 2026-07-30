@@ -51,7 +51,7 @@ test("production deploys on main pushes and manual dispatch, serialized and neve
   const production = workflow("production.yml");
   assert.deepEqual(triggers(production).sort(), ["push", "workflow_dispatch"]);
   assert.deepEqual(production.on.push.branches, ["main"]);
-  assert.equal(production.concurrency.group, "sunsethue-production");
+  assert.equal(production.concurrency.group, "production-deploy");
   assert.equal(production.concurrency["cancel-in-progress"], false);
   assert.deepEqual(production.permissions, { contents: "read" });
 });
@@ -116,7 +116,7 @@ test("rollback is manual, requires a reason, and shares the production concurren
   const inputs = rollback.on.workflow_dispatch.inputs;
   assert.equal(inputs.reason.required, true);
   assert.deepEqual(inputs.target.options, ["both", "worker", "pages"]);
-  assert.equal(rollback.concurrency.group, "sunsethue-production");
+  assert.equal(rollback.concurrency.group, "production-deploy");
   assert.equal(rollback.concurrency["cancel-in-progress"], false);
   assert.deepEqual(rollback.permissions, { contents: "read" });
 });

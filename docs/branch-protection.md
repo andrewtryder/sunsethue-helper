@@ -1,8 +1,8 @@
 # Branch protection
 
-Recommended settings for `main` on `andrewtryder/sunsethue-helper`. These are repository settings; the workflows enforce the corresponding policy in code, but GitHub still has to require the checks.
+Recommended settings for `main` on your deployment repository (`DEPLOY_REPOSITORY`). These are repository settings; the workflows enforce the corresponding policy in code, but GitHub still has to require the checks.
 
-This repository has a single human maintainer. Do **not** require a second-person approval when that would make merges impossible. Do require the automated validation check.
+This repository is designed for a single human maintainer. Do **not** require a second-person approval when that would make merges impossible. Do require the automated validation check.
 
 ## Required settings for `main`
 
@@ -28,7 +28,7 @@ Create a GitHub Environment named `production`.
 | Deployment branches | Restricted to `main` |
 | Required reviewers | Optional. Enable when a second person can approve; leave off for the solo maintainer |
 | Wait timer | Optional |
-| Environment secrets | See [cloudflare-credentials.md](cloudflare-credentials.md) |
+| Environment variables and secrets | See [cloudflare-credentials.md](cloudflare-credentials.md) |
 
 Every Cloudflare-touching job in `production.yml` and `rollback.yml` references this environment. Untrusted branches therefore cannot read production credentials.
 
@@ -51,5 +51,5 @@ The reusable `validate.yml` workflow declares `permissions: contents: read` and 
 Settings are not changed automatically by this repository. Apply them in the GitHub UI:
 
 1. Settings → Branches → Add / edit the `main` protection rule with the table above.
-2. Settings → Environments → New environment → `production`, restrict to `main`, add the secrets listed in [cloudflare-credentials.md](cloudflare-credentials.md).
+2. Settings → Environments → New environment → `production`, restrict to `main`, add the variables and secrets listed in [cloudflare-credentials.md](cloudflare-credentials.md).
 3. Confirm the required status check names match the job names after the first green run of `Validate`.

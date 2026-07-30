@@ -39,7 +39,7 @@ export async function handleHttpRequest(request, env, authContext = null, deps =
         return errorResponse("BAD_REQUEST", "Missing search query.", 400, requestId);
       }
 
-      const userAgentEmail = env.EMAIL_TO || "user@example.com";
+      const userAgentEmail = env.CONTACT_EMAIL || env.EMAIL_TO || "owner@example.com";
       const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`;
 
       const response = await fetchImpl(nominatimUrl, {

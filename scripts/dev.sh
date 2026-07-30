@@ -13,6 +13,16 @@ echo "Pages UI + /api proxy: http://127.0.0.1:5010"
 echo "Local auth bypass requires DEV_AUTH_BYPASS=true and loopback hosts only."
 echo "Local D1 is used by default; never point local tests at production D1."
 
+# Render Wrangler configs from templates (placeholders are fine locally).
+npm run config:generate
+
+WORKER_NAME="$(
+  node --input-type=module -e '
+    import { resolveProject } from "./scripts/lib/project-config.mjs";
+    process.stdout.write(resolveProject({ strict: false }).workerName);
+  '
+)"
+
 export DEV_AUTH_BYPASS="${DEV_AUTH_BYPASS:-true}"
 export AUTHORIZED_EMAIL="${AUTHORIZED_EMAIL:-owner@example.com}"
 export TEAM_DOMAIN="${TEAM_DOMAIN:-https://example.cloudflareaccess.com}"
@@ -29,7 +39,7 @@ sleep 3
 
 echo "Starting Cloudflare Pages on http://127.0.0.1:5010..."
 npx wrangler pages dev public --port 5010 \
-  --service API_SERVICE=sunsethue-helper-worker \
+  --service "API_SERVICE=${WORKER_NAME}" \
   --compatibility-date 2026-06-20 \
   --compatibility-flags nodejs_compat \
   --binding "DEV_AUTH_BYPASS=${DEV_AUTH_BYPASS}"

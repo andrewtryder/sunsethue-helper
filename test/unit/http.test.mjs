@@ -54,7 +54,7 @@ test("proxy header filtering drops hop-by-hop headers and keeps the Access asser
     Connection: "keep-alive, x-drop-me",
     "Keep-Alive": "timeout=5",
     "Transfer-Encoding": "chunked",
-    Host: "sunsethue-helper.pages.dev",
+    Host: "app.example.com",
     "X-Drop-Me": "gone"
   });
 

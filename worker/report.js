@@ -120,9 +120,13 @@ export function buildHtmlEmail(results, triggerType, reportTimeText, webappUrl) 
         </table>
         <div style="margin-top:24px;padding-top:16px;border-top:1px solid #e5e7eb;text-align:center;font-size:12px;line-height:1.5;color:#9ca3af;">
           <p style="margin:0;">Sent automatically by Sunsethue Helper.</p>
-          <p style="margin:8px 0 0 0;">
-            <a href="${webappUrl}" style="color:#2563eb;text-decoration:underline;">Manage locations in your private dashboard</a>.
-          </p>
+          ${
+            webappUrl
+              ? `<p style="margin:8px 0 0 0;">
+            <a href="${escapeHtml(webappUrl)}" style="color:#2563eb;text-decoration:underline;">Manage locations in your private dashboard</a>.
+          </p>`
+              : ""
+          }
         </div>
       </div>
     </body>
@@ -257,7 +261,7 @@ export async function runAndSendReport(triggerType, env, deps = {}) {
 
     const reportTimeText = reportTimeFormatter.format(now);
 
-    const webappUrl = env.WEBAPP_URL || "https://sunsethue-helper.pages.dev";
+    const webappUrl = env.WEBAPP_URL || null;
     const htmlEmail = buildHtmlEmail(results, triggerType, reportTimeText, webappUrl);
     
     const { WorkerMailer } = await loadMailer();

@@ -27,7 +27,9 @@ function assertContext() {
   const eventName = process.env.GITHUB_EVENT_NAME;
   const problems = [];
 
-  if (repository && repository !== PROJECT.repository) {
+  if (process.env.GITHUB_ACTIONS === "true" && !PROJECT.repository) {
+    problems.push("DEPLOY_REPOSITORY is required in GitHub Actions");
+  } else if (repository && PROJECT.repository && repository !== PROJECT.repository) {
     problems.push(`refusing to deploy from repository "${repository}"`);
   }
   if (refName && refName !== PROJECT.productionBranch) {

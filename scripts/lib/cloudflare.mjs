@@ -6,17 +6,20 @@
  * raw private API payload. Identifiers are truncated before they reach a log.
  */
 import { appendFile } from "node:fs/promises";
+import { resolveProject } from "./project-config.mjs";
 
 const API_BASE = "https://api.cloudflare.com/client/v4";
 
+const resolved = resolveProject({ strict: false });
+
 export const PROJECT = {
-  workerName: "sunsethue-helper-worker",
-  pagesProject: "sunsethue-helper",
-  productionHostname: "sunsethue-helper.pages.dev",
-  productionBranch: "main",
-  repository: "andrewtryder/sunsethue-helper",
-  d1Binding: "DB",
-  d1Name: "sunsethue-db",
+  workerName: resolved.workerName,
+  pagesProject: resolved.pagesProject,
+  productionHostname: resolved.productionHostname,
+  productionBranch: resolved.productionBranch,
+  repository: resolved.deployRepository,
+  d1Binding: resolved.d1Binding,
+  d1Name: resolved.d1Name,
   requiredSecretNames: [
     "AUTHORIZED_EMAIL",
     "TEAM_DOMAIN",
@@ -24,7 +27,8 @@ export const PROJECT = {
     "SUNSETHUE_API_KEY",
     "GMAIL_USER",
     "GMAIL_APP_PASSWORD",
-    "EMAIL_TO"
+    "EMAIL_TO",
+    "CONTACT_EMAIL"
   ]
 };
 

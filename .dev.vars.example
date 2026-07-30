@@ -1,10 +1,16 @@
 # Local Worker / Pages Function development values only.
 # Never put production Access Audience tags or real credentials in git.
+#
+# DEV_AUTH_BYPASS defaults to false so the example is fail-closed.
+# A developer may explicitly set DEV_AUTH_BYPASS=true for local loopback
+# development; worker/auth.js still refuses bypass on pages.dev / workers.dev.
 
-DEV_AUTH_BYPASS=true
+DEV_AUTH_BYPASS=false
 AUTHORIZED_EMAIL=owner@example.com
+CONTACT_EMAIL=owner@example.com
 TEAM_DOMAIN=https://example.cloudflareaccess.com
 POLICY_AUD=replace-with-local-placeholder-audience
+WEBAPP_URL=http://127.0.0.1:5010
 
 # Optional report/email secrets for local manual triggers:
 # SUNSETHUE_API_KEY=

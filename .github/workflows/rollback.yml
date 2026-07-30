@@ -30,7 +30,7 @@ on:
 
 # Shares the production group so a rollback can never overlap a deployment.
 concurrency:
-  group: sunsethue-production
+  group: production-deploy
   cancel-in-progress: false
 
 permissions:
@@ -46,7 +46,7 @@ jobs:
     timeout-minutes: 20
     environment:
       name: production
-      url: https://sunsethue-helper.pages.dev
+      url: ${{ vars.PRODUCTION_URL }}
     steps:
       - name: Check out the repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -62,6 +62,18 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Generate Wrangler configuration
+        env:
+          PAGES_PROJECT_NAME: ${{ vars.PAGES_PROJECT_NAME }}
+          WORKER_NAME: ${{ vars.WORKER_NAME }}
+          D1_DATABASE_NAME: ${{ vars.D1_DATABASE_NAME }}
+          D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
+          PRODUCTION_HOSTNAME: ${{ vars.PRODUCTION_HOSTNAME }}
+          ACCESS_HOSTNAME: ${{ vars.ACCESS_HOSTNAME }}
+          AUTHORIZED_EMAIL: ${{ secrets.AUTHORIZED_EMAIL }}
+          DEPLOY_REPOSITORY: ${{ vars.DEPLOY_REPOSITORY }}
+        run: npm run config:generate:strict
+
       - name: Validate identifiers and roll back
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -70,10 +82,26 @@ jobs:
           WORKER_VERSION_ID: ${{ inputs.worker_version_id }}
           PAGES_DEPLOYMENT_ID: ${{ inputs.pages_deployment_id }}
           ROLLBACK_REASON: ${{ inputs.reason }}
+          PAGES_PROJECT_NAME: ${{ vars.PAGES_PROJECT_NAME }}
+          WORKER_NAME: ${{ vars.WORKER_NAME }}
+          D1_DATABASE_NAME: ${{ vars.D1_DATABASE_NAME }}
+          D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
+          PRODUCTION_HOSTNAME: ${{ vars.PRODUCTION_HOSTNAME }}
+          ACCESS_HOSTNAME: ${{ vars.ACCESS_HOSTNAME }}
+          AUTHORIZED_EMAIL: ${{ secrets.AUTHORIZED_EMAIL }}
+          DEPLOY_REPOSITORY: ${{ vars.DEPLOY_REPOSITORY }}
         run: npm run rollback:production
 
       - name: Post-rollback smoke tests
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          PAGES_PROJECT_NAME: ${{ vars.PAGES_PROJECT_NAME }}
+          WORKER_NAME: ${{ vars.WORKER_NAME }}
+          D1_DATABASE_NAME: ${{ vars.D1_DATABASE_NAME }}
+          D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
+          PRODUCTION_HOSTNAME: ${{ vars.PRODUCTION_HOSTNAME }}
+          ACCESS_HOSTNAME: ${{ vars.ACCESS_HOSTNAME }}
+          AUTHORIZED_EMAIL: ${{ secrets.AUTHORIZED_EMAIL }}
+          DEPLOY_REPOSITORY: ${{ vars.DEPLOY_REPOSITORY }}
         run: npm run verify:production

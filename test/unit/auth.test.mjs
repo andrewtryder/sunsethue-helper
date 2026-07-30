@@ -239,8 +239,8 @@ test("local bypass works only when explicitly enabled on loopback", () => {
 });
 
 test("local bypass fails on pages.dev workers.dev and public hosts", () => {
-  assert.equal(isDevAuthBypassEnabled("true", "sunsethue-helper.pages.dev"), false);
-  assert.equal(isDevAuthBypassEnabled("true", "sunsethue-helper-worker.mrcoffee.workers.dev"), false);
+  assert.equal(isDevAuthBypassEnabled("true", "app.example.com"), false);
+  assert.equal(isDevAuthBypassEnabled("true", "worker.example.workers.dev"), false);
   assert.equal(isDevAuthBypassEnabled("true", "example.com"), false);
   assert.equal(isDevAuthBypassEnabled("false", "localhost"), false);
 });

@@ -5,7 +5,7 @@
 1. Never guess a rollback target. Use the exact Worker version id and Pages deployment id recorded in the deployment job summary.
 2. Validate that every identifier belongs to this application before mutating anything.
 3. Treat D1 separately. Schema recovery uses Time Travel or re-applying `schema.sql`, not an automated reverse migration.
-4. Share the `sunsethue-production` concurrency group so a rollback can never overlap a deployment.
+4. Share the `production-deploy` concurrency group so a rollback can never overlap a deployment.
 
 ## Automated rollback workflow
 
@@ -20,12 +20,13 @@ Trigger **Rollback production** (`.github/workflows/rollback.yml`) with:
 
 The workflow:
 
-1. Verifies the Cloudflare API token.
-2. Looks up the Worker version and/or Pages deployment and refuses anything that does not belong to this application, or any Pages deployment that is not `production`.
-3. Rolls the Worker back first (the Pages Function calls it through the service binding).
-4. Rolls Pages back second.
-5. Re-runs the unauthenticated post-deployment smoke tests.
-6. Writes a sanitized job summary. D1 is never modified.
+1. Generates Wrangler configs from the GitHub `production` environment (`config:generate:strict`).
+2. Verifies the Cloudflare API token.
+3. Looks up the Worker version and/or Pages deployment and refuses anything that does not belong to this application, or any Pages deployment that is not `production`.
+4. Rolls the Worker back first (the Pages Function calls it through the service binding).
+5. Rolls Pages back second.
+6. Re-runs the unauthenticated post-deployment smoke tests.
+7. Writes a sanitized job summary. D1 is never modified.
 
 ## Finding the identifiers
 
@@ -43,7 +44,7 @@ Example:
 
 ## Manual commands (same identifiers)
 
-Use the Wrangler version pinned in `package.json`.
+Use the Wrangler version pinned in `package.json`. Generate configs first (`npm run config:generate:strict`).
 
 ```bash
 # Worker
@@ -53,7 +54,7 @@ npx wrangler rollback <worker-version-id> \
   --yes
 
 # Pages (Cloudflare API)
-# POST /accounts/<account>/pages/projects/sunsethue-helper/deployments/<id>/rollback
+# POST /accounts/<account>/pages/projects/<PAGES_PROJECT_NAME>/deployments/<id>/rollback
 ```
 
 Or run the packaged entry points:

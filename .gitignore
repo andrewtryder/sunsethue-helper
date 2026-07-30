@@ -8,14 +8,30 @@ public/dist/
 /lib/
 
 # Environment and secrets
-.env
-.dev.vars
-.env.local
-.env.*.local
+.env*
+!.env.example
+.dev.vars*
+!.dev.vars.example
 functions/.env
 functions/.env.*
 functions/.secret.local
 config.json
+
+# Keys, certificates, and tokens
+*.pem
+*.key
+*.p12
+*.pfx
+*.jwk
+*.jwt
+
+# Local databases
+*.sqlite
+*.sqlite3
+
+# Cloudflare state and rollback snapshots
+cloudflare-state/
+rollback-snapshots/
 
 # Wrangler state
 .wrangler/
@@ -46,3 +62,7 @@ wrangler.jwt-public.toml
 # OS files
 .DS_Store
 Thumbs.db
+
+# Generated Wrangler configs (from *.example.toml templates)
+wrangler.toml
+wrangler.worker.toml

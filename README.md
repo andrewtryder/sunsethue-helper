@@ -6,12 +6,12 @@ Private sunrise/sunset quality notifier for a single authorized user.
 
 ```text
 Browser
-  -> Cloudflare Access (exact host: sunsethue-helper.pages.dev)
+  -> Cloudflare Access (exact production hostname)
   -> Pages static frontend
   -> same-origin /api/*
   -> Pages Function
   -> private service binding (API_SERVICE)
-  -> sunsethue-helper-worker
+  -> private Worker
   -> D1 + Sunsethue API + email
 ```
 
@@ -19,7 +19,7 @@ Scheduled reports continue to run from the Worker cron trigger and do **not** re
 
 ## Authentication and authorization
 
-1. **Cloudflare Access** admits only `owner@example.com` to `sunsethue-helper.pages.dev`.
+1. **Cloudflare Access** admits only the configured `AUTHORIZED_EMAIL` to the production hostname.
 2. The Pages Function forwards `/api/*` through a private Worker service binding and preserves `Cf-Access-Jwt-Assertion`.
 3. The Worker cryptographically verifies the Access JWT (signature, issuer, audience, expiry, `nbf`, email) and authorizes the exact email again.
 
@@ -29,41 +29,61 @@ Invalid or missing tokens return `401`. A valid token for another identity retur
 
 | Surface | Access policy | API data access |
 | --- | --- | --- |
-| `sunsethue-helper.pages.dev` | Protected by exact-host Access app | Allowed only after Access + Worker JWT auth |
-| `*.sunsethue-helper.pages.dev` deployment aliases / previews | Not covered by the production Access app | `/api/*` fails closed without a production Access JWT |
+| Production hostname | Protected by exact-host Access app | Allowed only after Access + Worker JWT auth |
+| `*.pages.dev` deployment aliases / previews | Not covered by the production Access app | `/api/*` fails closed without a production Access JWT |
 | `*.workers.dev` Worker URL | Disabled in Wrangler (`workers_dev = false`, `preview_urls = false`) | Not publicly reachable |
 
 Do not enable account-wide “Require Access protection.” Do not add wildcard, Everyone, email-domain, or bypass policies for this app.
+
+## Configure your own instance
+
+This repository ships without the owner's production identity or infrastructure IDs.
+
+1. Copy `.env.example` to `.env` and fill in your Cloudflare account, project names, D1 id, Access values, and mail secrets.
+2. Copy `.dev.vars.example` to `.dev.vars` for local Worker/Pages vars. Keep `DEV_AUTH_BYPASS=false` unless you explicitly need loopback-only bypass.
+3. Generate Wrangler configs (gitignored):
+
+```bash
+npm run config:generate          # placeholder defaults for local CI / dry-runs
+npm run config:generate:strict   # required before deploy or Access apply
+```
+
+4. In the GitHub `production` environment, set the variables and secrets listed in [docs/cloudflare-credentials.md](docs/cloudflare-credentials.md). `D1_DATABASE_ID` is a secret so deploy logs never print it.
+
+Tracked templates are `wrangler.example.toml` and `wrangler.worker.example.toml`. Do not commit real `wrangler.toml` / `wrangler.worker.toml` files.
 
 ## Local development
 
 ```bash
 npm install
+npm run config:generate
 npm run dev
 ```
 
 This starts:
 
-- Worker on `http://127.0.0.1:8789` via `wrangler.worker.toml`
+- Worker on `http://127.0.0.1:8789` via generated `wrangler.worker.toml`
 - Pages + Functions on `http://127.0.0.1:5010` with `API_SERVICE` bound to the local Worker
 
 Local auth bypass requires **both**:
 
-1. `DEV_AUTH_BYPASS=true`
+1. `DEV_AUTH_BYPASS=true` (explicit; the committed example defaults to `false`)
 2. Loopback host (`localhost`, `127.0.0.1`, or `[::1]`)
 
 It never activates from a caller-controlled header, query parameter, or localStorage value, and it never activates on `pages.dev` / `workers.dev`.
 
-Local D1 is used by default. Do not point local tests at the production D1 database.
+Local D1 is used by default. Do not point local tests at a production D1 database.
 
-Copy `.dev.vars.example` to `.dev.vars` and fill placeholders only. Never commit real tokens, JWTs, cookies, or Audience tags.
+Never commit real tokens, JWTs, cookies, Audience tags, or D1 database IDs.
 
 ## Configuration files
 
 | File | Role |
 | --- | --- |
-| `wrangler.toml` | Pages project (`pages_build_output_dir`, `API_SERVICE` binding) |
-| `wrangler.worker.toml` | Private API Worker (`workers_dev = false`, cron, D1) |
+| `wrangler.example.toml` | Template for the Pages project (`pages_build_output_dir`, `API_SERVICE` binding) |
+| `wrangler.worker.example.toml` | Template for the private API Worker (`workers_dev = false`, cron, D1) |
+| `wrangler.toml` / `wrangler.worker.toml` | Generated locally / in CI; gitignored |
+| `.env.example` / `.dev.vars.example` | Placeholder configuration |
 | `schema.sql` | D1 schema for local setup and tests (`npm run db:schema:local`) |
 | `public/_routes.json` | Invoke Functions only for `/api/*` |
 | `functions/api/[[path]].js` | Same-origin API proxy |
@@ -97,7 +117,7 @@ Details:
 - [docs/deployment.md](docs/deployment.md) — production pipeline, secrets, verification
 - [docs/rollback.md](docs/rollback.md) — exact-identifier rollback
 - [docs/branch-protection.md](docs/branch-protection.md) — recommended `main` settings
-- [docs/cloudflare-credentials.md](docs/cloudflare-credentials.md) — single API token and one-time Access setup
+- [docs/cloudflare-credentials.md](docs/cloudflare-credentials.md) — environment variables, secrets, and one-time Access setup
 
 ## Worker secrets
 
@@ -106,27 +126,17 @@ Set these as **Worker secrets** (never commit real values):
 | Name | Purpose |
 | --- | --- |
 | `AUTHORIZED_EMAIL` | Exact allowed email |
+| `CONTACT_EMAIL` | Public application contact (Nominatim User-Agent) |
 | `TEAM_DOMAIN` | `https://<team>.cloudflareaccess.com` |
 | `POLICY_AUD` | Access application Audience tag |
 | `SUNSETHUE_API_KEY` | Sunsethue API key |
 | `GMAIL_USER` / `GMAIL_APP_PASSWORD` | SMTP auth |
 | `EMAIL_TO` / `EMAIL_FROM` | Report recipients |
-
-## GitHub environment secrets
-
-All production credentials live in the GitHub `production` environment. See [docs/cloudflare-credentials.md](docs/cloudflare-credentials.md).
-
-| Name | Scope |
-| --- | --- |
-| `CLOUDFLARE_API_TOKEN` | Workers, Pages, D1, and Access (for rare local Access setup) |
-| `CLOUDFLARE_ACCOUNT_ID` | Account identifier |
-| Worker secrets listed above | Passed into the Worker deploy step |
-
-Rotate the Cloudflare token from the Cloudflare dashboard if it is ever exposed. Prefer a scoped API token over a Global API Key.
+| `WEBAPP_URL` | Optional dashboard link in report emails (set from `PRODUCTION_URL` in CI) |
 
 ## Access automation
 
-Access is initialization-only. Run these locally with `CLOUDFLARE_API_TOKEN` set; they are not part of the production pipeline.
+Access is initialization-only. Run these locally with instance configuration in `.env`; they are not part of the production pipeline.
 
 ```bash
 npm run access:snapshot   # sanitized rollback snapshot under .tmp/cloudflare-access/
@@ -157,10 +167,11 @@ If you are locked out of the UI:
 
 ```bash
 npx wrangler deployments list --config wrangler.worker.toml
-curl -i https://sunsethue-helper-worker.mrcoffee.workers.dev/api/locations
+# Attempt the Worker workers.dev URL for your account; expect a non-200 failure
+# (connection/error page), never application JSON.
 ```
 
-Expect a non-200 failure (for example connection/error page), never application JSON. Production verification also asserts this automatically.
+Production verification also asserts this automatically.
 
 ## Rollback
 
@@ -172,8 +183,8 @@ D1 recovery uses Time Travel or re-applying `schema.sql`; the rollback workflow 
 
 After deploy (CI only performs unauthenticated negative checks):
 
-1. Open `https://sunsethue-helper.pages.dev` in a private window and confirm Access challenges instead of rendering the app.
-2. Sign in as `owner@example.com` with the Cloudflare identity provider.
+1. Open the production URL in a private window and confirm Access challenges instead of rendering the app.
+2. Sign in as the authorized email with the Cloudflare identity provider.
 3. Confirm locations, logs, credits, address search, and manual report still work over same-origin `/api/*`.
 
 ## Toolchain

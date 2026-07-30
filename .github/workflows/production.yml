@@ -13,7 +13,7 @@ on:
 # One production pipeline at a time. Never cancel a run mid-deploy: a cancelled
 # deploy can leave the Worker and Pages on different versions.
 concurrency:
-  group: sunsethue-production
+  group: production-deploy
   cancel-in-progress: false
 
 # Read-only by default. Only the release job raises its own permissions.
@@ -36,7 +36,7 @@ jobs:
     timeout-minutes: 10
     environment:
       name: production
-      url: https://sunsethue-helper.pages.dev
+      url: ${{ vars.PRODUCTION_URL }}
     outputs:
       commit_sha: ${{ steps.state.outputs.commit_sha }}
       worker_version_before: ${{ steps.state.outputs.worker_version_before }}
@@ -56,11 +56,31 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Generate Wrangler configuration
+        env:
+          PAGES_PROJECT_NAME: ${{ vars.PAGES_PROJECT_NAME }}
+          WORKER_NAME: ${{ vars.WORKER_NAME }}
+          D1_DATABASE_NAME: ${{ vars.D1_DATABASE_NAME }}
+          D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
+          PRODUCTION_HOSTNAME: ${{ vars.PRODUCTION_HOSTNAME }}
+          ACCESS_HOSTNAME: ${{ vars.ACCESS_HOSTNAME }}
+          AUTHORIZED_EMAIL: ${{ secrets.AUTHORIZED_EMAIL }}
+          DEPLOY_REPOSITORY: ${{ vars.DEPLOY_REPOSITORY }}
+        run: npm run config:generate:strict
+
       - name: Record deployment state and validate bindings
         id: state
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          PAGES_PROJECT_NAME: ${{ vars.PAGES_PROJECT_NAME }}
+          WORKER_NAME: ${{ vars.WORKER_NAME }}
+          D1_DATABASE_NAME: ${{ vars.D1_DATABASE_NAME }}
+          D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
+          PRODUCTION_HOSTNAME: ${{ vars.PRODUCTION_HOSTNAME }}
+          ACCESS_HOSTNAME: ${{ vars.ACCESS_HOSTNAME }}
+          AUTHORIZED_EMAIL: ${{ secrets.AUTHORIZED_EMAIL }}
+          DEPLOY_REPOSITORY: ${{ vars.DEPLOY_REPOSITORY }}
         run: npm run deploy:prepare
 
 
@@ -72,7 +92,7 @@ jobs:
     timeout-minutes: 15
     environment:
       name: production
-      url: https://sunsethue-helper.pages.dev
+      url: ${{ vars.PRODUCTION_URL }}
     outputs:
       worker_version_after: ${{ steps.worker_state.outputs.worker_version }}
     steps:
@@ -89,6 +109,18 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Generate Wrangler configuration
+        env:
+          PAGES_PROJECT_NAME: ${{ vars.PAGES_PROJECT_NAME }}
+          WORKER_NAME: ${{ vars.WORKER_NAME }}
+          D1_DATABASE_NAME: ${{ vars.D1_DATABASE_NAME }}
+          D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
+          PRODUCTION_HOSTNAME: ${{ vars.PRODUCTION_HOSTNAME }}
+          ACCESS_HOSTNAME: ${{ vars.ACCESS_HOSTNAME }}
+          AUTHORIZED_EMAIL: ${{ secrets.AUTHORIZED_EMAIL }}
+          DEPLOY_REPOSITORY: ${{ vars.DEPLOY_REPOSITORY }}
+        run: npm run config:generate:strict
 
       # The Worker deploys first and must stay backward compatible, because the
       # previous Pages frontend keeps calling it until the next job finishes.
@@ -109,6 +141,8 @@ jobs:
             GMAIL_APP_PASSWORD
             EMAIL_TO
             EMAIL_FROM
+            CONTACT_EMAIL
+            WEBAPP_URL
         env:
           AUTHORIZED_EMAIL: ${{ secrets.AUTHORIZED_EMAIL }}
           TEAM_DOMAIN: ${{ secrets.TEAM_DOMAIN }}
@@ -118,12 +152,22 @@ jobs:
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           EMAIL_TO: ${{ secrets.EMAIL_TO }}
           EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          CONTACT_EMAIL: ${{ secrets.CONTACT_EMAIL }}
+          WEBAPP_URL: ${{ vars.PRODUCTION_URL }}
 
       - name: Record the deployed Worker version
         id: worker_state
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          PAGES_PROJECT_NAME: ${{ vars.PAGES_PROJECT_NAME }}
+          WORKER_NAME: ${{ vars.WORKER_NAME }}
+          D1_DATABASE_NAME: ${{ vars.D1_DATABASE_NAME }}
+          D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
+          PRODUCTION_HOSTNAME: ${{ vars.PRODUCTION_HOSTNAME }}
+          ACCESS_HOSTNAME: ${{ vars.ACCESS_HOSTNAME }}
+          AUTHORIZED_EMAIL: ${{ secrets.AUTHORIZED_EMAIL }}
+          DEPLOY_REPOSITORY: ${{ vars.DEPLOY_REPOSITORY }}
         run: node scripts/record-worker-version.mjs
 
   deploy-pages:
@@ -134,7 +178,7 @@ jobs:
     timeout-minutes: 15
     environment:
       name: production
-      url: https://sunsethue-helper.pages.dev
+      url: ${{ vars.PRODUCTION_URL }}
     steps:
       - name: Check out the repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -150,6 +194,18 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Generate Wrangler configuration
+        env:
+          PAGES_PROJECT_NAME: ${{ vars.PAGES_PROJECT_NAME }}
+          WORKER_NAME: ${{ vars.WORKER_NAME }}
+          D1_DATABASE_NAME: ${{ vars.D1_DATABASE_NAME }}
+          D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
+          PRODUCTION_HOSTNAME: ${{ vars.PRODUCTION_HOSTNAME }}
+          ACCESS_HOSTNAME: ${{ vars.ACCESS_HOSTNAME }}
+          AUTHORIZED_EMAIL: ${{ secrets.AUTHORIZED_EMAIL }}
+          DEPLOY_REPOSITORY: ${{ vars.DEPLOY_REPOSITORY }}
+        run: npm run config:generate:strict
+
       - name: Deploy Pages project
         id: pages
         uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
@@ -158,13 +214,14 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           packageManager: npm
           wranglerVersion: "4.115.0"
-          command: pages deploy --project-name=sunsethue-helper --branch=main
+          command: pages deploy --project-name=${{ vars.PAGES_PROJECT_NAME }} --branch=main
 
       - name: Report the Pages deployment result
         env:
           PAGES_URL: ${{ steps.pages.outputs.deployment-url }}
           WORKER_VERSION_BEFORE: ${{ needs.prepare.outputs.worker_version_before }}
           WORKER_VERSION_AFTER: ${{ needs.deploy-worker.outputs.worker_version_after }}
+          PRODUCTION_URL: ${{ vars.PRODUCTION_URL }}
         run: bash scripts/summarize-deployment.sh
 
   verify:
@@ -175,7 +232,7 @@ jobs:
     timeout-minutes: 10
     environment:
       name: production
-      url: https://sunsethue-helper.pages.dev
+      url: ${{ vars.PRODUCTION_URL }}
     steps:
       - name: Check out the repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -191,6 +248,18 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Generate Wrangler configuration
+        env:
+          PAGES_PROJECT_NAME: ${{ vars.PAGES_PROJECT_NAME }}
+          WORKER_NAME: ${{ vars.WORKER_NAME }}
+          D1_DATABASE_NAME: ${{ vars.D1_DATABASE_NAME }}
+          D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
+          PRODUCTION_HOSTNAME: ${{ vars.PRODUCTION_HOSTNAME }}
+          ACCESS_HOSTNAME: ${{ vars.ACCESS_HOSTNAME }}
+          AUTHORIZED_EMAIL: ${{ secrets.AUTHORIZED_EMAIL }}
+          DEPLOY_REPOSITORY: ${{ vars.DEPLOY_REPOSITORY }}
+        run: npm run config:generate:strict
+
       # Unauthenticated negative checks only. CI never presents a human Access
       # cookie or a real Access JWT.
       - name: Verify Access gating, origin bypass, bindings, and cron
@@ -198,6 +267,14 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           EXPECTED_COMMIT_SHA: ${{ needs.prepare.outputs.commit_sha }}
+          PAGES_PROJECT_NAME: ${{ vars.PAGES_PROJECT_NAME }}
+          WORKER_NAME: ${{ vars.WORKER_NAME }}
+          D1_DATABASE_NAME: ${{ vars.D1_DATABASE_NAME }}
+          D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
+          PRODUCTION_HOSTNAME: ${{ vars.PRODUCTION_HOSTNAME }}
+          ACCESS_HOSTNAME: ${{ vars.ACCESS_HOSTNAME }}
+          AUTHORIZED_EMAIL: ${{ secrets.AUTHORIZED_EMAIL }}
+          DEPLOY_REPOSITORY: ${{ vars.DEPLOY_REPOSITORY }}
         run: npm run verify:production
 
       - name: Record rollback targets

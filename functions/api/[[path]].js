@@ -70,7 +70,7 @@ export async function onRequest(context) {
     }
 
     const downstreamRequest = new Request(
-      new URL(downstreamPath, "https://sunsethue-helper-worker.internal"),
+      new URL(downstreamPath, "https://api.internal"),
       init
     );
 

@@ -2,7 +2,7 @@
 
 ## Goals
 
-- Exact-host Access for `sunsethue-helper.pages.dev`
+- Exact-host Access for the production hostname
 - Same-origin Pages Function API proxy via `API_SERVICE`
 - Worker JWT defense-in-depth with single-email authorization
 - Disable public Worker URLs after the private path is verified

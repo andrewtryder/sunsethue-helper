@@ -1,11 +1,15 @@
-name = "sunsethue-helper"
+# Template for the Pages project configuration.
+# Run `npm run config:generate` to render wrangler.toml from environment values.
+# Do not put production database IDs or secrets in this file.
+
+name = "{{PAGES_PROJECT_NAME}}"
 pages_build_output_dir = "./public"
 compatibility_date = "2026-06-20"
 compatibility_flags = [ "nodejs_compat" ]
 
 [[services]]
 binding = "API_SERVICE"
-service = "sunsethue-helper-worker"
+service = "{{WORKER_NAME}}"
 
 # Preview deployments are not covered by the production Access application.
 # Keep the same private Worker binding so /api/* fails closed on JWT checks.
@@ -15,4 +19,4 @@ compatibility_flags = [ "nodejs_compat" ]
 
 [[env.preview.services]]
 binding = "API_SERVICE"
-service = "sunsethue-helper-worker"
+service = "{{WORKER_NAME}}"

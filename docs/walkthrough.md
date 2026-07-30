@@ -2,7 +2,7 @@
 
 ## What changed
 
-Sunsethue Helper is now protected by Cloudflare Zero Trust Access on the exact production hostname `sunsethue-helper.pages.dev`. Browser API traffic uses same-origin `/api/*`, which is proxied by a Pages Function through a private Worker service binding. The Worker verifies Access JWTs and authorizes one email.
+Sunsethue Helper is now protected by Cloudflare Zero Trust Access on the exact production hostname. Browser API traffic uses same-origin `/api/*`, which is proxied by a Pages Function through a private Worker service binding. The Worker verifies Access JWTs and authorizes one email.
 
 ## Operator checklist
 

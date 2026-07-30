@@ -1,0 +1,14 @@
+# Local Worker / Pages Function development values only.
+# Never put production Access Audience tags or real credentials in git.
+
+DEV_AUTH_BYPASS=true
+AUTHORIZED_EMAIL=owner@example.com
+TEAM_DOMAIN=https://example.cloudflareaccess.com
+POLICY_AUD=replace-with-local-placeholder-audience
+
+# Optional report/email secrets for local manual triggers:
+# SUNSETHUE_API_KEY=
+# GMAIL_USER=
+# GMAIL_APP_PASSWORD=
+# EMAIL_TO=
+# EMAIL_FROM=

@@ -1,0 +1,21 @@
+name = "sunsethue-helper-worker"
+main = "worker/index.js"
+compatibility_date = "2026-05-01"
+compatibility_flags = [ "nodejs_compat" ]
+
+# Keep the Worker private. Browser traffic reaches it only through the
+# Pages Function service binding after Cloudflare Access admission.
+workers_dev = false
+preview_urls = false
+
+# AUTHORIZED_EMAIL, TEAM_DOMAIN, and POLICY_AUD are Worker secrets.
+# Do not commit account-specific Access values.
+
+[triggers]
+# Hourly UTC; worker/cron.js filters for 6am, 12pm, and 6pm Eastern.
+crons = ["0 * * * *"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "sunsethue-db"
+database_id = "00000000-0000-0000-0000-000000000000"

@@ -1,6 +1,6 @@
 # Conventional Commits
 
-All commit messages must follow [Conventional Commits](https://www.conventionalcommits.org/) as validated by commitplease (Angular style).
+All commit messages must follow [Conventional Commits](https://www.conventionalcommits.org/) as validated by commitlint (Angular style).
 
 ## Format
 
@@ -22,7 +22,7 @@ Optional footer: BREAKING CHANGE: description
 ```
 feat(frontend): add loading overlay fade transition
 fix(firestore): allow email/password users without email_verified
-ci(repo): add commitplease validation to pull request workflow
+ci(repo): add commitlint validation to pull request workflow
 docs: update changelog for v1.5.3
 refactor(functions): limit firestore location query to 10 reads
 ```

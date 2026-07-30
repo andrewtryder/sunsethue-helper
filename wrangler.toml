@@ -1,16 +1,18 @@
-name = "sunsethue-helper-worker"
-main = "worker/index.js"
-compatibility_date = "2026-05-01"
+name = "sunsethue-helper"
+pages_build_output_dir = "./public"
+compatibility_date = "2026-06-20"
 compatibility_flags = [ "nodejs_compat" ]
 
-[vars]
-AUTHORIZED_EMAIL = "owner@example.com"
+[[services]]
+binding = "API_SERVICE"
+service = "sunsethue-helper-worker"
 
-[triggers]
-# Hourly UTC; worker/cron.js filters for 6am, 12pm, and 6pm Eastern.
-crons = ["0 * * * *"]
+# Preview deployments are not covered by the production Access application.
+# Keep the same private Worker binding so /api/* fails closed on JWT checks.
+[env.preview]
+compatibility_date = "2026-06-20"
+compatibility_flags = [ "nodejs_compat" ]
 
-[[d1_databases]]
-binding = "DB"
-database_name = "sunsethue-db"
-database_id = "00000000-0000-0000-0000-000000000000"
+[[env.preview.services]]
+binding = "API_SERVICE"
+service = "sunsethue-helper-worker"

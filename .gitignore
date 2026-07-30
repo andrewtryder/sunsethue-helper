@@ -38,8 +38,10 @@ playwright-report/
 blob-report/
 playwright/.cache/
 
-# Generated previews
+# Generated previews and local Cloudflare rollback snapshots
 .tmp/
+.tmp/cloudflare-access/
+wrangler.jwt-public.toml
 
 # OS files
 .DS_Store

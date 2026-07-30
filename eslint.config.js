@@ -18,7 +18,7 @@ module.exports = [
       ecmaVersion: 2024,
       sourceType: "module",
       globals: {
-        // Global variables for browser/node
+        // Global variables for browser/node/workers
         window: "readonly",
         document: "readonly",
         console: "readonly",
@@ -29,7 +29,13 @@ module.exports = [
         navigator: "readonly",
         localStorage: "readonly",
         confirm: "readonly",
-        AbortController: "readonly"
+        AbortController: "readonly",
+        crypto: "readonly",
+        Headers: "readonly",
+        Request: "readonly",
+        Response: "readonly",
+        URL: "readonly",
+        Buffer: "readonly"
       }
     },
     rules: {

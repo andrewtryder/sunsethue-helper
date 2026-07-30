@@ -1,3 +1,7 @@
+-- Schema for sunsethue-db.
+-- Safe to re-run: all statements use IF NOT EXISTS.
+-- Apply locally with: npm run db:schema:local
+
 CREATE TABLE IF NOT EXISTS locations (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
@@ -23,3 +27,6 @@ CREATE TABLE IF NOT EXISTS runs (
   results TEXT NOT NULL, -- JSON string representation of locations run status
   error TEXT
 );
+
+CREATE INDEX IF NOT EXISTS idx_locations_createdAt ON locations (createdAt ASC);
+CREATE INDEX IF NOT EXISTS idx_runs_timestamp ON runs (timestamp DESC);

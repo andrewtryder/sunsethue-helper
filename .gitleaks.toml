@@ -1,0 +1,35 @@
+# Gitleaks config for the public-release audit.
+# Extends the default rule set; allowlists keep local secrets and fixtures out
+# of "publication blocked" noise while still scanning tracked source and history.
+title = "sunsethue-helper"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Local secrets, generated configs, dependencies, and tooling state"
+paths = [
+  '''(^|/)\.env($|\.)''',
+  '''(^|/)\.dev\.vars($|\.)''',
+  '''(^|/)\.release-audit\.local\.json$''',
+  '''(^|/)wrangler\.toml$''',
+  '''(^|/)wrangler\.worker\.toml$''',
+  '''(^|/)node_modules/''',
+  '''(^|/)\.git/''',
+  '''(^|/)\.tmp/''',
+  '''(^|/)coverage/''',
+  '''(^|/)package-lock\.json$''',
+  '''(^|/)\.gitleaks\.toml$'''
+]
+
+[[allowlists]]
+description = "Synthetic API keys and tokens used only in unit tests"
+paths = [
+  '''(^|/)test/'''
+]
+regexes = [
+  '''key/with\+chars''',
+  '''test-api-key''',
+  '''fake[-_]?secret''',
+  '''owner@example\.com'''
+]

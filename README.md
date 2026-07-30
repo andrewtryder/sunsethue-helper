@@ -193,5 +193,13 @@ After deploy (CI only performs unauthenticated negative checks):
 | --- | --- |
 | Node.js 24 | `.nvmrc`, `.node-version`, `package.json` engines, CI `node-version-file` |
 | Wrangler 4.115.0 | `package.json` `devDependencies.wrangler` and every `wranglerVersion:` in workflows |
+| Gitleaks 8.30.1 / TruffleHog 3.96.0 | `scripts/lib/scanner-versions.mjs` and `.github/workflows/security.yml` digests |
 
 `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24` is set on workflows so GitHub Actions that still declare Node 20 runtimes execute on Node 24. It is not an application Node-version setting. Revisit and remove it once every pinned action natively supports Node 24.
+
+## License and contributing
+
+This project is [MIT](LICENSE)-licensed. See [CONTRIBUTING.md](CONTRIBUTING.md),
+[SECURITY.md](SECURITY.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), and the
+[public release checklist](docs/public-release-checklist.md) before publishing
+a fork or making the repository public.

@@ -129,7 +129,7 @@ test("the Node version is consistent across the toolchain", async () => {
   assert.equal(nvmrc, nodeVersion, ".nvmrc and .node-version must agree");
   assert.equal(pkg.engines.node, `>=${nvmrc}`, "package.json engines must match .nvmrc");
 
-  for (const workflow of ["validate.yml", "production.yml", "rollback.yml"]) {
+  for (const workflow of ["validate.yml", "production.yml", "rollback.yml", "security.yml"]) {
     const contents = await read(`.github/workflows/${workflow}`);
     assert.match(
       contents,
@@ -292,4 +292,24 @@ test("tracked sources do not embed personal emails or a committed D1 UUID", asyn
     const withoutServiceHosts = contents.replace(/smtp\.gmail\.com/g, "smtp.example.com");
     assert.doesNotMatch(withoutServiceHosts, personalEmail, path);
   }
+});
+
+test("package metadata is private, MIT-licensed, and points at the GitHub homepage", async () => {
+  const pkg = JSON.parse(await read("package.json"));
+  const license = await read("LICENSE");
+
+  assert.equal(pkg.private, true);
+  assert.equal(pkg.license, "MIT");
+  assert.match(license, /MIT License/);
+  assert.match(license, /Copyright \(c\) 2026 Andrew Tryder/);
+  assert.equal(pkg.repository?.url, "git+https://github.com/andrewtryder/sunsethue-helper.git");
+  assert.equal(pkg.bugs?.url, "https://github.com/andrewtryder/sunsethue-helper/issues");
+  assert.equal(pkg.homepage, "https://github.com/andrewtryder/sunsethue-helper#readme");
+  assert.doesNotMatch(pkg.homepage, /\.pages\.dev/);
+  assert.match(pkg.packageManager, /^npm@\d+\.\d+\.\d+$/);
+});
+
+test("gitignore ignores the local release-audit needles file", async () => {
+  const gitignore = await read(".gitignore");
+  assert.match(gitignore, /^\.release-audit\.local\.json$/m);
 });

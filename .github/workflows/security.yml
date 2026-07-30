@@ -1,0 +1,60 @@
+name: Security
+
+# Public-release secret and history audit. Never receives production secrets —
+# no environment, no Cloudflare/SMTP/Sunsethue credentials.
+on:
+  workflow_dispatch:
+  schedule:
+    # Weekly Monday 14:00 UTC
+    - cron: "0 14 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-audit
+  cancel-in-progress: true
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  secret-scan:
+    name: Secret and history scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out the full history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Scan working tree with Gitleaks
+        uses: docker://ghcr.io/gitleaks/gitleaks@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f # v8.30.1
+        with:
+          args: detect --source=/github/workspace --no-git --config=/github/workspace/.gitleaks.toml --redact --no-banner --exit-code=1
+
+      - name: Scan full git history with Gitleaks
+        uses: docker://ghcr.io/gitleaks/gitleaks@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f # v8.30.1
+        with:
+          args: detect --source=/github/workspace --log-opts=--all --config=/github/workspace/.gitleaks.toml --redact --no-banner --exit-code=1
+
+      - name: High-entropy sweep with TruffleHog
+        uses: docker://ghcr.io/trufflesecurity/trufflehog@sha256:aa821cf4ace8861c7d096d83818cdf7bb9719028a52d37a52eaad44086a52577 # 3.96.0
+        with:
+          args: git file:///github/workspace --no-verification --results=verified,unknown --exclude-paths=/github/workspace/scripts/trufflehog-exclude.txt --fail
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Public-release identifier audit
+        # --ci skips local scanners (already run above via digest-pinned images)
+        # and tolerates a missing .release-audit.local.json.
+        run: npm run audit:release -- --ci

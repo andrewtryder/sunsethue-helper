@@ -1,0 +1,12 @@
+# Code owners
+
+# Single maintainer — keep required reviews achievable.
+* @andrewtryder
+
+/.github/workflows/ @andrewtryder
+/worker/ @andrewtryder
+/functions/ @andrewtryder
+/scripts/ @andrewtryder
+/*.example.toml @andrewtryder
+/schema.sql @andrewtryder
+/SECURITY.md @andrewtryder

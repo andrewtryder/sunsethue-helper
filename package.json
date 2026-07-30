@@ -7,40 +7,26 @@
   },
   "scripts": {
     "dev": "bash scripts/dev.sh",
-    "commitplease": "commitplease",
-    "setup:hooks": "bash scripts/setup-git-hooks.sh",
     "test": "node scripts/test-frontend.js && node scripts/test-frontend-unit.mjs",
     "test:coverage": "node scripts/test-frontend.js && node scripts/test-frontend-unit.mjs",
     "preview:email": "node scripts/preview-email.js",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "prepare": "husky"
   },
   "dependencies": {
     "worker-mailer": "^1.2.1"
   },
   "devDependencies": {
-    "commitplease": "^3.2.0",
+    "@commitlint/cli": "^21.2.1",
+    "@commitlint/config-conventional": "^21.2.0",
     "eslint": "^10.5.0",
-    "eslint-plugin-security": "^4.0.1"
+    "eslint-plugin-security": "^4.0.1",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.2.0"
   },
-  "commitplease": {
-    "style": "angular",
-    "nohook": true,
-    "types": [
-      "feat",
-      "fix",
-      "docs",
-      "style",
-      "refactor",
-      "perf",
-      "test",
-      "build",
-      "ci",
-      "chore",
-      "revert"
-    ],
-    "limits": {
-      "firstLine": "72",
-      "otherLine": "100"
-    }
+  "lint-staged": {
+    "*.{js,mjs,cjs,ts}": [
+      "eslint --fix"
+    ]
   }
 }

@@ -4,6 +4,29 @@ All notable changes to this project are documented in this file.
 
 This changelog follows [Conventional Commits](https://www.conventionalcommits.org/) and is maintained by [release-please](https://github.com/googleapis/release-please). Release sections group changes by commit type (`feat`, `fix`, etc.). Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.18.0](https://github.com/andrewtryder/sunsethue-helper/compare/v1.17.0...v1.18.0) (2026-07-31)
+
+
+### Features
+
+* add configurable notification outbox ([4802669](https://github.com/andrewtryder/sunsethue-helper/commit/4802669bbfb23d4df61f84cb041f7c23f42800c7))
+* configurable notification outbox ([bcadeca](https://github.com/andrewtryder/sunsethue-helper/commit/bcadeca4931ad069d5deadbf8f7d8fd35fdcb0db))
+* **credentials:** add secrets store provider credential administration ([a6b8bfd](https://github.com/andrewtryder/sunsethue-helper/commit/a6b8bfdd0ba432720d806dceec3e53b76e1528bc))
+* **credentials:** add Secrets Store provider credential administration ([53067fa](https://github.com/andrewtryder/sunsethue-helper/commit/53067faad55db6b11af9cd228716ab98d7134d29))
+
+
+### Bug Fixes
+
+* **ci:** pass secrets store env to pages and verify jobs ([b71403d](https://github.com/andrewtryder/sunsethue-helper/commit/b71403dae4995c82178f2fd4748f0cf3663fdc83))
+* **ci:** pass secrets store env to pages and verify jobs ([8e6a198](https://github.com/andrewtryder/sunsethue-helper/commit/8e6a1982997308e9e8bdb15e2586559272b7d9de))
+* **ci:** upload Worker secrets with worker config ([9ab746d](https://github.com/andrewtryder/sunsethue-helper/commit/9ab746d4f05fa1b6c3c916a1edde60fa2d64d606))
+* **credentials:** accept spaced gmail app passwords and surface codes ([16db040](https://github.com/andrewtryder/sunsethue-helper/commit/16db040a0611ca110746c5a381dd6ca1835a6571))
+* **credentials:** accept spaced gmail app passwords and surface codes ([5128405](https://github.com/andrewtryder/sunsethue-helper/commit/512840588990da60c28281a15c7eb85af69c53e3))
+* **credentials:** allow same-origin status GET without Origin ([a20f226](https://github.com/andrewtryder/sunsethue-helper/commit/a20f226f7bc4612350a751ce604a5b9611b648db))
+* **credentials:** allow same-origin status GET without Origin ([f01b04e](https://github.com/andrewtryder/sunsethue-helper/commit/f01b04efb72c814e139df811237ef5a8cda2f410))
+* **notifications:** harden outbox and validate APIs ([498a3e8](https://github.com/andrewtryder/sunsethue-helper/commit/498a3e81de4a3e0b4d9a79bef063b2174eb8e53c))
+* **test:** lowercase transport-schema email fixture for sanitizer ([5731f6b](https://github.com/andrewtryder/sunsethue-helper/commit/5731f6b83dd0dc055fedc01010833afb0046b9df))
+
 ## [1.17.0](https://github.com/andrewtryder/sunsethue-helper/compare/v1.16.0...v1.17.0) (2026-06-28)
 
 

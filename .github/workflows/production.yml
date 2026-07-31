@@ -228,8 +228,11 @@ jobs:
         env:
           PAGES_PROJECT_NAME: ${{ vars.PAGES_PROJECT_NAME }}
           WORKER_NAME: ${{ vars.WORKER_NAME }}
+          CREDENTIAL_ADMIN_WORKER_NAME: ${{ vars.CREDENTIAL_ADMIN_WORKER_NAME }}
           D1_DATABASE_NAME: ${{ vars.D1_DATABASE_NAME }}
           D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
+          SECRETS_STORE_ID: ${{ vars.SECRETS_STORE_ID }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           PRODUCTION_HOSTNAME: ${{ vars.PRODUCTION_HOSTNAME }}
           ACCESS_HOSTNAME: ${{ vars.ACCESS_HOSTNAME }}
           AUTHORIZED_EMAIL: ${{ secrets.AUTHORIZED_EMAIL }}
@@ -282,8 +285,11 @@ jobs:
         env:
           PAGES_PROJECT_NAME: ${{ vars.PAGES_PROJECT_NAME }}
           WORKER_NAME: ${{ vars.WORKER_NAME }}
+          CREDENTIAL_ADMIN_WORKER_NAME: ${{ vars.CREDENTIAL_ADMIN_WORKER_NAME }}
           D1_DATABASE_NAME: ${{ vars.D1_DATABASE_NAME }}
           D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
+          SECRETS_STORE_ID: ${{ vars.SECRETS_STORE_ID }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           PRODUCTION_HOSTNAME: ${{ vars.PRODUCTION_HOSTNAME }}
           ACCESS_HOSTNAME: ${{ vars.ACCESS_HOSTNAME }}
           AUTHORIZED_EMAIL: ${{ secrets.AUTHORIZED_EMAIL }}
@@ -299,14 +305,15 @@ jobs:
           EXPECTED_COMMIT_SHA: ${{ needs.prepare.outputs.commit_sha }}
           PAGES_PROJECT_NAME: ${{ vars.PAGES_PROJECT_NAME }}
           WORKER_NAME: ${{ vars.WORKER_NAME }}
+          CREDENTIAL_ADMIN_WORKER_NAME: ${{ vars.CREDENTIAL_ADMIN_WORKER_NAME }}
           D1_DATABASE_NAME: ${{ vars.D1_DATABASE_NAME }}
           D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
+          SECRETS_STORE_ID: ${{ vars.SECRETS_STORE_ID }}
           PRODUCTION_HOSTNAME: ${{ vars.PRODUCTION_HOSTNAME }}
           ACCESS_HOSTNAME: ${{ vars.ACCESS_HOSTNAME }}
           AUTHORIZED_EMAIL: ${{ secrets.AUTHORIZED_EMAIL }}
           DEPLOY_REPOSITORY: ${{ vars.DEPLOY_REPOSITORY }}
         run: npm run verify:production
-
       - name: Record rollback targets
         if: always()
         env:

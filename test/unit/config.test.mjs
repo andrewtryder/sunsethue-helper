@@ -289,9 +289,19 @@ test("production generates Wrangler config strictly and keeps the D1 id in secre
   assert.match(production, /vars\.PRODUCTION_URL/);
   assert.match(production, /vars\.SECRETS_STORE_ID/);
   assert.match(production, /vars\.CREDENTIAL_ADMIN_WORKER_NAME/);
+  assert.match(production, /secrets\.CLOUDFLARE_ACCOUNT_ID/);
   assert.match(production, /secrets-store:preflight/);
   assert.match(production, /wrangler\.credential-admin\.toml/);
   assert.match(production, /--target=admin/);
+  // Every config:generate:strict step must receive Secrets Store inputs (Pages/verify included).
+  const generateBlocks = production.split("npm run config:generate:strict");
+  assert.ok(generateBlocks.length >= 5, "expected multiple strict generate steps");
+  for (let i = 0; i < generateBlocks.length - 1; i += 1) {
+    const envBlock = generateBlocks[i].slice(generateBlocks[i].lastIndexOf("env:"));
+    assert.match(envBlock, /SECRETS_STORE_ID/);
+    assert.match(envBlock, /CREDENTIAL_ADMIN_WORKER_NAME/);
+    assert.match(envBlock, /CLOUDFLARE_ACCOUNT_ID/);
+  }
 });
 
 test("tracked sources do not embed personal emails or a committed D1 UUID", async () => {

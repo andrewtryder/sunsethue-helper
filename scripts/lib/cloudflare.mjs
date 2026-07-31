@@ -15,6 +15,7 @@ const resolved = resolveProject({ strict: false });
 
 export const PROJECT = {
   workerName: resolved.workerName,
+  credentialAdminWorkerName: resolved.credentialAdminWorkerName,
   pagesProject: resolved.pagesProject,
   productionHostname: resolved.productionHostname,
   productionBranch: resolved.productionBranch,
@@ -31,13 +32,16 @@ export const PROJECT = {
     "EMAIL_TO",
     "CONTACT_EMAIL"
   ],
+  requiredAdminSecretNames: ["CLOUDFLARE_API_TOKEN"],
   requiredD1Tables: [
     "locations",
     "runs",
     "notification_settings",
     "notification_outbox",
     "notification_test_limiter",
-    "report_execution_lock"
+    "report_execution_lock",
+    "provider_credential_status",
+    "provider_credential_limiter"
   ]
 };
 

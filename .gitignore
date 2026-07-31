@@ -69,3 +69,4 @@ Thumbs.db
 # Generated Wrangler configs (from *.example.toml templates)
 wrangler.toml
 wrangler.worker.toml
+wrangler.credential-admin.toml

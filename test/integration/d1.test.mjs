@@ -25,6 +25,8 @@ test("schema.sql creates the tables and indexes the Worker queries", async () =>
     assert.ok(schema.includes("CREATE TABLE IF NOT EXISTS notification_outbox"));
     assert.ok(schema.includes("CREATE TABLE IF NOT EXISTS report_execution_lock"));
     assert.ok(schema.includes("CREATE TABLE IF NOT EXISTS autocomplete_limiter"));
+    assert.ok(schema.includes("CREATE TABLE IF NOT EXISTS provider_credential_status"));
+    assert.ok(schema.includes("CREATE TABLE IF NOT EXISTS provider_credential_limiter"));
 
     const tables = local.database
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
@@ -36,6 +38,8 @@ test("schema.sql creates the tables and indexes the Worker queries", async () =>
       "notification_outbox",
       "notification_settings",
       "notification_test_limiter",
+      "provider_credential_limiter",
+      "provider_credential_status",
       "report_execution_lock",
       "runs"
     ]);

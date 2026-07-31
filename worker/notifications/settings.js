@@ -1,5 +1,7 @@
 import * as db from "../db.js";
 import { NotificationError } from "./errors.js";
+import { hasEmailTransportAsync } from "./resolve-email-transport.js";
+import { hasPushoverTransportAsync } from "./resolve-pushover-transport.js";
 
 const EMAIL_RE = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/;
 const SAFE_OPTION_RE = /^[A-Za-z0-9 _.-]{1,64}$/;
@@ -11,13 +13,17 @@ function text(value) {
   return typeof value === "string" ? value.trim() : value;
 }
 
+/** Synchronous legacy check used by defaults / tests with plain env objects. */
 export function hasEmailTransport(env) {
   return Boolean(env.GMAIL_USER && env.GMAIL_APP_PASSWORD && (env.EMAIL_FROM || env.GMAIL_USER));
 }
 
+/** Synchronous legacy check used by defaults / tests with plain env objects. */
 export function hasPushoverTransport(env) {
   return Boolean(env.PUSHOVER_APP_TOKEN && env.PUSHOVER_USER_KEY);
 }
+
+export { hasEmailTransportAsync, hasPushoverTransportAsync };
 
 export function validateEmailAddress(value) {
   return typeof value === "string" && !/[\r\n]/.test(value) && EMAIL_RE.test(value.trim());
@@ -39,7 +45,9 @@ export async function getSettings(env) {
   return row || getDefaultSettings(env);
 }
 
-export function publicSettings(settings, env) {
+export async function publicSettings(settings, env) {
+  const emailConfigured = await hasEmailTransportAsync(env);
+  const pushoverConfigured = await hasPushoverTransportAsync(env);
   return {
     emailEnabled: Boolean(settings.emailEnabled),
     emailTo: settings.emailTo || null,
@@ -47,8 +55,8 @@ export function publicSettings(settings, env) {
     pushoverDevice: settings.pushoverDevice || null,
     pushoverPriority: settings.pushoverPriority,
     pushoverSound: settings.pushoverSound || null,
-    emailConfigured: hasEmailTransport(env),
-    pushoverConfigured: hasPushoverTransport(env)
+    emailConfigured,
+    pushoverConfigured
   };
 }
 
@@ -83,12 +91,12 @@ export function validateSettingsInput(input) {
 export async function saveSettings(env, input, now = Date.now()) {
   const settings = validateSettingsInput(input);
   // Fail closed when the owner tries to enable a channel whose transport
-  // secrets are not configured. Prevents saving an "enabled" setting that
+  // credentials are not configured. Prevents saving an "enabled" setting that
   // would otherwise silently drop every future notification.
-  if (settings.emailEnabled && !hasEmailTransport(env)) {
+  if (settings.emailEnabled && !(await hasEmailTransportAsync(env))) {
     throw new NotificationError("PROVIDER_NOT_CONFIGURED");
   }
-  if (settings.pushoverEnabled && !hasPushoverTransport(env)) {
+  if (settings.pushoverEnabled && !(await hasPushoverTransportAsync(env))) {
     throw new NotificationError("PROVIDER_NOT_CONFIGURED");
   }
   await db.upsertNotificationSettings(env, { ...settings, updatedAt: now });

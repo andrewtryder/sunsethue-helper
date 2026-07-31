@@ -93,6 +93,26 @@ CREATE TABLE IF NOT EXISTS report_execution_lock (
   lastStartedAt INTEGER
 );
 
+-- Provider credential metadata only. Never store Gmail app passwords, Pushover
+-- tokens, ciphertext, or Cloudflare management tokens in D1.
+CREATE TABLE IF NOT EXISTS provider_credential_status (
+  provider TEXT PRIMARY KEY
+    CHECK (provider IN ('email', 'pushover')),
+  configured INTEGER NOT NULL DEFAULT 0
+    CHECK (configured IN (0, 1)),
+  maskedIdentifier TEXT,
+  updatedAt INTEGER,
+  lastValidatedAt INTEGER,
+  lastValidationCode TEXT,
+  lastUpdatedBy TEXT
+);
+
+-- Rate limit credential mutation endpoints without storing Access identities.
+CREATE TABLE IF NOT EXISTS provider_credential_limiter (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  lastRequestedAt INTEGER NOT NULL
+);
+
 CREATE UNIQUE INDEX IF NOT EXISTS idx_outbox_run_channel
   ON notification_outbox (runId, channel);
 CREATE INDEX IF NOT EXISTS idx_outbox_pending

@@ -1,6 +1,7 @@
 import { buildEmailSubject, escapeHtml, formatColumnDateET, getQualityBadge } from "../helpers.js";
 import { NotificationError } from "./errors.js";
 import { parseNotificationPayload } from "./payload.js";
+import { resolveEmailTransport } from "./resolve-email-transport.js";
 import { validateEmailAddress } from "./settings.js";
 
 const SMTP_TIMEOUT_MS = 30_000;
@@ -66,9 +67,9 @@ function withTimeout(promise, ms, code) {
 }
 
 export async function sendEmail(job, env, deps = {}) {
-  if (!env.GMAIL_USER || !env.GMAIL_APP_PASSWORD) throw new NotificationError("EMAIL_NOT_CONFIGURED");
+  const transport = await resolveEmailTransport(env);
   const payload = parseNotificationPayload(job.payload);
-  const from = parseMailbox(env.EMAIL_FROM || `Sunsethue Helper <${env.GMAIL_USER}>`);
+  const from = parseMailbox(transport.emailFrom || `Sunsethue Helper <${transport.gmailUser}>`);
   // Prefer the delivery-time snapshot columns over live settings so a settings
   // change made after the job was enqueued cannot redirect the recipient.
   const to = parseMailbox(job.deliveryEmailTo || job.settings?.emailTo || env.EMAIL_TO);
@@ -80,7 +81,7 @@ export async function sendEmail(job, env, deps = {}) {
   try {
     const { WorkerMailer } = await loadMailer();
     const mailer = await withTimeout(
-      WorkerMailer.connect({ host: "smtp.gmail.com", port: 465, secure: true, credentials: { username: env.GMAIL_USER, password: env.GMAIL_APP_PASSWORD }, authType: ["plain", "login"] }),
+      WorkerMailer.connect({ host: "smtp.gmail.com", port: 465, secure: true, credentials: { username: transport.gmailUser, password: transport.gmailAppPassword }, authType: ["plain", "login"] }),
       SMTP_TIMEOUT_MS,
       "SMTP_TIMEOUT"
     );

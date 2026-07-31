@@ -1,11 +1,12 @@
 import { NotificationError } from "./errors.js";
 import { buildPushoverContent, parseNotificationPayload } from "./payload.js";
+import { resolvePushoverTransport } from "./resolve-pushover-transport.js";
 
 const PUSHOVER_URL = "https://api.pushover.net/1/messages.json";
 const PUSHOVER_TIMEOUT_MS = 10_000;
 
 export async function sendPushover(job, env, deps = {}) {
-  if (!env.PUSHOVER_APP_TOKEN || !env.PUSHOVER_USER_KEY) throw new NotificationError("PUSHOVER_NOT_CONFIGURED");
+  const transport = await resolvePushoverTransport(env);
   const payload = parseNotificationPayload(job.payload);
   const { title, message } = buildPushoverContent(payload);
   // Prefer the delivery-time snapshot columns over live settings.
@@ -15,7 +16,7 @@ export async function sendPushover(job, env, deps = {}) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), PUSHOVER_TIMEOUT_MS);
   try {
-    const body = new URLSearchParams({ token: env.PUSHOVER_APP_TOKEN, user: env.PUSHOVER_USER_KEY, title, message, priority: String(priority), timestamp: String(Math.floor(payload.generatedAt / 1000)) });
+    const body = new URLSearchParams({ token: transport.appToken, user: transport.userKey, title, message, priority: String(priority), timestamp: String(Math.floor(payload.generatedAt / 1000)) });
     if (device) body.set("device", device);
     if (sound) body.set("sound", sound);
     if (payload.dashboardUrl) {

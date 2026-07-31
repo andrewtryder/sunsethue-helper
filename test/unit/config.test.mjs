@@ -20,11 +20,22 @@ test("the Worker template keeps the Worker private with a cron and D1 binding", 
   assert.match(config, /^preview_urls\s*=\s*false$/m, "Worker preview URLs must stay disabled");
   assert.match(config, /^crons\s*=\s*\[/m);
   assert.match(config, /^binding\s*=\s*"DB"$/m);
+  assert.match(config, /^binding\s*=\s*"CREDENTIAL_ADMIN"$/m);
+  assert.match(config, /EMAIL_TRANSPORT_SECRET/);
   assert.match(config, /database_id\s*=\s*"\{\{D1_DATABASE_ID\}\}"/);
   assert.doesNotMatch(config, /migrations_dir/, "versioned migrations are not used");
   assert.doesNotMatch(config, /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
 });
 
+test("the credential-admin template stays private with Secrets Store bindings", async () => {
+  const config = await read("wrangler.credential-admin.example.toml");
+  assert.match(config, /^workers_dev\s*=\s*false$/m);
+  assert.match(config, /^preview_urls\s*=\s*false$/m);
+  assert.match(config, /worker\/credential-admin\/index\.js/);
+  assert.match(config, /EMAIL_TRANSPORT_SECRET/);
+  assert.match(config, /PUSHOVER_TRANSPORT_SECRET/);
+  assert.doesNotMatch(config, /^[[:space:]]*CLOUDFLARE_API_TOKEN[[:space:]]*=/m);
+});
 test("the Pages template binds the Worker as a private service", async () => {
   const config = await read("wrangler.example.toml");
   assert.match(config, /^pages_build_output_dir\s*=/m);
@@ -44,17 +55,25 @@ test("generated Wrangler configs satisfy privacy and binding invariants", async 
       join(temp, "wrangler.worker.example.toml"),
       await read("wrangler.worker.example.toml")
     );
+    await writeFile(
+      join(temp, "wrangler.credential-admin.example.toml"),
+      await read("wrangler.credential-admin.example.toml")
+    );
 
     await generateWranglerConfig({ strict: false, root: temp });
     const pages = await readFile(join(temp, "wrangler.toml"), "utf8");
     const worker = await readFile(join(temp, "wrangler.worker.toml"), "utf8");
+    const admin = await readFile(join(temp, "wrangler.credential-admin.toml"), "utf8");
 
     assert.match(worker, /^workers_dev\s*=\s*false$/m);
     assert.match(worker, /^preview_urls\s*=\s*false$/m);
     assert.match(worker, /^binding\s*=\s*"DB"$/m);
+    assert.match(worker, /^binding\s*=\s*"CREDENTIAL_ADMIN"$/m);
+    assert.match(admin, /^workers_dev\s*=\s*false$/m);
+    assert.match(admin, /^preview_urls\s*=\s*false$/m);
     assert.match(pages, /^binding\s*=\s*"API_SERVICE"$/m);
     assert.match(pages, /^service\s*=\s*"sunsethue-helper-worker"$/m);
-    assert.doesNotMatch(pages + worker, /\{\{[A-Z0-9_]+\}\}/);
+    assert.doesNotMatch(pages + worker + admin, /\{\{[A-Z0-9_]+\}\}/);
   } finally {
     await rm(temp, { recursive: true, force: true });
   }
@@ -63,7 +82,8 @@ test("generated Wrangler configs satisfy privacy and binding invariants", async 
 test("no secret is committed as a plaintext Wrangler var", async () => {
   const configs = await Promise.all([
     read("wrangler.example.toml"),
-    read("wrangler.worker.example.toml")
+    read("wrangler.worker.example.toml"),
+    read("wrangler.credential-admin.example.toml")
   ]);
   const forbidden = [
     "SUNSETHUE_API_KEY",
@@ -73,7 +93,8 @@ test("no secret is committed as a plaintext Wrangler var", async () => {
     "AUTHORIZED_EMAIL",
     "CONTACT_EMAIL",
     "TEAM_DOMAIN",
-    "POLICY_AUD"
+    "POLICY_AUD",
+    "CLOUDFLARE_API_TOKEN"
   ];
 
   for (const config of configs) {
@@ -81,7 +102,7 @@ test("no secret is committed as a plaintext Wrangler var", async () => {
       assert.doesNotMatch(
         config,
         new RegExp(`^\\s*${name}\\s*=`, "m"),
-        `${name} must be a Worker secret, not a committed var`
+        `${name} must not be a plaintext Wrangler var`
       );
     }
   }
@@ -266,6 +287,11 @@ test("production generates Wrangler config strictly and keeps the D1 id in secre
   assert.doesNotMatch(production, /vars\.D1_DATABASE_ID/);
   assert.match(production, /vars\.PAGES_PROJECT_NAME/);
   assert.match(production, /vars\.PRODUCTION_URL/);
+  assert.match(production, /vars\.SECRETS_STORE_ID/);
+  assert.match(production, /vars\.CREDENTIAL_ADMIN_WORKER_NAME/);
+  assert.match(production, /secrets-store:preflight/);
+  assert.match(production, /wrangler\.credential-admin\.toml/);
+  assert.match(production, /--target=admin/);
 });
 
 test("tracked sources do not embed personal emails or a committed D1 UUID", async () => {

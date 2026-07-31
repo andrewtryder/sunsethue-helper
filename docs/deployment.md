@@ -63,13 +63,13 @@ All of these live in the `production` environment. Values are never logged.
 
 ### Variables
 
-`PAGES_PROJECT_NAME`, `WORKER_NAME`, `D1_DATABASE_NAME`, `PRODUCTION_HOSTNAME`, `PRODUCTION_URL`, `ACCESS_HOSTNAME`, `DEPLOY_REPOSITORY`
+`PAGES_PROJECT_NAME`, `WORKER_NAME`, `CREDENTIAL_ADMIN_WORKER_NAME`, `D1_DATABASE_NAME`, `SECRETS_STORE_ID`, `PRODUCTION_HOSTNAME`, `PRODUCTION_URL`, `ACCESS_HOSTNAME`, `DEPLOY_REPOSITORY`
 
 ### Secrets
 
 | Secret | Used by |
 | --- | --- |
-| `CLOUDFLARE_API_TOKEN` | prepare, deploy, verify, rollback |
+| `CLOUDFLARE_API_TOKEN` | prepare, deploy, verify, rollback; also uploaded to credential-admin Worker |
 | `CLOUDFLARE_ACCOUNT_ID` | same |
 | `D1_DATABASE_ID` | Wrangler config generation (masked in logs) |
 | `AUTHORIZED_EMAIL` | Worker secret during deploy |
@@ -77,12 +77,14 @@ All of these live in the `production` environment. Values are never logged.
 | `TEAM_DOMAIN` | Worker secret during deploy |
 | `POLICY_AUD` | Worker secret during deploy |
 | `SUNSETHUE_API_KEY` | Worker secret during deploy |
-| `GMAIL_USER` | Worker secret during deploy |
-| `GMAIL_APP_PASSWORD` | Worker secret during deploy |
+| `GMAIL_USER` | Main Worker secret (Stage 1 legacy fallback) |
+| `GMAIL_APP_PASSWORD` | Main Worker secret (Stage 1 legacy fallback) |
 | `EMAIL_TO` | Worker secret during deploy |
 | `EMAIL_FROM` | Worker secret during deploy |
-| `PUSHOVER_APP_TOKEN` | Optional Worker secret for Pushover delivery |
-| `PUSHOVER_USER_KEY` | Optional Worker secret for Pushover delivery |
+| `PUSHOVER_APP_TOKEN` | Optional main Worker secret (Stage 1 fallback) |
+| `PUSHOVER_USER_KEY` | Optional main Worker secret (Stage 1 fallback) |
+
+Before the first Secrets Store deploy: run `npm run secrets-store:bootstrap`, set `SECRETS_STORE_ID` / `CREDENTIAL_ADMIN_WORKER_NAME`, and apply `npm run db:schema:remote`. Details: [secrets-store-credentials.md](secrets-store-credentials.md).
 
 Access policy changes are not part of this workflow. See [cloudflare-credentials.md](cloudflare-credentials.md) for one-time Access setup with the same token.
 
@@ -97,6 +99,8 @@ Automated verification asserts:
 5. The Worker still has the `DB` binding and every required configuration binding (by name only).
 6. The cron trigger is still configured.
 7. No response body discloses a credential-shaped value.
+
+Production deploy order: Secrets Store preflight → upload main + credential-admin secrets → deploy credential-admin Worker → deploy main Worker → Pages.
 
 Authenticated browser verification remains a documented manual step. CI never holds a human Access cookie or a real Access JWT.
 
@@ -119,3 +123,5 @@ After a green production run:
 1. Open the production URL in a private window and confirm Access challenges.
 2. Sign in as the authorized email.
 3. Confirm locations, logs, credits, address search, and the manual report over same-origin `/api/*`.
+4. On Notifications: save Gmail credentials → send test email; save Pushover → send test push. Confirm status shows masked identifiers only.
+5. Confirm browser storage, network responses, and D1 metadata contain no plaintext provider secrets.

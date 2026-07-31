@@ -2,6 +2,7 @@
   "name": "sunsethue-helper",
   "version": "1.17.0",
   "private": true,
+  "type": "module",
   "description": "Daily sunrise/sunset quality email notifier on Cloudflare Pages, Workers, D1, and Access.",
   "license": "MIT",
   "repository": {
@@ -46,7 +47,7 @@
   },
   "dependencies": {
     "jose": "6.2.5",
-    "worker-mailer": "^1.2.1"
+    "worker-mailer": "1.2.1"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.1",

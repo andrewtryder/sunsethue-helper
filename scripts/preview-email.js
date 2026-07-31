@@ -1,10 +1,13 @@
 #!/usr/bin/env node
 
-const fs = require("fs");
-const path = require("path");
-const { execSync } = require("child_process");
-const { buildHtmlEmail } = require("../worker/report.js");
-const { buildEmailSubject } = require("../worker/helpers.js");
+import fs from "node:fs";
+import path from "node:path";
+import { execSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { buildHtmlEmail } from "../worker/report.js";
+import { buildEmailSubject } from "../worker/helpers.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const args = process.argv.slice(2);
 const triggerType = args.includes("--am") ? "AM" : "PM";

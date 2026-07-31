@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
-const {
+import {
   normalizeQualityToUnit,
   qualityToPercent,
   selectNextSunEvents
-} = require("../worker/helpers.js");
+} from "../worker/helpers.js";
 
 function printUsage() {
   console.error("Usage: node scripts/verify-forecast-quality.js <latitude> <longitude>");

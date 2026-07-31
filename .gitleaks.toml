@@ -18,7 +18,6 @@ paths = [
   '''(^|/)\.git/''',
   '''(^|/)\.tmp/''',
   '''(^|/)coverage/''',
-  '''(^|/)package-lock\.json$''',
   '''(^|/)\.gitleaks\.toml$'''
 ]
 

@@ -307,6 +307,9 @@ export async function handleHttpRequest(request, env, authContext = null, deps =
       // misconfigured channel cannot lock out a valid one for a full minute.
       if (body.channel === "email" && (!settings.emailEnabled || !(await hasEmailTransportAsync(env)))) return errorResponse("PROVIDER_NOT_CONFIGURED", "Email is not configured.", 409, requestId);
       if (body.channel === "pushover" && (!settings.pushoverEnabled || !(await hasPushoverTransportAsync(env)))) return errorResponse("PROVIDER_NOT_CONFIGURED", "Pushover is not configured.", 409, requestId);
+      if (body.channel === "email" && !(settings.emailTo || env.EMAIL_TO)) {
+        return errorResponse("INVALID_EMAIL_ADDRESS", "Set an email destination in notification settings before sending a test.", 409, requestId);
+      }
       if (!await db.claimNotificationTestSlot(env, now)) return errorResponse("RATE_LIMITED", "Try again in a minute.", 429, requestId);
       const jobs = await enqueueNotifications({ runId: crypto.randomUUID(), triggerType: "TEST", generatedAt: now, dashboardUrl: env.WEBAPP_URL || null, locationsCount: 0, results: [] }, env, {
         settings: { ...settings, emailEnabled: body.channel === "email" ? 1 : 0, pushoverEnabled: body.channel === "pushover" ? 1 : 0 }

@@ -49,9 +49,38 @@ test("pushover resolver throws when neither Secrets Store nor legacy is configur
 
 test("credential guards reject missing origin, cross-site, and missing admin header", () => {
   const env = { WEBAPP_URL: "https://app.example.com" };
-  const missingOrigin = assertCredentialRequestGuards(new Request("https://worker.example/api/provider-credentials"), env);
-  assert.equal(missingOrigin.ok, false);
-  assert.equal(missingOrigin.status, 403);
+
+  // Mutations still require Origin.
+  const missingOriginMutation = assertCredentialRequestGuards(
+    new Request("https://worker.example/api/provider-credentials/email", { method: "PUT" }),
+    env,
+    { mutation: true }
+  );
+  assert.equal(missingOriginMutation.ok, false);
+  assert.equal(missingOriginMutation.status, 403);
+
+  // Same-origin GET may omit Origin; Sec-Fetch-Site: same-origin is enough.
+  const getWithoutOrigin = assertCredentialRequestGuards(
+    new Request("https://worker.example/api/provider-credentials", {
+      headers: { "Sec-Fetch-Site": "same-origin" }
+    }),
+    env
+  );
+  assert.equal(getWithoutOrigin.ok, true);
+
+  const getEmptySite = assertCredentialRequestGuards(
+    new Request("https://worker.example/api/provider-credentials"),
+    env
+  );
+  assert.equal(getEmptySite.ok, true);
+
+  const getCrossSiteNoOrigin = assertCredentialRequestGuards(
+    new Request("https://worker.example/api/provider-credentials", {
+      headers: { "Sec-Fetch-Site": "cross-site" }
+    }),
+    env
+  );
+  assert.equal(getCrossSiteNoOrigin.ok, false);
 
   const crossSite = assertCredentialRequestGuards(
     new Request("https://worker.example/api/provider-credentials", {

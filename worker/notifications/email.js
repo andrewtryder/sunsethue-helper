@@ -72,7 +72,11 @@ export async function sendEmail(job, env, deps = {}) {
   const from = parseMailbox(transport.emailFrom || `Sunsethue Helper <${transport.gmailUser}>`);
   // Prefer the delivery-time snapshot columns over live settings so a settings
   // change made after the job was enqueued cannot redirect the recipient.
-  const to = parseMailbox(job.deliveryEmailTo || job.settings?.emailTo || env.EMAIL_TO);
+  const recipient = job.deliveryEmailTo || job.settings?.emailTo || env.EMAIL_TO;
+  if (typeof recipient !== "string" || recipient.trim() === "") {
+    throw new NotificationError("INVALID_EMAIL_ADDRESS");
+  }
+  const to = parseMailbox(recipient);
   let dashboardUrl = payload.dashboardUrl;
   if (dashboardUrl) {
     try { const url = new URL(dashboardUrl); if (url.protocol !== "https:" && url.protocol !== "http:") throw new Error(); dashboardUrl = url.toString(); } catch { throw new NotificationError("INVALID_DASHBOARD_URL"); }

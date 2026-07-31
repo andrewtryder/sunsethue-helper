@@ -1,323 +1,129 @@
 import * as db from "./db.js";
 import {
-  formatColumnDateET,
-  getQualityBadge,
-  escapeHtml,
   buildForecastEventSnapshot,
   normalizeForecastEvent,
   selectNextSunEvents,
-  validateReportEnv,
-  buildEmailSubject
+  validateReportEnv
 } from "./helpers.js";
+import { dispatchPendingNotifications } from "./notifications/dispatcher.js";
+import { buildNotificationPayload } from "./notifications/payload.js";
+import { NotificationError } from "./notifications/errors.js";
+import { getSettings } from "./notifications/settings.js";
 
-const reportTimeFormatter = new Intl.DateTimeFormat("en-US", {
-  timeZone: "America/New_York",
-  dateStyle: "full",
-  timeStyle: "short"
-});
+export { buildHtmlEmail } from "./notifications/email.js";
 
-function parseEmailAddress(addressString) {
-  const clean = addressString.trim();
-  if (clean.includes("<") && clean.endsWith(">")) {
-    const parts = clean.split("<");
-    const namePart = parts[0].trim().replace(/^"/, "").replace(/"$/, "").trim();
-    const emailPart = parts[1].replace(">", "").trim();
-    return { name: namePart, email: emailPart };
-  }
-  return { name: "", email: clean };
-}
+const REPORT_LOCK_MS = 5 * 60_000;
 
-function getHeaderEventTimes(results) {
-  for (const result of results) {
-    if (result.error) {
-      continue;
-    }
-    return {
-      sunrise: result.sunrise?.time || null,
-      sunset: result.sunset?.time || null
-    };
-  }
-  return { sunrise: null, sunset: null };
-}
-
-function buildForecastEventCell(event) {
-  if (!event) {
-    return `<span style="font-size:14px;color:#9ca3af;">N/A</span>`;
-  }
-  return getQualityBadge(event.quality, event.quality_text);
-}
-
-function buildEmailTableRows(results, triggerType) {
-  const isSunsetFirst = triggerType === "AM" || triggerType === "NOON";
-  let tableRowsHtml = "";
-
-  for (const result of results) {
-    if (result.error) {
-      tableRowsHtml += `
-        <tr>
-          <td style="padding:14px 8px;border-bottom:1px solid #e5e7eb;font-size:16px;font-weight:600;color:#1a1a1a;vertical-align:top;">${escapeHtml(result.name)}</td>
-          <td colspan="2" style="padding:14px 8px;border-bottom:1px solid #e5e7eb;font-size:14px;color:#dc2626;vertical-align:top;">
-            Error querying API: ${escapeHtml(result.error)}
-          </td>
-        </tr>
-      `;
-      continue;
-    }
-
-    const sunriseCell = buildForecastEventCell(result.sunrise);
-    const sunsetCell = buildForecastEventCell(result.sunset);
-    const firstCol = isSunsetFirst ? sunsetCell : sunriseCell;
-    const secondCol = isSunsetFirst ? sunriseCell : sunsetCell;
-
-    tableRowsHtml += `
-      <tr>
-        <td style="padding:14px 8px;border-bottom:1px solid #e5e7eb;font-size:16px;font-weight:600;color:#1a1a1a;vertical-align:top;">${escapeHtml(result.name)}</td>
-        <td style="padding:14px 8px;border-bottom:1px solid #e5e7eb;vertical-align:top;">${firstCol}</td>
-        <td style="padding:14px 8px;border-bottom:1px solid #e5e7eb;vertical-align:top;">${secondCol}</td>
-      </tr>
-    `;
-  }
-
-  return tableRowsHtml;
-}
-
-export function buildHtmlEmail(results, triggerType, reportTimeText, webappUrl) {
-  const isSunsetFirst = triggerType === "AM" || triggerType === "NOON";
-  const tableRowsHtml = buildEmailTableRows(results, triggerType);
-  const headerTimes = getHeaderEventTimes(results);
-  const sunriseHeaderDate = formatColumnDateET(headerTimes.sunrise);
-  const sunsetHeaderDate = formatColumnDateET(headerTimes.sunset);
-  const firstHeader = isSunsetFirst
-    ? `Next Sunset ${sunsetHeaderDate}`.trim()
-    : `Next Sunrise ${sunriseHeaderDate}`.trim();
-  const secondHeader = isSunsetFirst
-    ? `Next Sunrise ${sunriseHeaderDate}`.trim()
-    : `Next Sunset ${sunsetHeaderDate}`.trim();
-
-  return `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="utf-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1">
-      <title>Sunsethue Forecast Report</title>
-    </head>
-    <body style="margin:0;padding:0;background-color:#f4f4f5;color:#1a1a1a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-      <div style="max-width:600px;margin:0 auto;padding:24px 16px;">
-        <h1 style="margin:0 0 8px 0;font-size:24px;font-weight:700;line-height:1.3;color:#1a1a1a;">Sunrise &amp; Sunset Forecast</h1>
-        <p style="margin:0 0 20px 0;font-size:14px;line-height:1.5;color:#6b7280;">${reportTimeText} · ${triggerType} report</p>
-        <table style="width:100%;border-collapse:collapse;background-color:#ffffff;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
-          <thead>
-            <tr style="background-color:#f9fafb;">
-              <th style="padding:10px 8px;border-bottom:1px solid #e5e7eb;font-size:12px;font-weight:600;text-align:left;color:#6b7280;width:28%;">Location</th>
-              <th style="padding:10px 8px;border-bottom:1px solid #e5e7eb;font-size:12px;font-weight:600;text-align:left;color:#6b7280;width:36%;">${firstHeader}</th>
-              <th style="padding:10px 8px;border-bottom:1px solid #e5e7eb;font-size:12px;font-weight:600;text-align:left;color:#6b7280;width:36%;">${secondHeader}</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${tableRowsHtml}
-          </tbody>
-        </table>
-        <div style="margin-top:24px;padding-top:16px;border-top:1px solid #e5e7eb;text-align:center;font-size:12px;line-height:1.5;color:#9ca3af;">
-          <p style="margin:0;">Sent automatically by Sunsethue Helper.</p>
-          ${
-            webappUrl
-              ? `<p style="margin:8px 0 0 0;">
-            <a href="${escapeHtml(webappUrl)}" style="color:#2563eb;text-decoration:underline;">Manage locations in your private dashboard</a>.
-          </p>`
-              : ""
-          }
-        </div>
-      </div>
-    </body>
-    </html>
-  `;
-}
-
-function buildRunResultEntry(result) {
+function buildRunResult(result) {
   return {
     name: result.name,
     status: result.error ? "error" : "success",
-    error: result.error || null,
-    forecast: result.error
-      ? null
-      : {
-          sunrise: buildForecastEventSnapshot(result.sunrise),
-          sunset: buildForecastEventSnapshot(result.sunset)
-        }
+    error: result.error ? "FORECAST_UNAVAILABLE" : null,
+    forecast: result.error ? null : {
+      sunrise: buildForecastEventSnapshot(result.sunrise),
+      sunset: buildForecastEventSnapshot(result.sunset)
+    }
+  };
+}
+
+/** Fetch and persist a single normalized forecast snapshot. No provider calls occur here. */
+export async function generateReport(triggerType, env, deps = {}) {
+  const fetchImpl = deps.fetch || fetch;
+  const now = deps.now ?? Date.now();
+  validateReportEnv(env);
+  const locations = await db.getLocations(env);
+  const activeLocations = locations.slice(0, 10);
+  const results = await Promise.all(activeLocations.map(async (loc) => {
+    try {
+      const response = await fetchImpl(`https://api.sunsethue.com/forecast?latitude=${loc.latitude}&longitude=${loc.longitude}&days=2&key=${String(env.SUNSETHUE_API_KEY).trim()}`);
+      if (!response.ok) throw new Error("FORECAST_UPSTREAM_ERROR");
+      const json = await response.json();
+      if (!json?.data) throw new Error("FORECAST_INVALID_RESPONSE");
+      const selected = selectNextSunEvents(json.data, now);
+      return { loc, sunrise: normalizeForecastEvent(selected.nextSunrise), sunset: normalizeForecastEvent(selected.nextSunset), error: null };
+    } catch {
+      return { loc, sunrise: null, sunset: null, error: "FORECAST_UNAVAILABLE" };
+    }
+  }));
+  for (const result of results) {
+    await db.updateLocationForecast(env, result.loc.id, result.error ? {
+      lastForecastUpdate: now, forecastError: result.error
+    } : {
+      latestSunriseTime: result.sunrise?.time || null,
+      latestSunriseQuality: result.sunrise?.quality ?? null,
+      latestSunriseText: result.sunrise?.quality_text || null,
+      latestSunsetTime: result.sunset?.time || null,
+      latestSunsetQuality: result.sunset?.quality ?? null,
+      latestSunsetText: result.sunset?.quality_text || null,
+      lastForecastUpdate: now, forecastError: null
+    });
+  }
+  return {
+    runId: crypto.randomUUID(), triggerType, generatedAt: now, dashboardUrl: env.WEBAPP_URL || null,
+    locationsCount: activeLocations.length,
+    results: results.map((result) => ({ name: result.loc.name, sunrise: result.sunrise, sunset: result.sunset, error: result.error }))
   };
 }
 
 /**
- * @param {string} triggerType
- * @param {object} env
- * @param {{ fetch?: typeof fetch, loadMailer?: () => Promise<{ WorkerMailer: unknown }>, now?: number }} [deps]
- *   Injection seam used by tests so SMTP delivery and the Sunsethue API are never
- *   contacted for real. Production callers omit it.
+ * Persist the run and its enabled notification jobs together, snapshotting the
+ * current delivery preferences into each job so a later settings change cannot
+ * redirect a pending notification.
+ */
+export async function enqueueNotifications(model, env, deps = {}) {
+  const settings = deps.settings || await getSettings(env);
+  const payload = JSON.stringify(buildNotificationPayload(model));
+  const channels = [];
+  if (settings.emailEnabled) channels.push("email");
+  if (settings.pushoverEnabled) channels.push("pushover");
+  const jobs = channels.map((channel) => ({
+    id: crypto.randomUUID(),
+    runId: model.runId,
+    channel,
+    payload,
+    nextAttemptAt: model.generatedAt,
+    createdAt: model.generatedAt,
+    deliveryEmailTo: settings.emailTo ?? null,
+    deliveryPushoverDevice: settings.pushoverDevice ?? null,
+    deliveryPushoverPriority: settings.pushoverPriority ?? 0,
+    deliveryPushoverSound: settings.pushoverSound ?? null
+  }));
+  await db.createRunAndOutbox(env, {
+    id: model.runId, timestamp: model.generatedAt, triggerType: model.triggerType,
+    status: model.results.some((result) => result.error) ? "warning" : "success",
+    locationsCount: model.locationsCount, results: model.results.map(buildRunResult), error: null
+  }, jobs);
+  return jobs.map((job) => ({ id: job.id, channel: job.channel, status: "pending" }));
+}
+
+/**
+ * Compatibility entry point for manual and scheduled reports.
+ *
+ * Holds a singleton execution lock across the forecast fan-out so a cron
+ * trigger and a concurrent manual trigger can never both call the upstream API
+ * for the same set of locations.
  */
 export async function runAndSendReport(triggerType, env, deps = {}) {
-  const fetchImpl = deps.fetch || fetch;
-  const loadMailer = deps.loadMailer || (() => import("worker-mailer"));
   const now = deps.now ?? Date.now();
-  console.log(`Starting report run. Trigger: ${triggerType}. Target Email: ${env.EMAIL_TO}`);
-
+  const leaseToken = crypto.randomUUID();
+  const acquired = await db.claimReportLock(env, now, now + REPORT_LOCK_MS, leaseToken);
+  if (!acquired) {
+    throw new NotificationError("REPORT_IN_PROGRESS");
+  }
   try {
-    validateReportEnv(env);
-
-    const locations = await db.getLocations(env);
-    if (locations.length === 0) {
-      console.log("No locations found in D1. Skipping email.");
-      await db.addRun(env, {
-        id: crypto.randomUUID(),
-        timestamp: now,
-        triggerType,
-        status: "success",
-        locationsCount: 0,
-        results: [],
-        error: null
-      });
-      return;
-    }
-
-    const activeLocations = locations.slice(0, 10);
-
-    const fetchPromises = activeLocations.map(async (loc) => {
-      try {
-        console.log(`Fetching forecast for location: ${loc.name} (${loc.latitude}, ${loc.longitude})`);
-
-        const cleanApiKey = String(env.SUNSETHUE_API_KEY).trim();
-        const response = await fetchImpl(
-          `https://api.sunsethue.com/forecast?latitude=${loc.latitude}&longitude=${loc.longitude}&days=2&key=${cleanApiKey}`
-        );
-
-        if (!response.ok) {
-          throw new Error(`API returned HTTP status ${response.status}`);
-        }
-
-        const json = await response.json();
-        if (!json || !json.data) {
-          throw new Error("Invalid API response format");
-        }
-
-        const { nextSunrise, nextSunset } = selectNextSunEvents(json.data, now);
-        const sunrise = normalizeForecastEvent(nextSunrise);
-        const sunset = normalizeForecastEvent(nextSunset);
-
-        console.log(`Forecast selected for ${loc.name}:`, JSON.stringify({
-          latitude: loc.latitude,
-          longitude: loc.longitude,
-          sunrise: buildForecastEventSnapshot(nextSunrise),
-          sunset: buildForecastEventSnapshot(nextSunset)
-        }));
-
-        return {
-          loc,
-          sunrise,
-          sunset,
-          error: null
-        };
-      } catch (error) {
-        console.error(`Error querying Sunsethue API for ${loc.name}:`, error);
-        return {
-          loc,
-          sunrise: null,
-          sunset: null,
-          error: error.message
-        };
-      }
-    });
-
-    const apiResults = await Promise.all(fetchPromises);
-    const results = [];
-
-    for (const res of apiResults) {
-      if (!res.error) {
-        await db.updateLocationForecast(env, res.loc.id, {
-          latestSunriseTime: res.sunrise ? res.sunrise.time : null,
-          latestSunriseQuality: res.sunrise ? res.sunrise.quality : null,
-          latestSunriseText: res.sunrise ? res.sunrise.quality_text : null,
-          latestSunsetTime: res.sunset ? res.sunset.time : null,
-          latestSunsetQuality: res.sunset ? res.sunset.quality : null,
-          latestSunsetText: res.sunset ? res.sunset.quality_text : null,
-          lastForecastUpdate: now,
-          forecastError: null
-        });
-      } else {
-        await db.updateLocationForecast(env, res.loc.id, {
-          lastForecastUpdate: now,
-          forecastError: res.error
-        });
-      }
-
-      results.push({
-        name: res.loc.name,
-        latitude: res.loc.latitude,
-        longitude: res.loc.longitude,
-        sunrise: res.sunrise,
-        sunset: res.sunset,
-        error: res.error
-      });
-    }
-
-    const reportTimeText = reportTimeFormatter.format(now);
-
-    const webappUrl = env.WEBAPP_URL || null;
-    const htmlEmail = buildHtmlEmail(results, triggerType, reportTimeText, webappUrl);
-    
-    const { WorkerMailer } = await loadMailer();
-    console.log("Connecting to SMTP server via worker-mailer...");
-    const mailer = await WorkerMailer.connect({
-      host: "smtp.gmail.com",
-      port: 465,
-      secure: true,
-      credentials: {
-        username: env.GMAIL_USER,
-        password: env.GMAIL_APP_PASSWORD
-      },
-      authType: ["plain", "login"]
-    });
-
-    const parsedFrom = parseEmailAddress(env.EMAIL_FROM || `"Sunsethue Helper" <${env.GMAIL_USER}>`);
-
-    console.log("Sending email...");
-    await mailer.send({
-      from: {
-        name: parsedFrom.name,
-        email: parsedFrom.email
-      },
-      to: {
-        email: env.EMAIL_TO
-      },
-      subject: buildEmailSubject(triggerType),
-      html: htmlEmail
-    });
-    console.log("Email dispatched successfully via worker-mailer!");
-
-    const hasErrors = results.some((result) => result.error);
-    await db.addRun(env, {
-      id: crypto.randomUUID(),
-      timestamp: now,
-      triggerType,
-      status: hasErrors ? "warning" : "success",
-      locationsCount: activeLocations.length,
-      results: results.map(buildRunResultEntry),
-      error: null
-    });
-  } catch (globalError) {
-    console.error("Global report execution failed:", globalError);
+    const model = await generateReport(triggerType, env, deps);
+    const jobs = await enqueueNotifications(model, env, deps);
+    const outcomes = await dispatchPendingNotifications(env, deps);
+    return { runId: model.runId, jobs: jobs.map((job) => outcomes.find((outcome) => outcome.id === job.id) || job) };
+  } catch (error) {
+    // A report can fail before a run exists (for example, an absent forecast key).
     try {
-      await db.addRun(env, {
-        id: crypto.randomUUID(),
-        timestamp: now,
-        triggerType,
-        status: "failure",
-        locationsCount: 0,
-        results: [],
-        error: globalError.message
-      });
-    } catch (logError) {
-      console.error("Failed to write failure log to D1 database:", logError);
-    }
-    throw globalError;
+      await db.addRun(env, { id: crypto.randomUUID(), timestamp: now, triggerType, status: "failure", locationsCount: 0, results: [], error: "REPORT_GENERATION_FAILED" });
+    } catch { /* Preserve the original operational error. */ }
+    throw error;
+  } finally {
+    try {
+      await db.releaseReportLock(env, leaseToken);
+    } catch { /* Best-effort release; the lease expires on its own. */ }
   }
 }

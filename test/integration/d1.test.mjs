@@ -21,25 +21,37 @@ test("schema.sql creates the tables and indexes the Worker queries", async () =>
     const schema = await readSchemaSql();
     assert.ok(schema.includes("CREATE TABLE IF NOT EXISTS locations"));
     assert.ok(schema.includes("CREATE TABLE IF NOT EXISTS runs"));
+    assert.ok(schema.includes("CREATE TABLE IF NOT EXISTS notification_settings"));
+    assert.ok(schema.includes("CREATE TABLE IF NOT EXISTS notification_outbox"));
+    assert.ok(schema.includes("CREATE TABLE IF NOT EXISTS report_execution_lock"));
+    assert.ok(schema.includes("CREATE TABLE IF NOT EXISTS autocomplete_limiter"));
 
     const tables = local.database
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
       .all()
       .map((row) => row.name);
-    assert.deepEqual(tables, ["locations", "runs"]);
+    assert.deepEqual(tables, [
+      "autocomplete_limiter",
+      "locations",
+      "notification_outbox",
+      "notification_settings",
+      "notification_test_limiter",
+      "report_execution_lock",
+      "runs"
+    ]);
 
     const indexes = local.database
       .prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name LIKE 'idx_%' ORDER BY name")
       .all()
       .map((row) => row.name);
-    assert.deepEqual(indexes, ["idx_locations_createdAt", "idx_runs_timestamp"]);
+    assert.deepEqual(indexes, ["idx_locations_createdAt", "idx_outbox_pending", "idx_outbox_run_channel", "idx_runs_timestamp"]);
 
     // IF NOT EXISTS makes re-application safe for local resets.
     local.database.exec(schema);
     assert.equal(
       local.database.prepare("SELECT COUNT(*) AS total FROM sqlite_master WHERE type = 'table'").get()
         .total,
-      2
+      tables.length
     );
   });
 });

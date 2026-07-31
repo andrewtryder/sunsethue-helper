@@ -32,6 +32,7 @@ Instance-specific values (project names, hostnames, D1 id) are **not** committed
 | `SUNSETHUE_API_KEY` | Worker secret | Sunsethue API key |
 | `GMAIL_USER` / `GMAIL_APP_PASSWORD` | Worker secret | SMTP auth |
 | `EMAIL_TO` / `EMAIL_FROM` | Worker secret | Report recipients |
+| `PUSHOVER_APP_TOKEN` / `PUSHOVER_USER_KEY` | Worker secret | Optional Pushover application and user credentials |
 
 The Cloudflare API token must be a **scoped API token**, never a Global API Key.
 

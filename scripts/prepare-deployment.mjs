@@ -18,6 +18,7 @@ import {
   setOutputs,
   shortId,
   summarizePagesDeployment,
+  verifyD1TablesSync,
   verifyToken
 } from "./lib/cloudflare.mjs";
 
@@ -86,6 +87,16 @@ async function main() {
     );
   }
 
+  // Fail-closed D1 preflight. Confirm every table the Worker touches already
+  // exists in production D1; a fresh table lands via `npm run db:schema:remote`,
+  // never as part of this deploy pipeline.
+  const d1Check = verifyD1TablesSync();
+  if (!d1Check.skipped && d1Check.missing.length > 0) {
+    problems.push(
+      `Production D1 is missing required table${d1Check.missing.length === 1 ? "" : "s"}: ${d1Check.missing.join(", ")}. Run "npm run db:schema:remote" before deploying.`
+    );
+  }
+
   const previousPages = summarizePagesDeployment(deployments[0]);
 
   const rows = [
@@ -94,7 +105,8 @@ async function main() {
     `| Pages deployment before deploy | \`${previousPages?.shortId ?? "none"}\` |`,
     `| Pages deployment commit | \`${(previousPages?.commit ?? "unknown").slice(0, 12)}\` |`,
     `| Cron triggers | \`${cronExpressions.join(", ") || "none"}\` |`,
-    `| Worker bindings | ${bindingNamesOnly.length} present (names only) |`
+    `| Worker bindings | ${bindingNamesOnly.length} present (names only) |`,
+    `| D1 schema preflight | ${d1Check.skipped ? "skipped (no Cloudflare credentials)" : d1Check.missing.length === 0 ? "all required tables present" : `missing: ${d1Check.missing.join(", ")}`} |`
   ];
 
   await appendJobSummary(

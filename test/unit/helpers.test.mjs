@@ -188,7 +188,7 @@ test("selectNextSunEvents returns nulls when nothing is upcoming", () => {
   assert.deepEqual(selectNextSunEvents([], now), { nextSunrise: null, nextSunset: null });
 });
 
-test("report configuration validation names the missing setting", () => {
+test("report generation validation requires only the forecast credential", () => {
   const complete = {
     SUNSETHUE_API_KEY: "k",
     GMAIL_USER: "u",
@@ -202,12 +202,7 @@ test("report configuration validation names the missing setting", () => {
     () => validateReportEnv({ ...complete, SUNSETHUE_API_KEY: "PLACEHOLDER" }),
     /SUNSETHUE_API_KEY/
   );
-  assert.throws(() => validateReportEnv({ ...complete, GMAIL_USER: "" }), /Gmail SMTP/);
-  assert.throws(
-    () => validateReportEnv({ ...complete, GMAIL_APP_PASSWORD: "PLACEHOLDER_GMAIL_APP_PASSWORD" }),
-    /Gmail SMTP/
-  );
-  assert.throws(() => validateReportEnv({ ...complete, EMAIL_TO: "" }), /EMAIL_TO/);
+  assert.doesNotThrow(() => validateReportEnv({ ...complete, GMAIL_USER: "", GMAIL_APP_PASSWORD: "", EMAIL_TO: "" }));
 });
 
 test("email subjects describe the trigger type", () => {

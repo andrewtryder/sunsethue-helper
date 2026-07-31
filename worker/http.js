@@ -68,6 +68,9 @@ export function logSafe(level, message, meta = {}) {
     status: meta.status || null,
     code: meta.code || null
   };
+  for (const key of ["outboxId", "channel", "attempt", "duration"]) {
+    if (meta[key] !== undefined && meta[key] !== null) safe[key] = meta[key];
+  }
   const line = JSON.stringify(safe);
   if (level === "error") {
     console.error(line);

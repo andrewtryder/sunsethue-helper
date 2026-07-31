@@ -6,6 +6,7 @@
  * raw private API payload. Identifiers are truncated before they reach a log.
  */
 import { appendFile } from "node:fs/promises";
+import { spawnSync } from "node:child_process";
 import { resolveProject } from "./project-config.mjs";
 
 const API_BASE = "https://api.cloudflare.com/client/v4";
@@ -29,6 +30,14 @@ export const PROJECT = {
     "GMAIL_APP_PASSWORD",
     "EMAIL_TO",
     "CONTACT_EMAIL"
+  ],
+  requiredD1Tables: [
+    "locations",
+    "runs",
+    "notification_settings",
+    "notification_outbox",
+    "notification_test_limiter",
+    "report_execution_lock"
   ]
 };
 
@@ -178,6 +187,88 @@ export async function setOutputs(outputs) {
     return;
   }
   await appendFile(target, `${lines}\n`, "utf8");
+}
+
+/**
+ * Read-only check that every table required by the Worker exists in production
+ * D1. Uses `wrangler d1 execute --remote` because the D1 HTTP query API is not
+ * exposed by `cfRequest` here without a database UUID lookup, and this helper
+ * runs from GitHub Actions where wrangler is already available.
+ *
+ * Never mutates D1 (SELECTs only). Returns the list of missing table names.
+ * Never prints the wrangler token or the raw response body — only names.
+ *
+ * @returns {{ missing: string[], skipped: boolean, reason?: string }}
+ */
+export function verifyD1TablesSync({
+  configPath = "wrangler.worker.toml",
+  cwd = process.cwd(),
+  required = PROJECT.requiredD1Tables,
+  spawn = spawnSync
+} = {}) {
+  if (!process.env.CLOUDFLARE_API_TOKEN || !process.env.CLOUDFLARE_ACCOUNT_ID) {
+    return { missing: [], skipped: true, reason: "CLOUDFLARE_API_TOKEN or CLOUDFLARE_ACCOUNT_ID is not set" };
+  }
+
+  const result = spawn(
+    "npx",
+    [
+      "--no",
+      "wrangler",
+      "d1",
+      "execute",
+      PROJECT.d1Name,
+      "--config",
+      configPath,
+      "--remote",
+      "--json",
+      "--command",
+      "SELECT name FROM sqlite_master WHERE type='table'"
+    ],
+    { cwd, encoding: "utf8", shell: false }
+  );
+
+  if (result.status !== 0) {
+    return {
+      missing: [...required],
+      skipped: false,
+      reason: `wrangler d1 execute exited with status ${result.status ?? "unknown"}`
+    };
+  }
+
+  const names = extractTableNames(result.stdout);
+  const missing = required.filter((table) => !names.has(table));
+  return { missing, skipped: false };
+}
+
+function extractTableNames(stdout) {
+  const found = new Set();
+  if (!stdout) return found;
+  try {
+    const parsed = JSON.parse(stdout);
+    const walk = (node) => {
+      if (!node) return;
+      if (Array.isArray(node)) {
+        for (const item of node) walk(item);
+        return;
+      }
+      if (typeof node !== "object") return;
+      if (typeof node.name === "string") {
+        found.add(node.name);
+      }
+      for (const value of Object.values(node)) {
+        walk(value);
+      }
+    };
+    walk(parsed);
+  } catch {
+    // Fall back to matching bare table-name lines wrangler prints in text mode.
+    for (const line of stdout.split(/\r?\n/)) {
+      const match = /"name"\s*:\s*"([^"]+)"/.exec(line);
+      if (match) found.add(match[1]);
+    }
+  }
+  return found;
 }
 
 /**

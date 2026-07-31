@@ -141,6 +141,8 @@ jobs:
             GMAIL_APP_PASSWORD
             EMAIL_TO
             EMAIL_FROM
+            PUSHOVER_APP_TOKEN
+            PUSHOVER_USER_KEY
             CONTACT_EMAIL
             WEBAPP_URL
         env:
@@ -152,6 +154,8 @@ jobs:
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           EMAIL_TO: ${{ secrets.EMAIL_TO }}
           EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          PUSHOVER_APP_TOKEN: ${{ secrets.PUSHOVER_APP_TOKEN }}
+          PUSHOVER_USER_KEY: ${{ secrets.PUSHOVER_USER_KEY }}
           CONTACT_EMAIL: ${{ secrets.CONTACT_EMAIL }}
           WEBAPP_URL: ${{ vars.PRODUCTION_URL }}
 

@@ -95,14 +95,14 @@ test("an upstream Sunsethue failure degrades to a warning run", async () => {
       const runs = await db.getRuns(env);
       assert.equal(runs[0].status, "warning");
       const failed = runs[0].results.find((result) => result.status === "error");
-      assert.match(failed.error, /HTTP status 503/);
+      assert.equal(failed.error, "FORECAST_UNAVAILABLE");
 
       const stored = await db.getLocations(env);
       const failedRow = stored.find((row) => row.id === "a");
-      assert.match(failedRow.forecastError, /HTTP status 503/);
+      assert.equal(failedRow.forecastError, "FORECAST_UNAVAILABLE");
 
       assert.equal(mailer.sent.length, 1, "partial failures still send a report");
-      assert.match(mailer.sent[0].html, /Error querying API/);
+      assert.match(mailer.sent[0].html, /Forecast unavailable/);
     },
     { locations: [location("a", "Beach", 1), location("b", "Summit", 2)] }
   );
@@ -124,13 +124,13 @@ test("a malformed Sunsethue payload is recorded as an error", async () => {
 
       const runs = await db.getRuns(env);
       assert.equal(runs[0].status, "warning");
-      assert.match(runs[0].results[0].error, /Invalid API response format/);
+      assert.equal(runs[0].results[0].error, "FORECAST_UNAVAILABLE");
     },
     { locations: [location("a", "Beach", 1)] }
   );
 });
 
-test("no locations means no email and a zero-count run", async () => {
+test("no locations still creates the configured report delivery", async () => {
   await withEnv(async (env) => {
     const fetchFake = createFetchFake({});
     const mailer = createMailerFake();
@@ -142,7 +142,7 @@ test("no locations means no email and a zero-count run", async () => {
     });
 
     assert.equal(fetchFake.calls.length, 0);
-    assert.equal(mailer.sent.length, 0);
+    assert.equal(mailer.sent.length, 1);
 
     const runs = await db.getRuns(env);
     assert.equal(runs[0].locationsCount, 0);
@@ -176,26 +176,16 @@ test("at most ten locations are queried per run", async () => {
   );
 });
 
-test("missing SMTP configuration fails closed and logs a failure run", async () => {
+test("missing SMTP configuration disables the legacy default without blocking forecasts", async () => {
   await withEnv(
     async (env) => {
       const fetchFake = createFetchFake({});
       const mailer = createMailerFake();
 
-      await assert.rejects(
-        () =>
-          runAndSendReport("AM", env, {
-            fetch: fetchFake,
-            loadMailer: mailer.loadMailer,
-            now: NOW
-          }),
-        /Gmail SMTP configuration/
-      );
-
-      assert.equal(fetchFake.calls.length, 0, "no external calls before config validation");
+      await runAndSendReport("AM", env, { fetch: fetchFake, loadMailer: mailer.loadMailer, now: NOW });
+      assert.equal(fetchFake.calls.length, 1);
       const runs = await db.getRuns(env);
-      assert.equal(runs[0].status, "failure");
-      assert.match(runs[0].error, /Gmail SMTP configuration/);
+      assert.equal(runs[0].status, "warning");
     },
     {
       locations: [location("a", "Beach", 1)],
@@ -223,26 +213,18 @@ test("a missing Sunsethue API key fails closed", async () => {
   );
 });
 
-test("an SMTP send failure is recorded and rethrown", async () => {
+test("an SMTP send failure remains queued for retry", async () => {
   await withEnv(
     async (env) => {
       const mailer = createMailerFake({ failSend: true });
 
-      await assert.rejects(
-        () =>
-          runAndSendReport("AM", env, {
-            fetch: createFetchFake({
-              "api.sunsethue.com": () => jsonOk(sunsethueForecast({ baseTime: NOW }))
-            }),
-            loadMailer: mailer.loadMailer,
-            now: NOW
-          }),
-        /smtp send failed/
-      );
+      await runAndSendReport("AM", env, { fetch: createFetchFake({ "api.sunsethue.com": () => jsonOk(sunsethueForecast({ baseTime: NOW })) }), loadMailer: mailer.loadMailer, now: NOW });
 
       const runs = await db.getRuns(env);
-      assert.equal(runs[0].status, "failure");
-      assert.match(runs[0].error, /smtp send failed/);
+      assert.equal(runs[0].status, "success");
+      const deliveries = await db.getNotificationDeliveries(env);
+      assert.equal(deliveries[0].status, "pending");
+      assert.equal(deliveries[0].lastErrorCode, "SMTP_DELIVERY_FAILED");
     },
     { locations: [location("a", "Beach", 1)] }
   );

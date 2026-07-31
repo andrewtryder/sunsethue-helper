@@ -132,7 +132,30 @@ Set these as **Worker secrets** (never commit real values):
 | `SUNSETHUE_API_KEY` | Sunsethue API key |
 | `GMAIL_USER` / `GMAIL_APP_PASSWORD` | SMTP auth |
 | `EMAIL_TO` / `EMAIL_FROM` | Report recipients |
+| `PUSHOVER_APP_TOKEN` / `PUSHOVER_USER_KEY` | Optional Pushover application and recipient credentials |
 | `WEBAPP_URL` | Optional dashboard link in report emails (set from `PRODUCTION_URL` in CI) |
+
+## Notifications
+
+Delivery can be email-only, Pushover-only, both, or disabled. The protected
+Notifications tab stores channel preferences in D1; SMTP and Pushover credentials
+remain Worker secrets. Each report snapshot creates one D1 outbox job per enabled
+channel, then attempts delivery immediately. Jobs use at-least-once semantics:
+the dispatcher leases a job for one minute and retries transient failures after
+1 minute, 5 minutes, 30 minutes, and 2 hours (five attempts total). A later
+hourly cron also processes due jobs.
+
+Use the tab's test buttons and delivery history to test or retry a failed channel.
+Tests use the same outbox/dispatcher path as reports. Pushover users must register
+their own application, then set `PUSHOVER_APP_TOKEN` and `PUSHOVER_USER_KEY` as
+Worker secrets. Pushover titles are limited to 250 characters, messages to 1,024,
+and dashboard URLs to 512. No emergency priority is supported.
+
+`schema.sql` is intentionally the bootstrap source of truth, not a migration
+framework. Reapply it when provisioning or adding these idempotent tables. Before
+production schema work, take a D1 backup and confirm Time Travel retention. Rotate
+Gmail/Pushover secrets in the Worker and GitHub environment, then redeploy; never
+put credentials in D1, browser storage, commits, or public issue reports.
 
 ## Access automation
 

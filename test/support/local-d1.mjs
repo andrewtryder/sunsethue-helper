@@ -16,6 +16,8 @@ export async function readSchemaSql() {
 
 function statement(database, sql, boundArgs) {
   return {
+    __sql: sql,
+    __boundArgs: boundArgs,
     bind(...args) {
       return statement(database, sql, args);
     },
@@ -55,6 +57,20 @@ export async function createLocalD1() {
     DB: {
       prepare(sql) {
         return statement(database, sql, []);
+      },
+      async batch(statements) {
+        database.exec("BEGIN");
+        try {
+          const results = statements.map((item) => {
+            const info = database.prepare(item.__sql).run(...item.__boundArgs);
+            return { success: true, meta: { changes: info.changes, last_row_id: Number(info.lastInsertRowid) } };
+          });
+          database.exec("COMMIT");
+          return results;
+        } catch (error) {
+          database.exec("ROLLBACK");
+          throw error;
+        }
       }
     },
     database,

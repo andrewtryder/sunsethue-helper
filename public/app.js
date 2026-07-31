@@ -79,6 +79,16 @@ const emailSuccessModalClose = document.getElementById("email-success-modal-clos
 const emailSuccessModalDone = document.getElementById("email-success-modal-done");
 
 const apiCreditsStatus = document.getElementById("api-credits-status");
+const notificationSettingsForm = document.getElementById("notification-settings-form");
+const notificationEmailEnabled = document.getElementById("notification-email-enabled");
+const notificationEmailTo = document.getElementById("notification-email-to");
+const notificationPushoverEnabled = document.getElementById("notification-pushover-enabled");
+const notificationDevice = document.getElementById("notification-device");
+const notificationPriority = document.getElementById("notification-priority");
+const notificationSound = document.getElementById("notification-sound");
+const notificationEmailStatus = document.getElementById("notification-email-status");
+const notificationPushoverStatus = document.getElementById("notification-pushover-status");
+const notificationDeliveries = document.getElementById("notification-deliveries");
 
 // State
 let locationsList = [];
@@ -160,12 +170,22 @@ async function initApp() {
   try {
     appContainer.classList.remove("hidden");
     document.body.classList.add("app-visible");
-    
-    // Load locations and runs through same-origin /api/*
-    await Promise.all([
-      fetchLocations(),
-      fetchRuns()
+
+    // Locations and runs power the primary UI, so their failures must surface
+    // loudly. Notification settings and delivery history are secondary — a
+    // notification-provider outage should not black out the main dashboard.
+    await Promise.all([fetchLocations(), fetchRuns()]);
+    const notificationOutcomes = await Promise.allSettled([
+      fetchNotificationSettings(),
+      fetchNotificationDeliveries()
     ]);
+    for (const outcome of notificationOutcomes) {
+      if (outcome.status === "rejected") {
+        console.warn("Notification panel failed to load:", outcome.reason);
+        showBanner(dbErrorBanner, "Notification panel temporarily unavailable.", 6000);
+        break;
+      }
+    }
   } catch (error) {
     console.error("Initialization failed: ", error);
     showBanner(dbErrorBanner, `Initialization Error: ${error.message}`, 0);
@@ -175,6 +195,56 @@ async function initApp() {
     }
   }
 }
+
+async function fetchNotificationSettings() {
+  const response = await fetch(`${API_BASE}/api/notification-settings`);
+  if (!response.ok) throw new Error("Failed to load notification settings.");
+  const settings = await response.json();
+  notificationEmailEnabled.checked = settings.emailEnabled;
+  notificationEmailTo.value = settings.emailTo || "";
+  notificationPushoverEnabled.checked = settings.pushoverEnabled;
+  notificationDevice.value = settings.pushoverDevice || "";
+  notificationPriority.value = String(settings.pushoverPriority);
+  notificationSound.value = settings.pushoverSound || "";
+  notificationEmailStatus.textContent = settings.emailConfigured ? "Email transport configured" : "Email transport not configured";
+  notificationPushoverStatus.textContent = settings.pushoverConfigured ? "Pushover configured" : "Pushover not configured";
+}
+
+async function fetchNotificationDeliveries() {
+  const response = await fetch(`${API_BASE}/api/notification-deliveries`);
+  if (!response.ok) throw new Error("Failed to load delivery history.");
+  const deliveries = await response.json();
+  notificationDeliveries.replaceChildren();
+  if (!deliveries.length) { notificationDeliveries.textContent = "No notification deliveries yet."; return; }
+  const list = document.createElement("ul");
+  deliveries.forEach((delivery) => {
+    const item = document.createElement("li");
+    item.textContent = `${delivery.channel}: ${delivery.status} · attempts ${delivery.attempts}${delivery.lastErrorCode ? ` · ${delivery.lastErrorCode}` : ""}`;
+    list.appendChild(item);
+  });
+  notificationDeliveries.appendChild(list);
+}
+
+notificationSettingsForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const body = { emailEnabled: notificationEmailEnabled.checked, emailTo: notificationEmailTo.value || null, pushoverEnabled: notificationPushoverEnabled.checked, pushoverDevice: notificationDevice.value || null, pushoverPriority: Number(notificationPriority.value), pushoverSound: notificationSound.value || null };
+  try {
+    const response = await fetch(`${API_BASE}/api/notification-settings`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    if (!response.ok) throw new Error("Notification settings were not accepted.");
+    showBanner(dbSuccessBanner, "Notification settings saved.");
+    await fetchNotificationSettings();
+  } catch (error) { showBanner(dbErrorBanner, error.message); }
+});
+
+async function testNotification(channel) {
+  const response = await fetch(`${API_BASE}/api/notifications/test`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ channel }) });
+  if (!response.ok) throw new Error("Test notification could not be queued.");
+  showBanner(dbSuccessBanner, `${channel === "email" ? "Email" : "Pushover"} test queued.`);
+  await fetchNotificationDeliveries();
+}
+
+document.getElementById("test-email-btn")?.addEventListener("click", () => testNotification("email").catch((error) => showBanner(dbErrorBanner, error.message)));
+document.getElementById("test-pushover-btn")?.addEventListener("click", () => testNotification("pushover").catch((error) => showBanner(dbErrorBanner, error.message)));
 
 // Fetch Locations
 async function fetchLocations() {
@@ -755,11 +825,14 @@ searchAddressInput.addEventListener("input", () => {
   
   autocompleteTimeout = setTimeout(async () => {
     try {
-      const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(queryText)}&limit=5`;
-      const response = await fetch(url);
+      const response = await fetch(`${API_BASE}/api/autocomplete`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: queryText })
+      });
       if (!response.ok) return;
       const data = await response.json();
-      
+
       if (data && data.features && data.features.length > 0) {
         renderSuggestions(data.features);
       } else {

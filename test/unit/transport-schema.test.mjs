@@ -61,7 +61,7 @@ test("email transport requires configured fields and rejects unknown keys", () =
     (error) => error instanceof CredentialError
   );
   const doc = buildEmailTransportDocument({
-    gmailUser: "Owner@Example.com",
+    gmailUser: "owner@example.com",
     gmailAppPassword: "abcdefghijklmnop",
     emailFrom: "Sunsethue Helper <owner@example.com>"
   });

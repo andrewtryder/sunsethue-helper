@@ -27,7 +27,8 @@ import {
   adminUpdateEmail,
   adminUpdatePushover,
   CredentialAdminProxyError,
-  getCredentialAdmin
+  getCredentialAdmin,
+  mapAdminError
 } from "../../worker/credential-admin-proxy.js";
 import { resolveEmailTransport, emailTransportSource } from "../../worker/notifications/resolve-email-transport.js";
 import { resolvePushoverTransport, pushoverTransportSource } from "../../worker/notifications/resolve-pushover-transport.js";
@@ -74,7 +75,7 @@ test("email transport rejects CR/LF and whitespace in app password", () => {
     () =>
       buildEmailTransportDocument({
         gmailUser: "owner@example.com",
-        gmailAppPassword: "abcd efghijklmno",
+        gmailAppPassword: "abcd\tefghijklmno",
         emailFrom: "owner@example.com"
       }),
     (error) => error.code === "INVALID_EMAIL_CREDENTIALS"
@@ -90,6 +91,15 @@ test("email transport rejects CR/LF and whitespace in app password", () => {
   );
 });
 
+test("gmail app password spaces from Google display format are stripped", () => {
+  const doc = buildEmailTransportDocument({
+    gmailUser: "owner@example.com",
+    gmailAppPassword: "abcd efgh ijkl mnop",
+    emailFrom: "owner@example.com"
+  });
+  assert.equal(doc.document.gmailAppPassword, "abcdefghijklmnop");
+  assert.doesNotMatch(doc.serialized, /abcd efgh/);
+});
 test("pushover transport requires both credentials within conservative limits", () => {
   assert.throws(
     () => buildPushoverTransportDocument({ appToken: "short", userKey: "abcdefghijklmnopqrstuvwxyz12" }),
@@ -289,6 +299,14 @@ test("credential-admin proxy maps errors and invokes RPC methods", async () => {
   await assert.rejects(() => adminRemoveEmail(failing, {}), (e) => e.code === "CREDENTIAL_UPDATE_FORBIDDEN" && e.status === 403);
   await assert.rejects(() => adminUpdatePushover(failing, {}, {}), (e) => e.code === "SECRETS_STORE_SECRET_MISSING" && e.status === 409);
   await assert.rejects(() => adminGetStatus(failing, {}), (e) => e.code === "CREDENTIAL_ADMIN_UNAVAILABLE" && e.status === 503);
+
+  // Service-binding RPC typically loses instanceof and custom fields; message carries the code.
+  const rpcShaped = mapAdminError({ message: "INVALID_EMAIL_CREDENTIALS", name: "Error" });
+  assert.equal(rpcShaped.code, "INVALID_EMAIL_CREDENTIALS");
+  assert.equal(rpcShaped.status, 400);
+  const rpcStore = mapAdminError({ message: "SECRETS_STORE_UPDATE_FAILED" });
+  assert.equal(rpcStore.code, "SECRETS_STORE_UPDATE_FAILED");
+  assert.equal(rpcStore.status, 502);
 });
 
 test("resolvers handle binding failures and invalid store documents", async () => {

@@ -40,6 +40,28 @@ const LOCATION_INPUT_FIELDS = new Set(["name", "latitude", "longitude"]);
 const AUTOCOMPLETE_TIMEOUT_MS = 5_000;
 const PHOTON_CONTACT_FALLBACK = "https://github.com/andrewtryder/sunsethue-helper";
 
+function credentialMutationMessage(code, action) {
+  if (code === "INVALID_EMAIL_CREDENTIALS") {
+    return "Check Gmail address, app password, and sender mailbox.";
+  }
+  if (code === "INVALID_PUSHOVER_CREDENTIALS") {
+    return "Check Pushover application token and user/group key.";
+  }
+  if (code === "CREDENTIAL_UPDATE_FORBIDDEN") {
+    return "Credential administration is forbidden.";
+  }
+  if (code === "SECRETS_STORE_SECRET_MISSING" || code === "SECRETS_STORE_NOT_CONFIGURED") {
+    return "Secrets Store is not configured for this provider.";
+  }
+  if (code === "CREDENTIAL_ADMIN_UNAVAILABLE") {
+    return "Credential administration is unavailable.";
+  }
+  if (action === "remove-email") return "Unable to remove email credentials.";
+  if (action === "update-pushover") return "Unable to update Pushover credentials.";
+  if (action === "remove-pushover") return "Unable to remove Pushover credentials.";
+  return "Unable to update email credentials.";
+}
+
 function bodyErrorResponse(error, requestId) {
   if (error === "UNSUPPORTED_MEDIA_TYPE") {
     return errorResponse("UNSUPPORTED_MEDIA_TYPE", "Content-Type must be application/json.", 415, requestId);
@@ -138,9 +160,14 @@ export async function handleHttpRequest(request, env, authContext = null, deps =
           return jsonResponse({ email: status }, 200, requestId);
         } catch (error) {
           if (error instanceof CredentialAdminProxyError) {
-            return errorResponse(error.code, "Unable to update email credentials.", error.status, requestId);
+            return errorResponse(
+              error.code,
+              credentialMutationMessage(error.code, "update-email"),
+              error.status,
+              requestId
+            );
           }
-          return errorResponse("SECRETS_STORE_UPDATE_FAILED", "Unable to update email credentials.", 502, requestId);
+          return errorResponse("SECRETS_STORE_UPDATE_FAILED", credentialMutationMessage("SECRETS_STORE_UPDATE_FAILED", "update-email"), 502, requestId);
         }
       }
       if (request.method === "DELETE") {
@@ -162,9 +189,14 @@ export async function handleHttpRequest(request, env, authContext = null, deps =
           return jsonResponse({ email: status }, 200, requestId);
         } catch (error) {
           if (error instanceof CredentialAdminProxyError) {
-            return errorResponse(error.code, "Unable to remove email credentials.", error.status, requestId);
+            return errorResponse(
+              error.code,
+              credentialMutationMessage(error.code, "remove-email"),
+              error.status,
+              requestId
+            );
           }
-          return errorResponse("SECRETS_STORE_UPDATE_FAILED", "Unable to remove email credentials.", 502, requestId);
+          return errorResponse("SECRETS_STORE_UPDATE_FAILED", credentialMutationMessage("SECRETS_STORE_UPDATE_FAILED", "remove-email"), 502, requestId);
         }
       }
       return methodNotAllowed("PUT, DELETE", requestId);
@@ -195,9 +227,14 @@ export async function handleHttpRequest(request, env, authContext = null, deps =
           return jsonResponse({ pushover: status }, 200, requestId);
         } catch (error) {
           if (error instanceof CredentialAdminProxyError) {
-            return errorResponse(error.code, "Unable to update Pushover credentials.", error.status, requestId);
+            return errorResponse(
+              error.code,
+              credentialMutationMessage(error.code, "update-pushover"),
+              error.status,
+              requestId
+            );
           }
-          return errorResponse("SECRETS_STORE_UPDATE_FAILED", "Unable to update Pushover credentials.", 502, requestId);
+          return errorResponse("SECRETS_STORE_UPDATE_FAILED", credentialMutationMessage("SECRETS_STORE_UPDATE_FAILED", "update-pushover"), 502, requestId);
         }
       }
       if (request.method === "DELETE") {
@@ -219,9 +256,14 @@ export async function handleHttpRequest(request, env, authContext = null, deps =
           return jsonResponse({ pushover: status }, 200, requestId);
         } catch (error) {
           if (error instanceof CredentialAdminProxyError) {
-            return errorResponse(error.code, "Unable to remove Pushover credentials.", error.status, requestId);
+            return errorResponse(
+              error.code,
+              credentialMutationMessage(error.code, "remove-pushover"),
+              error.status,
+              requestId
+            );
           }
-          return errorResponse("SECRETS_STORE_UPDATE_FAILED", "Unable to remove Pushover credentials.", 502, requestId);
+          return errorResponse("SECRETS_STORE_UPDATE_FAILED", credentialMutationMessage("SECRETS_STORE_UPDATE_FAILED", "remove-pushover"), 502, requestId);
         }
       }
       return methodNotAllowed("PUT, DELETE", requestId);

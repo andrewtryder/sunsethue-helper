@@ -13,20 +13,52 @@ export class CredentialAdminProxyError extends Error {
   }
 }
 
-function mapAdminError(error) {
-  if (error instanceof CredentialError) {
-    const status =
-      error.code === "INVALID_EMAIL_CREDENTIALS" || error.code === "INVALID_PUSHOVER_CREDENTIALS"
-        ? 400
-        : error.code === "CREDENTIAL_UPDATE_FORBIDDEN"
-          ? 403
-          : error.code === "SECRETS_STORE_SECRET_MISSING" || error.code === "SECRETS_STORE_NOT_CONFIGURED"
-            ? 409
-            : 502;
-    return new CredentialAdminProxyError(error.code, status);
+const KNOWN_ADMIN_CODES = new Set([
+  "INVALID_EMAIL_CREDENTIALS",
+  "INVALID_PUSHOVER_CREDENTIALS",
+  "CREDENTIAL_UPDATE_FORBIDDEN",
+  "SECRETS_STORE_SECRET_MISSING",
+  "SECRETS_STORE_NOT_CONFIGURED",
+  "SECRETS_STORE_UPDATE_FAILED",
+  "SECRETS_STORE_ACTIVATION_TIMEOUT",
+  "CREDENTIAL_ADMIN_UNAVAILABLE"
+]);
+
+function statusForAdminCode(code) {
+  if (code === "INVALID_EMAIL_CREDENTIALS" || code === "INVALID_PUSHOVER_CREDENTIALS") return 400;
+  if (code === "CREDENTIAL_UPDATE_FORBIDDEN") return 403;
+  if (code === "SECRETS_STORE_SECRET_MISSING" || code === "SECRETS_STORE_NOT_CONFIGURED") return 409;
+  if (code === "CREDENTIAL_ADMIN_UNAVAILABLE") return 503;
+  return 502;
+}
+
+/**
+ * Recover controlled codes from RPC-shaped errors (instanceof is lost across bindings).
+ */
+export function extractAdminErrorCode(error) {
+  const candidates = [error?.code, error?.message, error?.cause?.code, error?.cause?.message];
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && KNOWN_ADMIN_CODES.has(candidate)) {
+      return candidate;
+    }
   }
-  if (error?.code) {
-    return new CredentialAdminProxyError(error.code, error.status || 502);
+  return null;
+}
+
+export function mapAdminError(error) {
+  if (error instanceof CredentialAdminProxyError) {
+    return error;
+  }
+  if (error instanceof CredentialError) {
+    return new CredentialAdminProxyError(error.code, statusForAdminCode(error.code));
+  }
+  const code = extractAdminErrorCode(error);
+  if (code) {
+    const status =
+      typeof error?.status === "number" && error.status >= 400 && error.status < 600
+        ? error.status
+        : statusForAdminCode(code);
+    return new CredentialAdminProxyError(code, status);
   }
   return new CredentialAdminProxyError("CREDENTIAL_ADMIN_UNAVAILABLE", 503);
 }

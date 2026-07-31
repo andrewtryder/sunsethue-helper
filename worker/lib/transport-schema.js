@@ -50,6 +50,15 @@ function assertNoControlOrWhitespace(value, code) {
   }
 }
 
+/**
+ * Google displays App Passwords as spaced groups (`xxxx xxxx xxxx xxxx`).
+ * Strip ASCII spaces only; other whitespace/control characters remain invalid.
+ */
+export function normalizeGmailAppPassword(value) {
+  if (typeof value !== "string") return value;
+  return value.replaceAll(" ", "");
+}
+
 function assertSerializedSize(obj) {
   const serialized = JSON.stringify(obj);
   if (serialized.length > MAX_TRANSPORT_BYTES) {
@@ -93,14 +102,15 @@ export function parseEmailTransport(raw) {
   if (!validateEmailAddress(parsed.gmailUser)) {
     throw new CredentialError("INVALID_EMAIL_CREDENTIALS");
   }
-  assertNoControlOrWhitespace(parsed.gmailAppPassword, "INVALID_EMAIL_CREDENTIALS");
+  const gmailAppPassword = normalizeGmailAppPassword(parsed.gmailAppPassword);
+  assertNoControlOrWhitespace(gmailAppPassword, "INVALID_EMAIL_CREDENTIALS");
   parseMailbox(parsed.emailFrom);
   assertSerializedSize(parsed);
   return {
     version: 1,
     configured: true,
     gmailUser: parsed.gmailUser.trim().toLowerCase(),
-    gmailAppPassword: parsed.gmailAppPassword,
+    gmailAppPassword,
     emailFrom: parsed.emailFrom.trim()
   };
 }
@@ -131,17 +141,19 @@ export function buildEmailTransportDocument({ gmailUser, gmailAppPassword, email
   if (!validateEmailAddress(gmailUser)) {
     throw new CredentialError("INVALID_EMAIL_CREDENTIALS");
   }
-  // Reject surrounding whitespace on app password without normalizing the secret.
-  if (typeof gmailAppPassword !== "string" || gmailAppPassword !== gmailAppPassword.trim()) {
+  if (typeof gmailAppPassword !== "string") {
     throw new CredentialError("INVALID_EMAIL_CREDENTIALS");
   }
-  assertNoControlOrWhitespace(gmailAppPassword, "INVALID_EMAIL_CREDENTIALS");
+  // Strip Google's spaced App Password display format only. Do not trim() first —
+  // that would hide trailing CR/LF and accept an invalid paste.
+  const normalizedPassword = normalizeGmailAppPassword(gmailAppPassword);
+  assertNoControlOrWhitespace(normalizedPassword, "INVALID_EMAIL_CREDENTIALS");
   parseMailbox(emailFrom);
   const doc = {
     version: 1,
     configured: true,
     gmailUser: gmailUser.trim().toLowerCase(),
-    gmailAppPassword,
+    gmailAppPassword: normalizedPassword,
     emailFrom: emailFrom.trim()
   };
   return { document: doc, serialized: assertSerializedSize(doc) };

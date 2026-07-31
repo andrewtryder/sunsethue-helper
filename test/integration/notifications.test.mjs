@@ -40,7 +40,7 @@ test("settings default to valid legacy email only and never expose secrets", asy
     const settings = await getSettings(env);
     assert.equal(settings.emailEnabled, 1);
     assert.equal(settings.pushoverEnabled, 0);
-    const visible = publicSettings(settings, env);
+    const visible = await publicSettings(settings, env);
     assert.equal(visible.emailConfigured, true);
     assert.equal(visible.pushoverConfigured, true);
     assert.doesNotMatch(JSON.stringify(visible), /fake-password|fake-pushover/);

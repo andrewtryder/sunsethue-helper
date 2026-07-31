@@ -89,6 +89,17 @@ const notificationSound = document.getElementById("notification-sound");
 const notificationEmailStatus = document.getElementById("notification-email-status");
 const notificationPushoverStatus = document.getElementById("notification-pushover-status");
 const notificationDeliveries = document.getElementById("notification-deliveries");
+const gmailCredentialsForm = document.getElementById("gmail-credentials-form");
+const gmailCredentialsStatus = document.getElementById("gmail-credentials-status");
+const gmailUserInput = document.getElementById("gmail-user");
+const gmailAppPasswordInput = document.getElementById("gmail-app-password");
+const gmailEmailFromInput = document.getElementById("gmail-email-from");
+const pushoverCredentialsForm = document.getElementById("pushover-credentials-form");
+const pushoverCredentialsStatus = document.getElementById("pushover-credentials-status");
+const pushoverAppTokenInput = document.getElementById("pushover-app-token");
+const pushoverUserKeyInput = document.getElementById("pushover-user-key");
+
+const CREDENTIAL_ADMIN_HEADER = { "X-Sunsethue-Admin": "credentials" };
 
 // State
 let locationsList = [];
@@ -177,7 +188,8 @@ async function initApp() {
     await Promise.all([fetchLocations(), fetchRuns()]);
     const notificationOutcomes = await Promise.allSettled([
       fetchNotificationSettings(),
-      fetchNotificationDeliveries()
+      fetchNotificationDeliveries(),
+      fetchProviderCredentials()
     ]);
     for (const outcome of notificationOutcomes) {
       if (outcome.status === "rejected") {
@@ -210,6 +222,39 @@ async function fetchNotificationSettings() {
   notificationPushoverStatus.textContent = settings.pushoverConfigured ? "Pushover configured" : "Pushover not configured";
 }
 
+function formatCredentialUpdatedAt(value) {
+  if (!value) return "";
+  try {
+    return ` · updated ${new Date(value).toLocaleString()}`;
+  } catch {
+    return "";
+  }
+}
+
+async function fetchProviderCredentials() {
+  const response = await fetch(`${API_BASE}/api/provider-credentials`);
+  if (!response.ok) throw new Error("Failed to load provider credentials.");
+  const status = await response.json();
+  if (gmailCredentialsStatus) {
+    if (status.email?.configured) {
+      gmailCredentialsStatus.textContent = `Configured: ${status.email.gmailUserMasked || "masked"}${status.email.emailFromMasked ? ` · from ${status.email.emailFromMasked}` : ""}${formatCredentialUpdatedAt(status.email.updatedAt)}`;
+    } else {
+      gmailCredentialsStatus.textContent = "Not configured";
+    }
+  }
+  if (pushoverCredentialsStatus) {
+    if (status.pushover?.configured) {
+      pushoverCredentialsStatus.textContent = `Configured · app token ${status.pushover.appTokenPresent ? "present" : "missing"} · user key ${status.pushover.userKeyPresent ? "present" : "missing"}${formatCredentialUpdatedAt(status.pushover.updatedAt)}`;
+    } else {
+      pushoverCredentialsStatus.textContent = "Not configured";
+    }
+  }
+  // Never prepopulate secret fields.
+  if (gmailAppPasswordInput) gmailAppPasswordInput.value = "";
+  if (pushoverAppTokenInput) pushoverAppTokenInput.value = "";
+  if (pushoverUserKeyInput) pushoverUserKeyInput.value = "";
+}
+
 async function fetchNotificationDeliveries() {
   const response = await fetch(`${API_BASE}/api/notification-deliveries`);
   if (!response.ok) throw new Error("Failed to load delivery history.");
@@ -236,9 +281,123 @@ notificationSettingsForm?.addEventListener("submit", async (event) => {
   } catch (error) { showBanner(dbErrorBanner, error.message); }
 });
 
+gmailCredentialsForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const saveBtn = document.getElementById("save-gmail-credentials-btn");
+  saveBtn && (saveBtn.disabled = true);
+  try {
+    const body = {
+      gmailUser: gmailUserInput?.value || "",
+      gmailAppPassword: gmailAppPasswordInput?.value || "",
+      emailFrom: gmailEmailFromInput?.value || ""
+    };
+    const response = await fetch(`${API_BASE}/api/provider-credentials/email`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", ...CREDENTIAL_ADMIN_HEADER },
+      body: JSON.stringify(body)
+    });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null);
+      throw new Error(payload?.error?.message || "Unable to save Gmail credentials.");
+    }
+    if (gmailAppPasswordInput) gmailAppPasswordInput.value = "";
+    showBanner(dbSuccessBanner, "Gmail credentials saved.");
+    await Promise.all([fetchProviderCredentials(), fetchNotificationSettings()]);
+  } catch (error) {
+    showBanner(dbErrorBanner, error.message);
+  } finally {
+    saveBtn && (saveBtn.disabled = false);
+    saveBtn?.focus();
+  }
+});
+
+document.getElementById("remove-gmail-credentials-btn")?.addEventListener("click", async (event) => {
+  const btn = event.currentTarget;
+  if (!window.confirm("Remove Gmail credentials? Email delivery will be disabled until new credentials are saved.")) {
+    btn.focus();
+    return;
+  }
+  btn.disabled = true;
+  try {
+    const response = await fetch(`${API_BASE}/api/provider-credentials/email`, {
+      method: "DELETE",
+      headers: { ...CREDENTIAL_ADMIN_HEADER }
+    });
+    if (!response.ok) throw new Error("Unable to remove Gmail credentials.");
+    showBanner(dbSuccessBanner, "Gmail credentials removed.");
+    await Promise.all([fetchProviderCredentials(), fetchNotificationSettings()]);
+  } catch (error) {
+    showBanner(dbErrorBanner, error.message);
+  } finally {
+    btn.disabled = false;
+    btn.focus();
+  }
+});
+
+pushoverCredentialsForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const saveBtn = document.getElementById("save-pushover-credentials-btn");
+  saveBtn && (saveBtn.disabled = true);
+  try {
+    const body = {
+      appToken: pushoverAppTokenInput?.value || "",
+      userKey: pushoverUserKeyInput?.value || ""
+    };
+    const response = await fetch(`${API_BASE}/api/provider-credentials/pushover`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", ...CREDENTIAL_ADMIN_HEADER },
+      body: JSON.stringify(body)
+    });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null);
+      throw new Error(payload?.error?.message || "Unable to save Pushover credentials.");
+    }
+    if (pushoverAppTokenInput) pushoverAppTokenInput.value = "";
+    if (pushoverUserKeyInput) pushoverUserKeyInput.value = "";
+    showBanner(dbSuccessBanner, "Pushover credentials saved.");
+    await Promise.all([fetchProviderCredentials(), fetchNotificationSettings()]);
+  } catch (error) {
+    showBanner(dbErrorBanner, error.message);
+  } finally {
+    saveBtn && (saveBtn.disabled = false);
+    saveBtn?.focus();
+  }
+});
+
+document.getElementById("remove-pushover-credentials-btn")?.addEventListener("click", async (event) => {
+  const btn = event.currentTarget;
+  if (!window.confirm("Remove Pushover credentials? Pushover delivery will be disabled until new credentials are saved.")) {
+    btn.focus();
+    return;
+  }
+  btn.disabled = true;
+  try {
+    const response = await fetch(`${API_BASE}/api/provider-credentials/pushover`, {
+      method: "DELETE",
+      headers: { ...CREDENTIAL_ADMIN_HEADER }
+    });
+    if (!response.ok) throw new Error("Unable to remove Pushover credentials.");
+    showBanner(dbSuccessBanner, "Pushover credentials removed.");
+    await Promise.all([fetchProviderCredentials(), fetchNotificationSettings()]);
+  } catch (error) {
+    showBanner(dbErrorBanner, error.message);
+  } finally {
+    btn.disabled = false;
+    btn.focus();
+  }
+});
+
 async function testNotification(channel) {
   const response = await fetch(`${API_BASE}/api/notifications/test`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ channel }) });
-  if (!response.ok) throw new Error("Test notification could not be queued.");
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null);
+    const code = payload?.error?.code;
+    if (code === "PROVIDER_NOT_CONFIGURED" || code === "EMAIL_NOT_CONFIGURED" || code === "PUSHOVER_NOT_CONFIGURED") {
+      throw new Error("Credentials are not configured for this channel.");
+    }
+    if (code === "RATE_LIMITED") throw new Error("Rate limited. Try again in a minute.");
+    throw new Error("Test notification could not be queued.");
+  }
   showBanner(dbSuccessBanner, `${channel === "email" ? "Email" : "Pushover"} test queued.`);
   await fetchNotificationDeliveries();
 }

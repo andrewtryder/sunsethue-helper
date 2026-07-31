@@ -17,12 +17,14 @@ Instance-specific values (project names, hostnames, D1 id) are **not** committed
 | `PRODUCTION_URL` | `https://your-pages-project.pages.dev` | Environment URL and Worker `WEBAPP_URL` |
 | `ACCESS_HOSTNAME` | `your-pages-project.pages.dev` | Access application hostname (defaults to production hostname when unset locally) |
 | `DEPLOY_REPOSITORY` | `your-github-org/your-repo` | Repository the deploy scripts will accept |
+| `SECRETS_STORE_ID` | Cloudflare store id | Secrets Store id for provider transport secrets (non-secret inventory) |
+| `CREDENTIAL_ADMIN_WORKER_NAME` | `sunsethue-helper-credential-admin` | Private credential-administration Worker name |
 
 ### Secrets
 
 | Secret | Used by | Must be able to / purpose |
 | --- | --- | --- |
-| `CLOUDFLARE_API_TOKEN` | `production.yml`, `rollback.yml`, local `npm run access:*` | Deploy Worker and Pages, read verification metadata, manage Access when needed |
+| `CLOUDFLARE_API_TOKEN` | `production.yml`, `rollback.yml`, local `npm run access:*`, credential-admin Worker | Deploy Worker and Pages, Secrets Store Edit, read verification metadata, manage Access when needed |
 | `CLOUDFLARE_ACCOUNT_ID` | Same | Identify the account |
 | `D1_DATABASE_ID` | Config generation before deploy | Bind the Worker to the correct D1 database (stored as a secret so GitHub masks it in logs) |
 | `AUTHORIZED_EMAIL` | Worker secret | Exact allowed Access identity |
@@ -30,11 +32,13 @@ Instance-specific values (project names, hostnames, D1 id) are **not** committed
 | `TEAM_DOMAIN` | Worker secret | `https://<team>.cloudflareaccess.com` |
 | `POLICY_AUD` | Worker secret | Access application Audience tag |
 | `SUNSETHUE_API_KEY` | Worker secret | Sunsethue API key |
-| `GMAIL_USER` / `GMAIL_APP_PASSWORD` | Worker secret | SMTP auth |
-| `EMAIL_TO` / `EMAIL_FROM` | Worker secret | Report recipients |
-| `PUSHOVER_APP_TOKEN` / `PUSHOVER_USER_KEY` | Worker secret | Optional Pushover application and user credentials |
+| `GMAIL_USER` / `GMAIL_APP_PASSWORD` | Main Worker secret (Stage 1 fallback) | Legacy SMTP auth until Secrets Store cutover |
+| `EMAIL_TO` / `EMAIL_FROM` | Worker secret | Report recipients / default From |
+| `PUSHOVER_APP_TOKEN` / `PUSHOVER_USER_KEY` | Main Worker secret (Stage 1 optional fallback) | Legacy Pushover credentials |
 
-The Cloudflare API token must be a **scoped API token**, never a Global API Key.
+The Cloudflare API token must be a **scoped API token**, never a Global API Key. It must include **Account → Secrets Store → Edit** in addition to the deploy permissions below.
+
+Provider Gmail/Pushover credentials are preferred from Secrets Store (see [secrets-store-credentials.md](secrets-store-credentials.md)). D1 stores only masked metadata.
 
 If `D1_DATABASE_ID` (or any other required value) is missing, `npm run config:generate:strict` fails with the **name** of the missing variable and does not print the identifier.
 
@@ -43,6 +47,7 @@ If `D1_DATABASE_ID` (or any other required value) is missing, `npm run config:ge
 - Account → Workers Scripts → Edit
 - Account → Cloudflare Pages → Edit
 - Account → D1 → Edit
+- Account → Secrets Store → Edit
 - Account → Access: Apps and Policies → Edit
 - Account → Access: Organizations, Identity Providers, and Groups → Read
 - Account → Account Settings → Read (minimum metadata)
@@ -58,7 +63,7 @@ npm run config:generate          # placeholders allowed for local dry-runs
 npm run config:generate:strict   # required before real deploy / Access apply
 ```
 
-Generated `wrangler.toml` and `wrangler.worker.toml` are gitignored. Edit the tracked `*.example.toml` templates only.
+Generated `wrangler.toml`, `wrangler.worker.toml`, and `wrangler.credential-admin.toml` are gitignored. Edit the tracked `*.example.toml` templates only.
 
 ## One-time Access setup
 
@@ -75,10 +80,13 @@ See the README Access automation section for lockout recovery and Audience tag h
 
 ## Rotation
 
-1. Create a replacement scoped API token in the Cloudflare dashboard with the permissions above.
+1. Create a replacement scoped API token in the Cloudflare dashboard with the permissions above (including Secrets Store Edit).
 2. Update the GitHub `production` environment secret `CLOUDFLARE_API_TOKEN` (and any local `.env` copy).
-3. Confirm a dry-run of `production.yml` and a local `npm run access:verify`.
-4. Revoke the previous token in Cloudflare.
+3. Upload the same token to the credential-admin Worker (`npm run secrets:upload:admin` or the production workflow).
+4. Confirm a dry-run of `production.yml` and a local `npm run access:verify`.
+5. Revoke the previous token in Cloudflare.
+
+Rotate provider Gmail/Pushover credentials through the Notifications UI (Secrets Store) when Stage 1 is live. Stage 1 legacy Worker secrets can still be rotated via GitHub env + redeploy until Stage 2 removes them.
 
 Rotate `D1_DATABASE_ID` only when you intentionally point the Worker at a different database; treat a leaked id as an inventory disclosure, not a credential, but prefer keeping it out of public logs.
 

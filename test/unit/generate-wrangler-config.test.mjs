@@ -67,11 +67,19 @@ test("non-strict generation writes placeholder configs without printing the D1 i
     );
     await writeFile(
       join(temp, "wrangler.worker.example.toml"),
-      'name = "{{WORKER_NAME}}"\ndatabase_name = "{{D1_DATABASE_NAME}}"\ndatabase_id = "{{D1_DATABASE_ID}}"\n'
+      'name = "{{WORKER_NAME}}"\ndatabase_name = "{{D1_DATABASE_NAME}}"\ndatabase_id = "{{D1_DATABASE_ID}}"\nadmin = "{{CREDENTIAL_ADMIN_WORKER_NAME}}"\nstore = "{{SECRETS_STORE_ID}}"\n'
+    );
+    await writeFile(
+      join(temp, "wrangler.credential-admin.example.toml"),
+      'name = "{{CREDENTIAL_ADMIN_WORKER_NAME}}"\naccount = "{{CLOUDFLARE_ACCOUNT_ID}}"\nstore = "{{SECRETS_STORE_ID}}"\n'
     );
 
     const result = await generateWranglerConfig({ strict: false, root: temp });
-    assert.deepEqual(result.written.sort(), ["wrangler.toml", "wrangler.worker.toml"]);
+    assert.deepEqual(result.written.sort(), [
+      "wrangler.credential-admin.toml",
+      "wrangler.toml",
+      "wrangler.worker.toml"
+    ]);
     assert.equal(result.values.D1_DATABASE_ID, "[redacted]");
 
     const worker = await readFile(join(temp, "wrangler.worker.toml"), "utf8");

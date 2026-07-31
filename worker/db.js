@@ -337,3 +337,76 @@ export async function releaseReportLock(env, leaseToken) {
   ).bind(leaseToken).run();
   return result.meta?.changes === 1;
 }
+
+export async function getProviderCredentialStatus(env, provider) {
+  return env.DB.prepare(
+    `SELECT provider, configured, maskedIdentifier, updatedAt, lastValidatedAt, lastValidationCode, lastUpdatedBy
+     FROM provider_credential_status WHERE provider = ?`
+  ).bind(provider).first();
+}
+
+export async function listProviderCredentialStatus(env) {
+  const result = await env.DB.prepare(
+    `SELECT provider, configured, maskedIdentifier, updatedAt, lastValidatedAt, lastValidationCode, lastUpdatedBy
+     FROM provider_credential_status`
+  ).all();
+  return result.results || [];
+}
+
+export async function upsertProviderCredentialStatus(env, {
+  provider,
+  configured,
+  maskedIdentifier = null,
+  updatedAt,
+  lastValidatedAt = null,
+  lastValidationCode = null,
+  lastUpdatedBy = null
+}) {
+  await env.DB.prepare(
+    `INSERT INTO provider_credential_status
+      (provider, configured, maskedIdentifier, updatedAt, lastValidatedAt, lastValidationCode, lastUpdatedBy)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(provider) DO UPDATE SET
+      configured = excluded.configured,
+      maskedIdentifier = excluded.maskedIdentifier,
+      updatedAt = excluded.updatedAt,
+      lastValidatedAt = excluded.lastValidatedAt,
+      lastValidationCode = excluded.lastValidationCode,
+      lastUpdatedBy = excluded.lastUpdatedBy`
+  ).bind(
+    provider,
+    configured ? 1 : 0,
+    maskedIdentifier,
+    updatedAt,
+    lastValidatedAt,
+    lastValidationCode,
+    lastUpdatedBy
+  ).run();
+}
+
+export async function claimProviderCredentialSlot(env, now, intervalMs = 10_000) {
+  const threshold = now - intervalMs;
+  const updated = await env.DB.prepare(
+    `UPDATE provider_credential_limiter
+     SET lastRequestedAt = ?
+     WHERE id = 1 AND lastRequestedAt <= ?`
+  ).bind(now, threshold).run();
+  if (updated.meta?.changes === 1) return true;
+  const inserted = await env.DB.prepare(
+    `INSERT OR IGNORE INTO provider_credential_limiter (id, lastRequestedAt) VALUES (1, ?)`
+  ).bind(now).run();
+  return inserted.meta?.changes === 1;
+}
+
+/**
+ * Disable a notification channel when its credentials are removed.
+ */
+export async function disableNotificationChannel(env, channel, now) {
+  const row = await getNotificationSettingsRow(env);
+  if (!row) return;
+  if (channel === "email") {
+    await upsertNotificationSettings(env, { ...row, emailEnabled: 0, updatedAt: now });
+  } else if (channel === "pushover") {
+    await upsertNotificationSettings(env, { ...row, pushoverEnabled: 0, updatedAt: now });
+  }
+}

@@ -14,6 +14,8 @@ preview_urls = false
 
 # AUTHORIZED_EMAIL, TEAM_DOMAIN, and POLICY_AUD are Worker secrets.
 # Do not commit account-specific Access values.
+# Provider transport credentials are read from Secrets Store bindings below.
+# CLOUDFLARE_API_TOKEN must never be present on this Worker.
 
 [triggers]
 # Hourly UTC; worker/cron.js filters for 6am, 12pm, and 6pm Eastern.
@@ -23,3 +25,18 @@ crons = ["0 * * * *"]
 binding = "DB"
 database_name = "{{D1_DATABASE_NAME}}"
 database_id = "{{D1_DATABASE_ID}}"
+
+[[services]]
+binding = "CREDENTIAL_ADMIN"
+service = "{{CREDENTIAL_ADMIN_WORKER_NAME}}"
+entrypoint = "CredentialAdminEntrypoint"
+
+[[secrets_store_secrets]]
+binding = "EMAIL_TRANSPORT_SECRET"
+store_id = "{{SECRETS_STORE_ID}}"
+secret_name = "SUNSETHUE_EMAIL_TRANSPORT"
+
+[[secrets_store_secrets]]
+binding = "PUSHOVER_TRANSPORT_SECRET"
+store_id = "{{SECRETS_STORE_ID}}"
+secret_name = "SUNSETHUE_PUSHOVER_TRANSPORT"

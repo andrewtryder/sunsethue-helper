@@ -23,6 +23,8 @@ export function loadLocalEnv() {
 }
 
 const PLACEHOLDER_D1_ID = "00000000-0000-0000-0000-000000000000";
+const PLACEHOLDER_STORE_ID = "00000000000000000000000000000000";
+const PLACEHOLDER_ACCOUNT_ID = "00000000000000000000000000000000";
 
 /** Environment variables that must be set when resolveProject({ strict: true }). */
 export const STRICT_REQUIRED = [
@@ -35,6 +37,12 @@ export const STRICT_REQUIRED = [
   "DEPLOY_REPOSITORY"
 ];
 
+/** Additional vars required for production Wrangler generation with Secrets Store. */
+export const STRICT_SECRETS_STORE_REQUIRED = [
+  "SECRETS_STORE_ID",
+  "CREDENTIAL_ADMIN_WORKER_NAME",
+  "CLOUDFLARE_ACCOUNT_ID"
+];
 function read(name) {
   const value = process.env[name];
   if (value === undefined || value === null) return null;
@@ -67,8 +75,12 @@ export function resolveProject({ strict = false } = {}) {
 
   const pagesProject = read("PAGES_PROJECT_NAME") || "sunsethue-helper";
   const workerName = read("WORKER_NAME") || "sunsethue-helper-worker";
+  const credentialAdminWorkerName =
+    read("CREDENTIAL_ADMIN_WORKER_NAME") || "sunsethue-helper-credential-admin";
   const d1Name = read("D1_DATABASE_NAME") || "sunsethue-db";
   const d1DatabaseId = read("D1_DATABASE_ID") || PLACEHOLDER_D1_ID;
+  const secretsStoreId = read("SECRETS_STORE_ID") || PLACEHOLDER_STORE_ID;
+  const cloudflareAccountId = read("CLOUDFLARE_ACCOUNT_ID") || PLACEHOLDER_ACCOUNT_ID;
   const productionHostname = read("PRODUCTION_HOSTNAME") || `${pagesProject}.pages.dev`;
   const accessHostname = read("ACCESS_HOSTNAME") || productionHostname;
   const authorizedEmail = (read("AUTHORIZED_EMAIL") || "owner@example.com").toLowerCase();
@@ -80,8 +92,11 @@ export function resolveProject({ strict = false } = {}) {
   return {
     pagesProject,
     workerName,
+    credentialAdminWorkerName,
     d1Name,
     d1DatabaseId,
+    secretsStoreId,
+    cloudflareAccountId,
     productionHostname,
     accessHostname,
     authorizedEmail,
@@ -94,13 +109,24 @@ export function resolveProject({ strict = false } = {}) {
 }
 
 /** Token map used to render Wrangler templates. */
-export function resolveTemplateValues({ strict = false } = {}) {
+export function resolveTemplateValues({ strict = false, requireSecretsStore = false } = {}) {
   const project = resolveProject({ strict });
+  if (strict && requireSecretsStore) {
+    const missing = missingRequired(STRICT_SECRETS_STORE_REQUIRED);
+    if (missing.length > 0) {
+      throw new Error(
+        `Missing required environment variable${missing.length === 1 ? "" : "s"}: ${missing.join(", ")}`
+      );
+    }
+  }
   return {
     PAGES_PROJECT_NAME: project.pagesProject,
     WORKER_NAME: project.workerName,
+    CREDENTIAL_ADMIN_WORKER_NAME: project.credentialAdminWorkerName,
     D1_DATABASE_NAME: project.d1Name,
     D1_DATABASE_ID: project.d1DatabaseId,
+    SECRETS_STORE_ID: project.secretsStoreId,
+    CLOUDFLARE_ACCOUNT_ID: project.cloudflareAccountId,
     PRODUCTION_HOSTNAME: project.productionHostname
   };
 }

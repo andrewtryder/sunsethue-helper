@@ -3,7 +3,13 @@ import { enqueueNotifications, runAndSendReport } from "./report.js";
 import * as db from "./db.js";
 import { dispatchPendingNotifications } from "./notifications/dispatcher.js";
 import { NotificationError } from "./notifications/errors.js";
-import { getSettings, hasEmailTransport, hasPushoverTransport, publicSettings, saveSettings } from "./notifications/settings.js";
+import {
+  getSettings,
+  hasEmailTransportAsync,
+  hasPushoverTransportAsync,
+  publicSettings,
+  saveSettings
+} from "./notifications/settings.js";
 import {
   createRequestId,
   jsonResponse,
@@ -19,6 +25,16 @@ import {
   validateLocationName,
   validateSearchQuery
 } from "./validation.js";
+import { assertCredentialRequestGuards, MAX_CREDENTIAL_BODY_BYTES } from "./credential-guards.js";
+import {
+  adminGetStatus,
+  adminRemoveEmail,
+  adminRemovePushover,
+  adminUpdateEmail,
+  adminUpdatePushover,
+  CredentialAdminProxyError
+} from "./credential-admin-proxy.js";
+import { readJsonBodyLimited } from "./credential-body.js";
 
 const LOCATION_INPUT_FIELDS = new Set(["name", "latitude", "longitude"]);
 const AUTOCOMPLETE_TIMEOUT_MS = 5_000;
@@ -55,20 +71,160 @@ export async function handleHttpRequest(request, env, authContext = null, deps =
   try {
     if (path === "/api/notification-settings") {
       if (request.method === "GET") {
-        return jsonResponse(publicSettings(await getSettings(env), env), 200, requestId);
+        return jsonResponse(await publicSettings(await getSettings(env), env), 200, requestId);
       }
       if (request.method !== "PUT") return methodNotAllowed("GET, PUT", requestId);
       const parsed = await readJsonBody(request);
       if ("error" in parsed) return bodyErrorResponse(parsed.error, requestId);
       try {
         const settings = await saveSettings(env, parsed.value, deps.now ?? Date.now());
-        return jsonResponse(publicSettings(settings, env), 200, requestId);
+        return jsonResponse(await publicSettings(settings, env), 200, requestId);
       } catch (error) {
         if (error instanceof NotificationError && error.code === "PROVIDER_NOT_CONFIGURED") {
           return errorResponse("PROVIDER_NOT_CONFIGURED", "The selected channel is not configured.", 409, requestId);
         }
         return errorResponse(error.code || "INVALID_SETTINGS", "Invalid notification settings.", 400, requestId);
       }
+    }
+
+    if (path === "/api/provider-credentials") {
+      if (request.method !== "GET") return methodNotAllowed("GET", requestId);
+      const guard = assertCredentialRequestGuards(request, env, { mutation: false });
+      if (!guard.ok) return errorResponse(guard.code, guard.message, guard.status, requestId);
+      try {
+        const rows = await db.listProviderCredentialStatus(env);
+        const byProvider = Object.fromEntries(rows.map((row) => [row.provider, row]));
+        const status = await adminGetStatus(env, {
+          email: {
+            updatedAt: byProvider.email?.updatedAt ?? null,
+            lastValidationCode: byProvider.email?.lastValidationCode ?? null
+          },
+          pushover: {
+            updatedAt: byProvider.pushover?.updatedAt ?? null,
+            lastValidationCode: byProvider.pushover?.lastValidationCode ?? null
+          }
+        });
+        return jsonResponse(status, 200, requestId);
+      } catch (error) {
+        if (error instanceof CredentialAdminProxyError) {
+          return errorResponse(error.code, "Credential administration is unavailable.", error.status, requestId);
+        }
+        return errorResponse("CREDENTIAL_ADMIN_UNAVAILABLE", "Credential administration is unavailable.", 503, requestId);
+      }
+    }
+
+    if (path === "/api/provider-credentials/email") {
+      const guard = assertCredentialRequestGuards(request, env, { mutation: true });
+      if (!guard.ok) return errorResponse(guard.code, guard.message, guard.status, requestId);
+      const actor = authContext?.email || null;
+      const now = deps.now ?? Date.now();
+      if (request.method === "PUT") {
+        if (!(await db.claimProviderCredentialSlot(env, now))) {
+          return errorResponse("CREDENTIAL_UPDATE_RATE_LIMITED", "Try again shortly.", 429, requestId);
+        }
+        const parsed = await readJsonBodyLimited(request, MAX_CREDENTIAL_BODY_BYTES);
+        if ("error" in parsed) return bodyErrorResponse(parsed.error, requestId);
+        try {
+          const status = await adminUpdateEmail(env, parsed.value, { requestId, actor, now });
+          await db.upsertProviderCredentialStatus(env, {
+            provider: "email",
+            configured: status.configured ? 1 : 0,
+            maskedIdentifier: status.gmailUserMasked || null,
+            updatedAt: now,
+            lastValidatedAt: now,
+            lastValidationCode: status.lastValidationCode || "OK",
+            lastUpdatedBy: actor
+          });
+          return jsonResponse({ email: status }, 200, requestId);
+        } catch (error) {
+          if (error instanceof CredentialAdminProxyError) {
+            return errorResponse(error.code, "Unable to update email credentials.", error.status, requestId);
+          }
+          return errorResponse("SECRETS_STORE_UPDATE_FAILED", "Unable to update email credentials.", 502, requestId);
+        }
+      }
+      if (request.method === "DELETE") {
+        if (!(await db.claimProviderCredentialSlot(env, now))) {
+          return errorResponse("CREDENTIAL_UPDATE_RATE_LIMITED", "Try again shortly.", 429, requestId);
+        }
+        try {
+          const status = await adminRemoveEmail(env, { requestId, actor, now });
+          await db.upsertProviderCredentialStatus(env, {
+            provider: "email",
+            configured: 0,
+            maskedIdentifier: null,
+            updatedAt: now,
+            lastValidatedAt: now,
+            lastValidationCode: null,
+            lastUpdatedBy: actor
+          });
+          await db.disableNotificationChannel(env, "email", now);
+          return jsonResponse({ email: status }, 200, requestId);
+        } catch (error) {
+          if (error instanceof CredentialAdminProxyError) {
+            return errorResponse(error.code, "Unable to remove email credentials.", error.status, requestId);
+          }
+          return errorResponse("SECRETS_STORE_UPDATE_FAILED", "Unable to remove email credentials.", 502, requestId);
+        }
+      }
+      return methodNotAllowed("PUT, DELETE", requestId);
+    }
+
+    if (path === "/api/provider-credentials/pushover") {
+      const guard = assertCredentialRequestGuards(request, env, { mutation: true });
+      if (!guard.ok) return errorResponse(guard.code, guard.message, guard.status, requestId);
+      const actor = authContext?.email || null;
+      const now = deps.now ?? Date.now();
+      if (request.method === "PUT") {
+        if (!(await db.claimProviderCredentialSlot(env, now))) {
+          return errorResponse("CREDENTIAL_UPDATE_RATE_LIMITED", "Try again shortly.", 429, requestId);
+        }
+        const parsed = await readJsonBodyLimited(request, MAX_CREDENTIAL_BODY_BYTES);
+        if ("error" in parsed) return bodyErrorResponse(parsed.error, requestId);
+        try {
+          const status = await adminUpdatePushover(env, parsed.value, { requestId, actor, now });
+          await db.upsertProviderCredentialStatus(env, {
+            provider: "pushover",
+            configured: status.configured ? 1 : 0,
+            maskedIdentifier: status.configured ? "configured" : null,
+            updatedAt: now,
+            lastValidatedAt: now,
+            lastValidationCode: status.lastValidationCode || "OK",
+            lastUpdatedBy: actor
+          });
+          return jsonResponse({ pushover: status }, 200, requestId);
+        } catch (error) {
+          if (error instanceof CredentialAdminProxyError) {
+            return errorResponse(error.code, "Unable to update Pushover credentials.", error.status, requestId);
+          }
+          return errorResponse("SECRETS_STORE_UPDATE_FAILED", "Unable to update Pushover credentials.", 502, requestId);
+        }
+      }
+      if (request.method === "DELETE") {
+        if (!(await db.claimProviderCredentialSlot(env, now))) {
+          return errorResponse("CREDENTIAL_UPDATE_RATE_LIMITED", "Try again shortly.", 429, requestId);
+        }
+        try {
+          const status = await adminRemovePushover(env, { requestId, actor, now });
+          await db.upsertProviderCredentialStatus(env, {
+            provider: "pushover",
+            configured: 0,
+            maskedIdentifier: null,
+            updatedAt: now,
+            lastValidatedAt: now,
+            lastValidationCode: null,
+            lastUpdatedBy: actor
+          });
+          await db.disableNotificationChannel(env, "pushover", now);
+          return jsonResponse({ pushover: status }, 200, requestId);
+        } catch (error) {
+          if (error instanceof CredentialAdminProxyError) {
+            return errorResponse(error.code, "Unable to remove Pushover credentials.", error.status, requestId);
+          }
+          return errorResponse("SECRETS_STORE_UPDATE_FAILED", "Unable to remove Pushover credentials.", 502, requestId);
+        }
+      }
+      return methodNotAllowed("PUT, DELETE", requestId);
     }
 
     if (path === "/api/notification-deliveries") {
@@ -107,8 +263,8 @@ export async function handleHttpRequest(request, env, authContext = null, deps =
       const settings = await getSettings(env);
       // Check provider readiness before consuming the rate-limit slot so a
       // misconfigured channel cannot lock out a valid one for a full minute.
-      if (body.channel === "email" && (!settings.emailEnabled || !hasEmailTransport(env))) return errorResponse("PROVIDER_NOT_CONFIGURED", "Email is not configured.", 409, requestId);
-      if (body.channel === "pushover" && (!settings.pushoverEnabled || !hasPushoverTransport(env))) return errorResponse("PROVIDER_NOT_CONFIGURED", "Pushover is not configured.", 409, requestId);
+      if (body.channel === "email" && (!settings.emailEnabled || !(await hasEmailTransportAsync(env)))) return errorResponse("PROVIDER_NOT_CONFIGURED", "Email is not configured.", 409, requestId);
+      if (body.channel === "pushover" && (!settings.pushoverEnabled || !(await hasPushoverTransportAsync(env)))) return errorResponse("PROVIDER_NOT_CONFIGURED", "Pushover is not configured.", 409, requestId);
       if (!await db.claimNotificationTestSlot(env, now)) return errorResponse("RATE_LIMITED", "Try again in a minute.", 429, requestId);
       const jobs = await enqueueNotifications({ runId: crypto.randomUUID(), triggerType: "TEST", generatedAt: now, dashboardUrl: env.WEBAPP_URL || null, locationsCount: 0, results: [] }, env, {
         settings: { ...settings, emailEnabled: body.channel === "email" ? 1 : 0, pushoverEnabled: body.channel === "pushover" ? 1 : 0 }

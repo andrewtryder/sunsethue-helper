@@ -67,10 +67,11 @@ Rotate anything that might have been committed, logged, or shared:
 
 | Credential | Where to revoke / rotate | Notes |
 | --- | --- | --- |
-| Cloudflare API token | Cloudflare dashboard → My Profile → API Tokens | Create a new token, update the GitHub `production` secret, then delete the old token |
+| Cloudflare API token | Cloudflare dashboard → My Profile → API Tokens | Create a new token, update the GitHub `production` secret **and** the credential-admin Worker secret, then delete the old token |
 | Cloudflare Access application / policy | Zero Trust → Access → Applications | Confirm only the intended email is allowed; rotate any service tokens |
 | Access `POLICY_AUD` / team domain | Zero Trust → Access | Update Worker secrets after any application rebuild |
-| SMTP / Gmail app password | Google Account → Security → App passwords | Revoke the old app password; set the new Worker secret |
+| SMTP / Gmail app password | Google Account → Security → App passwords | Revoke the old app password; update via Notifications UI (Secrets Store) or Stage 1 Worker secret |
+| Pushover tokens | Pushover dashboard | Rotate app/user keys via Notifications UI or Stage 1 Worker secrets |
 | Sunsethue API key | Sunsethue account / API settings | Rotate and update the Worker secret |
 | D1 database id | Cloudflare dashboard → Workers → D1 | The id itself is not a password, but treat a leaked production id as an inventory disclosure; confirm the database is not publicly reachable |
 | GitHub Actions secrets | Repository → Settings → Environments → production | Re-enter rotated values; never paste them into issues or PRs |

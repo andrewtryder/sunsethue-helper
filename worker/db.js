@@ -1,22 +1,43 @@
+const MANUAL_RETRY_COOLDOWN_MS = 60_000;
+const MAX_MANUAL_RETRIES = 10;
+
 export async function getLocations(env) {
   const { results } = await env.DB.prepare("SELECT * FROM locations ORDER BY createdAt ASC").all();
   return results;
 }
 
+/**
+ * Insert a location only when the tenant is under the 10-row cap.
+ * The atomic `INSERT ... SELECT ... WHERE (SELECT COUNT(*) ...) < 10` prevents
+ * a race between two concurrent tabs from creating an 11th row.
+ *
+ * @returns {Promise<boolean>} true when a row was inserted
+ */
 export async function addLocation(env, loc) {
-  await env.DB.prepare(
-    "INSERT INTO locations (id, name, latitude, longitude, createdAt) VALUES (?, ?, ?, ?, ?)"
+  const result = await env.DB.prepare(
+    `INSERT INTO locations (id, name, latitude, longitude, createdAt)
+     SELECT ?, ?, ?, ?, ?
+     WHERE (SELECT COUNT(*) FROM locations) < 10`
   ).bind(loc.id, loc.name, loc.latitude, loc.longitude, loc.createdAt).run();
+  return result.meta?.changes === 1;
 }
 
+/**
+ * @returns {Promise<boolean>} true when the addressed row was updated
+ */
 export async function updateLocation(env, id, loc) {
-  await env.DB.prepare(
+  const result = await env.DB.prepare(
     "UPDATE locations SET name = ?, latitude = ?, longitude = ? WHERE id = ?"
   ).bind(loc.name, loc.latitude, loc.longitude, id).run();
+  return result.meta?.changes === 1;
 }
 
+/**
+ * @returns {Promise<boolean>} true when the addressed row was deleted
+ */
 export async function deleteLocation(env, id) {
-  await env.DB.prepare("DELETE FROM locations WHERE id = ?").bind(id).run();
+  const result = await env.DB.prepare("DELETE FROM locations WHERE id = ?").bind(id).run();
+  return result.meta?.changes === 1;
 }
 
 export async function updateLocationForecast(env, id, data) {
@@ -119,9 +140,24 @@ export async function createRunAndOutbox(env, run, jobs) {
     ),
     ...jobs.map((job) => env.DB.prepare(
       `INSERT INTO notification_outbox
-        (id, runId, channel, status, payload, attempts, nextAttemptAt, lockedUntil, providerMessageId, lastErrorCode, createdAt, sentAt)
-       VALUES (?, ?, ?, 'pending', ?, 0, ?, NULL, NULL, NULL, ?, NULL)`
-    ).bind(job.id, job.runId, job.channel, job.payload, job.nextAttemptAt, job.createdAt))
+        (id, runId, channel, status, payload, attempts, nextAttemptAt, lockedUntil, leaseToken, providerMessageId, lastErrorCode, createdAt, sentAt,
+         deliveryEmailTo, deliveryPushoverDevice, deliveryPushoverPriority, deliveryPushoverSound,
+         manualAttempts, lastManualRetryAt)
+       VALUES (?, ?, ?, 'pending', ?, 0, ?, NULL, NULL, NULL, NULL, ?, NULL,
+               ?, ?, ?, ?,
+               0, NULL)`
+    ).bind(
+      job.id,
+      job.runId,
+      job.channel,
+      job.payload,
+      job.nextAttemptAt,
+      job.createdAt,
+      job.deliveryEmailTo ?? null,
+      job.deliveryPushoverDevice ?? null,
+      job.deliveryPushoverPriority ?? null,
+      job.deliveryPushoverSound ?? null
+    ))
   ];
   return env.DB.batch(statements);
 }
@@ -137,14 +173,19 @@ export async function getOutboxJobs(env, now, limit = 20) {
   return results;
 }
 
-export async function claimOutboxJob(env, id, now, lockedUntil) {
+/**
+ * Atomically claim an outbox job for the caller identified by `leaseToken`.
+ * Only pending jobs due for delivery or expired-lease processing jobs can be
+ * claimed. Returns true when this caller now owns the lease.
+ */
+export async function claimOutboxJob(env, id, now, lockedUntil, leaseToken) {
   const result = await env.DB.prepare(
     `UPDATE notification_outbox
-     SET status = 'processing', lockedUntil = ?
+     SET status = 'processing', lockedUntil = ?, leaseToken = ?
      WHERE id = ?
        AND ((status = 'pending' AND nextAttemptAt <= ?)
          OR (status = 'processing' AND lockedUntil IS NOT NULL AND lockedUntil <= ?))`
-  ).bind(lockedUntil, id, now, now).run();
+  ).bind(lockedUntil, leaseToken, id, now, now).run();
   return result.meta?.changes === 1;
 }
 
@@ -152,20 +193,31 @@ export async function getOutboxJob(env, id) {
   return env.DB.prepare("SELECT * FROM notification_outbox WHERE id = ?").bind(id).first();
 }
 
-export async function completeOutboxJob(env, id, sentAt, providerMessageId = null) {
-  await env.DB.prepare(
+/**
+ * Atomic transition to 'sent'. Requires the current lease token to match, so a
+ * dispatcher whose lease expired mid-flight can never overwrite a subsequent
+ * claim's outcome. Returns true when the transition actually happened.
+ */
+export async function completeOutboxJob(env, id, leaseToken, sentAt, providerMessageId = null) {
+  const result = await env.DB.prepare(
     `UPDATE notification_outbox
-     SET status = 'sent', sentAt = ?, providerMessageId = ?, lockedUntil = NULL, lastErrorCode = NULL
-     WHERE id = ? AND status = 'processing'`
-  ).bind(sentAt, providerMessageId, id).run();
+     SET status = 'sent', sentAt = ?, providerMessageId = ?, lockedUntil = NULL, leaseToken = NULL, lastErrorCode = NULL
+     WHERE id = ? AND status = 'processing' AND leaseToken = ?`
+  ).bind(sentAt, providerMessageId, id, leaseToken).run();
+  return result.meta?.changes === 1;
 }
 
-export async function failOutboxJob(env, id, { attempts, nextAttemptAt, code, terminal }) {
-  await env.DB.prepare(
+/**
+ * Atomic transition to 'failed' or back to 'pending'. Same lease-fencing rule
+ * as completeOutboxJob. Returns true when the transition actually happened.
+ */
+export async function failOutboxJob(env, id, leaseToken, { attempts, nextAttemptAt, code, terminal }) {
+  const result = await env.DB.prepare(
     `UPDATE notification_outbox
-     SET status = ?, attempts = ?, nextAttemptAt = ?, lockedUntil = NULL, lastErrorCode = ?
-     WHERE id = ? AND status = 'processing'`
-  ).bind(terminal ? "failed" : "pending", attempts, nextAttemptAt, code, id).run();
+     SET status = ?, attempts = ?, nextAttemptAt = ?, lockedUntil = NULL, leaseToken = NULL, lastErrorCode = ?
+     WHERE id = ? AND status = 'processing' AND leaseToken = ?`
+  ).bind(terminal ? "failed" : "pending", attempts, nextAttemptAt, code, id, leaseToken).run();
+  return result.meta?.changes === 1;
 }
 
 export async function getNotificationDeliveries(env, limit = 30) {
@@ -176,23 +228,112 @@ export async function getNotificationDeliveries(env, limit = 30) {
   return results;
 }
 
+/**
+ * Owner-initiated retry of a failed delivery.
+ *
+ * Enforces a cooldown between manual retries and a hard cap on total manual
+ * attempts. Automatic attempts are reset to 0 so the exponential-backoff clock
+ * starts over, but manualAttempts is tracked separately so a persistent
+ * upstream failure cannot be poked forever.
+ *
+ * @returns {Promise<{ ok: true } | { ok: false, code: string }>}
+ */
 export async function retryFailedDelivery(env, id, now) {
+  const row = await env.DB.prepare(
+    "SELECT status, manualAttempts, lastManualRetryAt FROM notification_outbox WHERE id = ?"
+  ).bind(id).first();
+  if (!row || row.status !== "failed") return { ok: false, code: "NOT_RETRYABLE" };
+
+  if (row.lastManualRetryAt !== null && row.lastManualRetryAt !== undefined) {
+    const elapsed = now - Number(row.lastManualRetryAt);
+    if (elapsed < MANUAL_RETRY_COOLDOWN_MS) {
+      return { ok: false, code: "MANUAL_RETRY_COOLDOWN" };
+    }
+  }
+
+  const manualAttempts = Number(row.manualAttempts ?? 0);
+  if (manualAttempts >= MAX_MANUAL_RETRIES) {
+    return { ok: false, code: "MANUAL_RETRY_EXHAUSTED" };
+  }
+
   const result = await env.DB.prepare(
     `UPDATE notification_outbox
-     SET status = 'pending', attempts = 0, nextAttemptAt = ?, lockedUntil = NULL, lastErrorCode = NULL, sentAt = NULL
+     SET status = 'pending', attempts = 0, nextAttemptAt = ?, lockedUntil = NULL, leaseToken = NULL,
+         lastErrorCode = NULL, sentAt = NULL,
+         manualAttempts = manualAttempts + 1, lastManualRetryAt = ?
      WHERE id = ? AND status = 'failed'`
-  ).bind(now, id).run();
-  return result.meta?.changes === 1;
+  ).bind(now, now, id).run();
+  if (result.meta?.changes !== 1) return { ok: false, code: "NOT_RETRYABLE" };
+  return { ok: true };
 }
 
+/**
+ * Race-free acquisition of the manual-test rate-limit slot.
+ *
+ * First-run path: `INSERT OR IGNORE` (the winning caller creates the row).
+ * Steady-state path: `UPDATE ... WHERE lastRequestedAt <= now - interval`, which
+ * only affects one row per interval. A caller wins only if either operation
+ * reports one row of change.
+ */
 export async function claimNotificationTestSlot(env, now, intervalMs = 60_000) {
-  const existing = await env.DB.prepare(
-    "SELECT lastRequestedAt FROM notification_test_limiter WHERE id = 1"
-  ).first();
-  if (existing && now - existing.lastRequestedAt < intervalMs) return false;
-  await env.DB.prepare(
-    `INSERT INTO notification_test_limiter (id, lastRequestedAt) VALUES (1, ?)
-     ON CONFLICT(id) DO UPDATE SET lastRequestedAt = excluded.lastRequestedAt`
+  const threshold = now - intervalMs;
+  const updated = await env.DB.prepare(
+    `UPDATE notification_test_limiter
+     SET lastRequestedAt = ?
+     WHERE id = 1 AND lastRequestedAt <= ?`
+  ).bind(now, threshold).run();
+  if (updated.meta?.changes === 1) return true;
+  const inserted = await env.DB.prepare(
+    `INSERT OR IGNORE INTO notification_test_limiter (id, lastRequestedAt) VALUES (1, ?)`
   ).bind(now).run();
-  return true;
+  return inserted.meta?.changes === 1;
+}
+
+/**
+ * Same race-free semantics as `claimNotificationTestSlot`, applied to the
+ * autocomplete proxy so a browser session can't hammer Photon.
+ */
+export async function claimAutocompleteSlot(env, now, intervalMs = 500) {
+  const threshold = now - intervalMs;
+  const updated = await env.DB.prepare(
+    `UPDATE autocomplete_limiter
+     SET lastRequestedAt = ?
+     WHERE id = 1 AND lastRequestedAt <= ?`
+  ).bind(now, threshold).run();
+  if (updated.meta?.changes === 1) return true;
+  const inserted = await env.DB.prepare(
+    `INSERT OR IGNORE INTO autocomplete_limiter (id, lastRequestedAt) VALUES (1, ?)`
+  ).bind(now).run();
+  return inserted.meta?.changes === 1;
+}
+
+/**
+ * Try to acquire the singleton report execution lock.
+ * Returns true when this caller owns the lease.
+ */
+export async function claimReportLock(env, now, lockedUntil, leaseToken) {
+  const updated = await env.DB.prepare(
+    `UPDATE report_execution_lock
+     SET leaseToken = ?, lockedUntil = ?, lastStartedAt = ?
+     WHERE id = 1 AND (lockedUntil IS NULL OR lockedUntil <= ?)`
+  ).bind(leaseToken, lockedUntil, now, now).run();
+  if (updated.meta?.changes === 1) return true;
+  const inserted = await env.DB.prepare(
+    `INSERT OR IGNORE INTO report_execution_lock (id, leaseToken, lockedUntil, lastStartedAt)
+     VALUES (1, ?, ?, ?)`
+  ).bind(leaseToken, lockedUntil, now).run();
+  return inserted.meta?.changes === 1;
+}
+
+/**
+ * Release the report lock, but only when we still own it. A caller whose lease
+ * expired must not clobber a fresh acquirer's leaseToken.
+ */
+export async function releaseReportLock(env, leaseToken) {
+  const result = await env.DB.prepare(
+    `UPDATE report_execution_lock
+     SET leaseToken = NULL, lockedUntil = 0
+     WHERE id = 1 AND leaseToken = ?`
+  ).bind(leaseToken).run();
+  return result.meta?.changes === 1;
 }

@@ -170,14 +170,22 @@ async function initApp() {
   try {
     appContainer.classList.remove("hidden");
     document.body.classList.add("app-visible");
-    
-    // Load locations and runs through same-origin /api/*
-    await Promise.all([
-      fetchLocations(),
-      fetchRuns(),
+
+    // Locations and runs power the primary UI, so their failures must surface
+    // loudly. Notification settings and delivery history are secondary — a
+    // notification-provider outage should not black out the main dashboard.
+    await Promise.all([fetchLocations(), fetchRuns()]);
+    const notificationOutcomes = await Promise.allSettled([
       fetchNotificationSettings(),
       fetchNotificationDeliveries()
     ]);
+    for (const outcome of notificationOutcomes) {
+      if (outcome.status === "rejected") {
+        console.warn("Notification panel failed to load:", outcome.reason);
+        showBanner(dbErrorBanner, "Notification panel temporarily unavailable.", 6000);
+        break;
+      }
+    }
   } catch (error) {
     console.error("Initialization failed: ", error);
     showBanner(dbErrorBanner, `Initialization Error: ${error.message}`, 0);
@@ -817,11 +825,14 @@ searchAddressInput.addEventListener("input", () => {
   
   autocompleteTimeout = setTimeout(async () => {
     try {
-      const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(queryText)}&limit=5`;
-      const response = await fetch(url);
+      const response = await fetch(`${API_BASE}/api/autocomplete`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: queryText })
+      });
       if (!response.ok) return;
       const data = await response.json();
-      
+
       if (data && data.features && data.features.length > 0) {
         renderSuggestions(data.features);
       } else {

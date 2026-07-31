@@ -1,6 +1,8 @@
 -- Local and production D1 schema.
 -- Safe to re-run: all statements use IF NOT EXISTS.
 -- Apply locally with: npm run db:schema:local
+-- Apply to production D1 with: npm run db:schema:remote
+--   (creates missing tables/indexes; never mutates existing rows).
 
 CREATE TABLE IF NOT EXISTS locations (
   id TEXT PRIMARY KEY,
@@ -53,10 +55,17 @@ CREATE TABLE IF NOT EXISTS notification_outbox (
   attempts INTEGER NOT NULL DEFAULT 0,
   nextAttemptAt INTEGER NOT NULL,
   lockedUntil INTEGER,
+  leaseToken TEXT,
   providerMessageId TEXT,
   lastErrorCode TEXT,
   createdAt INTEGER NOT NULL,
   sentAt INTEGER,
+  deliveryEmailTo TEXT,
+  deliveryPushoverDevice TEXT,
+  deliveryPushoverPriority INTEGER,
+  deliveryPushoverSound TEXT,
+  manualAttempts INTEGER NOT NULL DEFAULT 0,
+  lastManualRetryAt INTEGER,
   FOREIGN KEY (runId) REFERENCES runs(id)
 );
 
@@ -65,6 +74,23 @@ CREATE TABLE IF NOT EXISTS notification_outbox (
 CREATE TABLE IF NOT EXISTS notification_test_limiter (
   id INTEGER PRIMARY KEY CHECK (id = 1),
   lastRequestedAt INTEGER NOT NULL
+);
+
+-- A single-row limiter for the address-autocomplete proxy. Rate limiting
+-- protects Photon (Komoot) from unauthenticated amplification through our
+-- Access-authenticated endpoint.
+CREATE TABLE IF NOT EXISTS autocomplete_limiter (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  lastRequestedAt INTEGER NOT NULL
+);
+
+-- Cross-instance serialization for the report pipeline. A cron trigger and a
+-- concurrent manual trigger must never both call generateReport().
+CREATE TABLE IF NOT EXISTS report_execution_lock (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  leaseToken TEXT,
+  lockedUntil INTEGER NOT NULL,
+  lastStartedAt INTEGER
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_outbox_run_channel

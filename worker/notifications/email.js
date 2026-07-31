@@ -3,6 +3,8 @@ import { NotificationError } from "./errors.js";
 import { parseNotificationPayload } from "./payload.js";
 import { validateEmailAddress } from "./settings.js";
 
+const SMTP_TIMEOUT_MS = 30_000;
+
 function parseMailbox(value) {
   if (typeof value !== "string" || /[\r\n]/.test(value)) throw new NotificationError("INVALID_EMAIL_ADDRESS");
   const clean = value.trim();
@@ -47,11 +49,29 @@ export function buildHtmlEmail(results, triggerType, reportTimeText, dashboardUr
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Sunsethue Forecast Report</title></head><body style="margin:0;padding:0;background:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;"><div style="max-width:600px;margin:0 auto;padding:24px 16px;"><h1 style="font-size:24px;">Sunrise &amp; Sunset Forecast</h1><p style="color:#6b7280;">${escapeHtml(reportTimeText)} · ${escapeHtml(triggerType)} report</p><table style="width:100%;border-collapse:collapse;background:#fff;"><thead><tr><th>Location</th><th>${escapeHtml(firstHeader)}</th><th>${escapeHtml(secondHeader)}</th></tr></thead><tbody>${rows}</tbody></table><div style="margin-top:24px;text-align:center;color:#9ca3af;"><p>Sent automatically by Sunsethue Helper.</p>${link}</div></div></body></html>`;
 }
 
+function withTimeout(promise, ms, code) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new NotificationError(code, { retryable: true })), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      }
+    );
+  });
+}
+
 export async function sendEmail(job, env, deps = {}) {
   if (!env.GMAIL_USER || !env.GMAIL_APP_PASSWORD) throw new NotificationError("EMAIL_NOT_CONFIGURED");
   const payload = parseNotificationPayload(job.payload);
   const from = parseMailbox(env.EMAIL_FROM || `Sunsethue Helper <${env.GMAIL_USER}>`);
-  const to = parseMailbox(job.emailTo || job.settings?.emailTo || env.EMAIL_TO);
+  // Prefer the delivery-time snapshot columns over live settings so a settings
+  // change made after the job was enqueued cannot redirect the recipient.
+  const to = parseMailbox(job.deliveryEmailTo || job.settings?.emailTo || env.EMAIL_TO);
   let dashboardUrl = payload.dashboardUrl;
   if (dashboardUrl) {
     try { const url = new URL(dashboardUrl); if (url.protocol !== "https:" && url.protocol !== "http:") throw new Error(); dashboardUrl = url.toString(); } catch { throw new NotificationError("INVALID_DASHBOARD_URL"); }
@@ -59,8 +79,16 @@ export async function sendEmail(job, env, deps = {}) {
   const loadMailer = deps.loadMailer || (() => import("worker-mailer"));
   try {
     const { WorkerMailer } = await loadMailer();
-    const mailer = await WorkerMailer.connect({ host: "smtp.gmail.com", port: 465, secure: true, credentials: { username: env.GMAIL_USER, password: env.GMAIL_APP_PASSWORD }, authType: ["plain", "login"] });
-    await mailer.send({ from, to: { email: to.email }, subject: buildEmailSubject(payload.triggerType), html: buildHtmlEmail(toReportResults(payload), payload.triggerType, new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", dateStyle: "full", timeStyle: "short" }).format(payload.generatedAt), dashboardUrl) });
+    const mailer = await withTimeout(
+      WorkerMailer.connect({ host: "smtp.gmail.com", port: 465, secure: true, credentials: { username: env.GMAIL_USER, password: env.GMAIL_APP_PASSWORD }, authType: ["plain", "login"] }),
+      SMTP_TIMEOUT_MS,
+      "SMTP_TIMEOUT"
+    );
+    await withTimeout(
+      mailer.send({ from, to: { email: to.email }, subject: buildEmailSubject(payload.triggerType), html: buildHtmlEmail(toReportResults(payload), payload.triggerType, new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", dateStyle: "full", timeStyle: "short" }).format(payload.generatedAt), dashboardUrl) }),
+      SMTP_TIMEOUT_MS,
+      "SMTP_TIMEOUT"
+    );
     return { providerMessageId: null };
   } catch (error) {
     if (error instanceof NotificationError) throw error;

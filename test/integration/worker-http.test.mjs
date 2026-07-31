@@ -12,11 +12,12 @@ import {
   makeRequest
 } from "../helpers.mjs";
 
+const LOCATION_ID = "00000000-0000-0000-0000-000000000001";
 const API_ROUTES = [
   { method: "GET", path: "/api/locations" },
   { method: "POST", path: "/api/locations" },
-  { method: "PUT", path: "/api/locations/abc" },
-  { method: "DELETE", path: "/api/locations/abc" },
+  { method: "PUT", path: `/api/locations/${LOCATION_ID}` },
+  { method: "DELETE", path: `/api/locations/${LOCATION_ID}` },
   { method: "GET", path: "/api/runs" },
   { method: "POST", path: "/api/triggerReport" },
   { method: "GET", path: "/api/getApiCredits" },
@@ -24,7 +25,7 @@ const API_ROUTES = [
 ];
 
 function mockEnv(overrides = {}) {
-  const locations = [{ id: "1", name: "Home", latitude: 1, longitude: 2 }];
+  const locations = [{ id: LOCATION_ID, name: "Home", latitude: 1, longitude: 2 }];
   return {
     ...baseEnv(),
     SUNSETHUE_API_KEY: "test-key",
@@ -42,7 +43,7 @@ function mockEnv(overrides = {}) {
             return { results: locations };
           },
           async run() {
-            return { success: true };
+            return { success: true, meta: { changes: 1 } };
           },
           async first() {
             return locations[0];
@@ -139,7 +140,7 @@ test("location mutations and protected reads require authorization", async () =>
   assert.equal(createResponse.status, 200);
 
   const updateResponse = await worker.fetch(
-    makeRequest("/api/locations/1", {
+    makeRequest(`/api/locations/${LOCATION_ID}`, {
       method: "PUT",
       headers: { "Cf-Access-Jwt-Assertion": token },
       body: { name: "Park 2", latitude: 40.8, longitude: -74.1 }
@@ -150,7 +151,7 @@ test("location mutations and protected reads require authorization", async () =>
   assert.equal(updateResponse.status, 200);
 
   const deleteResponse = await worker.fetch(
-    makeRequest("/api/locations/1", {
+    makeRequest(`/api/locations/${LOCATION_ID}`, {
       method: "DELETE",
       headers: { "Cf-Access-Jwt-Assertion": token }
     }),

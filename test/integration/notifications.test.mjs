@@ -13,6 +13,8 @@ import { createFetchFake, createMailerFake, jsonOk } from "../support/fakes.mjs"
 import { makeRequest } from "../helpers.mjs";
 
 const NOW = Date.parse("2026-07-15T12:00:00Z");
+const TOKEN_A = "00000000-0000-0000-0000-000000000001";
+const TOKEN_B = "00000000-0000-0000-0000-000000000002";
 
 async function withEnv(fn) {
   const local = await createLocalD1();
@@ -55,6 +57,27 @@ test("settings support both channels and reject injection, emergency priority, a
   });
 });
 
+test("saveSettings fails closed when the caller enables an unconfigured provider", async () => {
+  await withEnv(async (env) => {
+    const withoutPushover = { ...env, PUSHOVER_APP_TOKEN: "", PUSHOVER_USER_KEY: "" };
+    await assert.rejects(
+      () => saveSettings(withoutPushover, {
+        emailEnabled: false, emailTo: null,
+        pushoverEnabled: true, pushoverDevice: null, pushoverPriority: 0, pushoverSound: null
+      }, NOW),
+      /PROVIDER_NOT_CONFIGURED/
+    );
+    const withoutEmail = { ...env, GMAIL_USER: "", GMAIL_APP_PASSWORD: "" };
+    await assert.rejects(
+      () => saveSettings(withoutEmail, {
+        emailEnabled: true, emailTo: "owner@example.com",
+        pushoverEnabled: false, pushoverDevice: null, pushoverPriority: 0, pushoverSound: null
+      }, NOW),
+      /PROVIDER_NOT_CONFIGURED/
+    );
+  });
+});
+
 test("run and outbox creation is atomic and creates one job per enabled channel", async () => {
   await withEnv(async (env) => {
     await saveSettings(env, { emailEnabled: true, emailTo: "owner@example.com", pushoverEnabled: true, pushoverDevice: null, pushoverPriority: 0, pushoverSound: null }, NOW);
@@ -67,6 +90,30 @@ test("run and outbox creation is atomic and creates one job per enabled channel"
   });
 });
 
+test("enqueueNotifications snapshots delivery preferences at enqueue time", async () => {
+  await withEnv(async (env) => {
+    await saveSettings(env, {
+      emailEnabled: false, emailTo: null,
+      pushoverEnabled: true, pushoverDevice: "phone-original", pushoverPriority: 1, pushoverSound: "cosmic"
+    }, NOW);
+    const [job] = await enqueueNotifications(model("run-snapshot"), env);
+    const stored = await db.getOutboxJob(env, job.id);
+    assert.equal(stored.deliveryPushoverDevice, "phone-original");
+    assert.equal(stored.deliveryPushoverPriority, 1);
+    assert.equal(stored.deliveryPushoverSound, "cosmic");
+
+    // A settings change after enqueue must not redirect the pending job.
+    await saveSettings(env, {
+      emailEnabled: false, emailTo: null,
+      pushoverEnabled: true, pushoverDevice: "phone-new", pushoverPriority: 0, pushoverSound: "none"
+    }, NOW);
+    const stillOriginal = await db.getOutboxJob(env, job.id);
+    assert.equal(stillOriginal.deliveryPushoverDevice, "phone-original");
+    assert.equal(stillOriginal.deliveryPushoverPriority, 1);
+    assert.equal(stillOriginal.deliveryPushoverSound, "cosmic");
+  });
+});
+
 test("dispatcher claims once, sends email through the injected mailer, and records only safe status", async () => {
   await withEnv(async (env) => {
     const jobs = await enqueueNotifications(model("run-email"), env);
@@ -76,15 +123,33 @@ test("dispatcher claims once, sends email through the injected mailer, and recor
     assert.equal(mailer.sent.length, 1);
     const stored = await db.getOutboxJob(env, jobs[0].id);
     assert.equal(stored.status, "sent");
+    assert.equal(stored.leaseToken, null, "lease token cleared on completion");
     assert.equal(stored.payload.includes("fake-password"), false);
-    assert.equal(await db.claimOutboxJob(env, jobs[0].id, NOW, NOW + 60_000), false);
+    assert.equal(await db.claimOutboxJob(env, jobs[0].id, NOW, NOW + 60_000, TOKEN_A), false);
+  });
+});
+
+test("lease fencing prevents an expired-lease writer from overwriting a live job", async () => {
+  await withEnv(async (env) => {
+    const [job] = await enqueueNotifications(model("run-fenced"), env);
+    assert.equal(await db.claimOutboxJob(env, job.id, NOW, NOW + 60_000, TOKEN_A), true);
+
+    // A caller with a stale token must not be able to complete or fail the job.
+    assert.equal(await db.completeOutboxJob(env, job.id, TOKEN_B, NOW, null), false);
+    assert.equal(await db.failOutboxJob(env, job.id, TOKEN_B, { attempts: 1, nextAttemptAt: NOW, code: "STALE", terminal: true }), false);
+
+    // The current lease-holder can complete the job.
+    assert.equal(await db.completeOutboxJob(env, job.id, TOKEN_A, NOW + 1, "provider-id"), true);
+    const stored = await db.getOutboxJob(env, job.id);
+    assert.equal(stored.status, "sent");
+    assert.equal(stored.providerMessageId, "provider-id");
   });
 });
 
 test("notification logs omit synthetic provider secrets, recipient data, and location names", async () => {
   await withEnv(async (env) => {
     env.GMAIL_APP_PASSWORD = "synthetic-secret-password";
-    env.EMAIL_TO = "private-recipient@example.test";
+    env.EMAIL_TO = "private-recipient@example.com";
     const privateModel = model("private-log-run");
     privateModel.results[0].name = "Secret Observatory";
     await enqueueNotifications(privateModel, env);
@@ -105,7 +170,7 @@ test("expired leases recover and transient Pushover failures follow the retry sc
   await withEnv(async (env) => {
     await saveSettings(env, { emailEnabled: false, emailTo: null, pushoverEnabled: true, pushoverDevice: null, pushoverPriority: 0, pushoverSound: null }, NOW);
     const [job] = await enqueueNotifications(model("run-push"), env);
-    assert.equal(await db.claimOutboxJob(env, job.id, NOW, NOW + 1), true);
+    assert.equal(await db.claimOutboxJob(env, job.id, NOW, NOW + 1, TOKEN_A), true);
     const fetchFake = createFetchFake({ "api.pushover.net": () => new Response("busy", { status: 429 }) });
     const outcomes = await dispatchPendingNotifications(env, { now: NOW + 2, fetch: fetchFake });
     assert.equal(outcomes[0].status, "pending");
@@ -127,7 +192,10 @@ test("Pushover payload is bounded and successful provider request IDs are safe",
       assert.equal(url.pathname, "/1/messages.json");
       const body = new URLSearchParams(init.body);
       assert.ok(body.get("title").length <= 250);
-      assert.ok(body.get("message").length <= 1024);
+      assert.ok(new TextEncoder().encode(body.get("message")).byteLength <= 1024);
+      assert.equal(body.get("device"), "phone");
+      assert.equal(body.get("priority"), "-1");
+      assert.equal(body.get("sound"), "none");
       return jsonOk({ status: 1, request: "safe-request-id" });
     } });
     const result = await sendPushover({ ...stored, settings: await getSettings(env) }, env, { fetch: fetchFake });
@@ -140,6 +208,22 @@ test("notification helpers classify failures and reject malformed payloads witho
   assert.equal(asNotificationError(new NotificationError("KNOWN")).code, "KNOWN");
   assert.throws(() => parseNotificationPayload("not json"), /INVALID_NOTIFICATION_PAYLOAD/);
   assert.throws(() => parseNotificationPayload(JSON.stringify({ version: 2, locations: null })), /INVALID_NOTIFICATION_PAYLOAD/);
+  assert.throws(() => parseNotificationPayload(JSON.stringify({
+    version: 1, triggerType: "BOGUS", generatedAt: NOW, locations: []
+  })), /INVALID_NOTIFICATION_PAYLOAD/);
+  assert.throws(() => parseNotificationPayload(JSON.stringify({
+    version: 1, triggerType: "AM", generatedAt: NOW, dashboardUrl: "javascript:alert(1)", locations: []
+  })), /INVALID_NOTIFICATION_PAYLOAD/);
+  assert.throws(() => parseNotificationPayload(JSON.stringify({
+    version: 1, triggerType: "AM", generatedAt: NOW, dashboardUrl: null,
+    locations: [{ name: "A", errorCode: "SOMETHING_ELSE" }]
+  })), /INVALID_NOTIFICATION_PAYLOAD/);
+  const okPayload = JSON.stringify({
+    version: 1, triggerType: "AM", generatedAt: NOW, dashboardUrl: "https://ok.example",
+    locations: [{ name: "A", sunrise: null, sunset: null, errorCode: null }]
+  });
+  const parsed = parseNotificationPayload(okPayload);
+  assert.equal(parsed.locations[0].name, "A");
   const content = buildPushoverContent({ triggerType: "AM", locations: [{ name: "A", errorCode: "FORECAST_UNAVAILABLE" }] });
   assert.match(content.message, /unavailable/);
   assert.equal(buildPushoverContent({ triggerType: "AM", locations: [] }).message, "Forecast report generated.");
@@ -184,6 +268,34 @@ test("notification settings and delivery history routes validate bodies and reda
   });
 });
 
+test("PUT /api/notification-settings maps PROVIDER_NOT_CONFIGURED to 409", async () => {
+  await withEnv(async (env) => {
+    const misconfigured = { ...env, PUSHOVER_APP_TOKEN: "", PUSHOVER_USER_KEY: "" };
+    const call = (path, options, deps = {}) => handleHttpRequest(makeRequest(path, options), misconfigured, { authorized: true }, { now: NOW, ...deps });
+    const response = await call("/api/notification-settings", {
+      method: "PUT",
+      body: { emailEnabled: false, emailTo: null, pushoverEnabled: true, pushoverDevice: null, pushoverPriority: 0, pushoverSound: null }
+    });
+    assert.equal(response.status, 409);
+    assert.equal((await response.json()).error.code, "PROVIDER_NOT_CONFIGURED");
+  });
+});
+
+test("test endpoint checks provider readiness before consuming the rate-limit slot", async () => {
+  await withEnv(async (env) => {
+    const noPushover = { ...env, PUSHOVER_APP_TOKEN: "", PUSHOVER_USER_KEY: "" };
+    // Test the response: the getSettings will return 0 for pushoverEnabled by default,
+    // so we need email-configured but pushover-unconfigured. env has valid email.
+    const call = (path, options, deps = {}) => handleHttpRequest(makeRequest(path, options), noPushover, { authorized: true }, { now: NOW, ...deps });
+    const misconfigured = await call("/api/notifications/test", { method: "POST", body: { channel: "pushover" } });
+    assert.equal(misconfigured.status, 409);
+    // Because provider readiness was checked first, the email slot is still free.
+    const mailer = createMailerFake();
+    const email = await call("/api/notifications/test", { method: "POST", body: { channel: "email" } }, { loadMailer: mailer.loadMailer });
+    assert.equal(email.status, 202);
+  });
+});
+
 test("test and manual-retry routes use the dispatcher, enforce rate limiting, and do not expose payloads", async () => {
   await withEnv(async (env) => {
     const mailer = createMailerFake();
@@ -196,12 +308,133 @@ test("test and manual-retry routes use the dispatcher, enforce rate limiting, an
     assert.equal((await call("/api/notifications/test", { method: "POST", body: { channel: "email" } })).status, 429);
 
     const [job] = await enqueueNotifications(model("retry-route"), env);
-    await db.claimOutboxJob(env, job.id, NOW, NOW + 10);
-    await db.failOutboxJob(env, job.id, { attempts: 5, nextAttemptAt: NOW, code: "SMTP_DELIVERY_FAILED", terminal: true });
+    await db.claimOutboxJob(env, job.id, NOW, NOW + 10, TOKEN_A);
+    await db.failOutboxJob(env, job.id, TOKEN_A, { attempts: 5, nextAttemptAt: NOW, code: "SMTP_DELIVERY_FAILED", terminal: true });
     const retried = await call(`/api/notification-deliveries/${job.id}/retry`, { method: "POST" }, { now: NOW + 61_000 });
     assert.equal(retried.status, 200);
     const deliveries = await (await call("/api/notification-deliveries")).json();
     assert.equal("payload" in deliveries[0], false);
-    assert.equal((await call("/api/notification-deliveries/nope/retry", { method: "POST" })).status, 409);
+    // Non-UUID id → 400 for a stricter contract than the old generic 409.
+    assert.equal((await call("/api/notification-deliveries/nope/retry", { method: "POST" })).status, 400);
+    // A valid-looking UUID that doesn't exist → 409 NOT_RETRYABLE.
+    const missing = await call("/api/notification-deliveries/00000000-0000-0000-0000-000000000000/retry", { method: "POST" });
+    assert.equal(missing.status, 409);
+  });
+});
+
+async function rotateLeaseToken(local, id, token) {
+  local.database
+    .prepare("UPDATE notification_outbox SET leaseToken = ? WHERE id = ?")
+    .run(token, id);
+}
+
+test("dispatcher drops outcomes when a parallel claimer wins the lease", async () => {
+  const local = await createLocalD1();
+  try {
+    const env = {
+      DB: local.DB, GMAIL_USER: "reports@example.com", GMAIL_APP_PASSWORD: "fake-password",
+      EMAIL_TO: "owner@example.com", EMAIL_FROM: "Sunsethue <reports@example.com>",
+      PUSHOVER_APP_TOKEN: "fake-pushover-app", PUSHOVER_USER_KEY: "fake-pushover-user",
+      WEBAPP_URL: "https://dashboard.example.test"
+    };
+    await saveSettings(env, { emailEnabled: false, emailTo: null, pushoverEnabled: true, pushoverDevice: null, pushoverPriority: 0, pushoverSound: null }, NOW);
+    const [job] = await enqueueNotifications(model("run-race"), env);
+    let fetchCount = 0;
+    const fetchFake = createFetchFake({
+      "api.pushover.net": async () => {
+        fetchCount += 1;
+        // Simulate another Worker instance stealing the lease mid-flight.
+        await rotateLeaseToken(local, job.id, TOKEN_B);
+        return jsonOk({ status: 1, request: "race" });
+      }
+    });
+    const outcomes = await dispatchPendingNotifications(env, { now: NOW, fetch: fetchFake });
+    assert.equal(fetchCount, 1);
+    assert.deepEqual(outcomes, [], "the winning caller reports its own outcome");
+    const stored = await db.getOutboxJob(env, job.id);
+    assert.equal(stored.leaseToken, TOKEN_B, "the parallel claimer still holds the lease");
+    assert.equal(stored.status, "processing");
+  } finally { local.close(); }
+});
+
+test("dispatcher drops fail outcomes when a parallel claimer wins the lease", async () => {
+  const local = await createLocalD1();
+  try {
+    const env = {
+      DB: local.DB, GMAIL_USER: "reports@example.com", GMAIL_APP_PASSWORD: "fake-password",
+      EMAIL_TO: "owner@example.com", EMAIL_FROM: "Sunsethue <reports@example.com>",
+      PUSHOVER_APP_TOKEN: "fake-pushover-app", PUSHOVER_USER_KEY: "fake-pushover-user",
+      WEBAPP_URL: "https://dashboard.example.test"
+    };
+    await saveSettings(env, { emailEnabled: false, emailTo: null, pushoverEnabled: true, pushoverDevice: null, pushoverPriority: 0, pushoverSound: null }, NOW);
+    const [job] = await enqueueNotifications(model("run-fail-race"), env);
+    const fetchFake = createFetchFake({
+      "api.pushover.net": async () => {
+        await rotateLeaseToken(local, job.id, TOKEN_B);
+        return new Response("busy", { status: 429 });
+      }
+    });
+    const outcomes = await dispatchPendingNotifications(env, { now: NOW, fetch: fetchFake });
+    assert.deepEqual(outcomes, []);
+    const stored = await db.getOutboxJob(env, job.id);
+    assert.equal(stored.leaseToken, TOKEN_B);
+  } finally { local.close(); }
+});
+
+test("dispatcher reports PUSHOVER_UNAVAILABLE for unexpected fetch failures", async () => {
+  await withEnv(async (env) => {
+    await saveSettings(env, { emailEnabled: false, emailTo: null, pushoverEnabled: true, pushoverDevice: null, pushoverPriority: 0, pushoverSound: null }, NOW);
+    await enqueueNotifications(model("run-network"), env);
+    const outcomes = await dispatchPendingNotifications(env, {
+      now: NOW,
+      fetch: async () => { throw new Error("network partition"); }
+    });
+    assert.equal(outcomes[0].code, "PUSHOVER_UNAVAILABLE");
+    assert.equal(outcomes[0].status, "pending");
+  });
+});
+
+test("runAndSendReport surfaces REPORT_IN_PROGRESS when the lock is held", async () => {
+  await withEnv(async (env) => {
+    // Claim the report lock under a foreign token; runAndSendReport must fail
+    // fast with REPORT_IN_PROGRESS rather than run generateReport twice.
+    assert.equal(await db.claimReportLock(env, NOW, NOW + 60_000, TOKEN_A), true);
+    const { runAndSendReport } = await import("../../worker/report.js");
+    env.SUNSETHUE_API_KEY = "test-key";
+    await assert.rejects(
+      () => runAndSendReport("Manual Test", env, { fetch: () => { throw new Error("must not be called"); }, now: NOW + 1 }),
+      /REPORT_IN_PROGRESS/
+    );
+  });
+});
+
+test("API triggerReport maps a held report lock to 429", async () => {
+  await withEnv(async (env) => {
+    env.SUNSETHUE_API_KEY = "test-key";
+    assert.equal(await db.claimReportLock(env, NOW, NOW + 60_000, TOKEN_A), true);
+    const response = await handleHttpRequest(makeRequest("/api/triggerReport", { method: "POST" }), env, { authorized: true }, { now: NOW + 1 });
+    assert.equal(response.status, 429);
+    assert.equal((await response.json()).error.code, "REPORT_IN_PROGRESS");
+  });
+});
+
+test("manual retry enforces cooldown and cap", async () => {
+  await withEnv(async (env) => {
+    const [job] = await enqueueNotifications(model("retry-limits"), env);
+    await db.claimOutboxJob(env, job.id, NOW, NOW + 10, TOKEN_A);
+    await db.failOutboxJob(env, job.id, TOKEN_A, { attempts: 5, nextAttemptAt: NOW, code: "SMTP_DELIVERY_FAILED", terminal: true });
+
+    // First retry succeeds and records lastManualRetryAt.
+    const first = await db.retryFailedDelivery(env, job.id, NOW + 61_000);
+    assert.deepEqual(first, { ok: true });
+
+    // Mark it failed again so we can attempt a second retry.
+    await db.claimOutboxJob(env, job.id, NOW + 62_000, NOW + 63_000, TOKEN_B);
+    await db.failOutboxJob(env, job.id, TOKEN_B, { attempts: 5, nextAttemptAt: NOW + 63_000, code: "SMTP_DELIVERY_FAILED", terminal: true });
+
+    // Cooldown window (< 60s since last manual retry).
+    const cooldown = await db.retryFailedDelivery(env, job.id, NOW + 90_000);
+    assert.equal(cooldown.ok, false);
+    assert.equal(cooldown.code, "MANUAL_RETRY_COOLDOWN");
   });
 });

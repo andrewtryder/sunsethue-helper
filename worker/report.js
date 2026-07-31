@@ -7,9 +7,12 @@ import {
 } from "./helpers.js";
 import { dispatchPendingNotifications } from "./notifications/dispatcher.js";
 import { buildNotificationPayload } from "./notifications/payload.js";
+import { NotificationError } from "./notifications/errors.js";
 import { getSettings } from "./notifications/settings.js";
 
 export { buildHtmlEmail } from "./notifications/email.js";
+
+const REPORT_LOCK_MS = 5 * 60_000;
 
 function buildRunResult(result) {
   return {
@@ -62,7 +65,11 @@ export async function generateReport(triggerType, env, deps = {}) {
   };
 }
 
-/** Persist the run and its enabled notification jobs together. */
+/**
+ * Persist the run and its enabled notification jobs together, snapshotting the
+ * current delivery preferences into each job so a later settings change cannot
+ * redirect a pending notification.
+ */
 export async function enqueueNotifications(model, env, deps = {}) {
   const settings = deps.settings || await getSettings(env);
   const payload = JSON.stringify(buildNotificationPayload(model));
@@ -70,8 +77,16 @@ export async function enqueueNotifications(model, env, deps = {}) {
   if (settings.emailEnabled) channels.push("email");
   if (settings.pushoverEnabled) channels.push("pushover");
   const jobs = channels.map((channel) => ({
-    id: crypto.randomUUID(), runId: model.runId, channel, payload,
-    nextAttemptAt: model.generatedAt, createdAt: model.generatedAt
+    id: crypto.randomUUID(),
+    runId: model.runId,
+    channel,
+    payload,
+    nextAttemptAt: model.generatedAt,
+    createdAt: model.generatedAt,
+    deliveryEmailTo: settings.emailTo ?? null,
+    deliveryPushoverDevice: settings.pushoverDevice ?? null,
+    deliveryPushoverPriority: settings.pushoverPriority ?? 0,
+    deliveryPushoverSound: settings.pushoverSound ?? null
   }));
   await db.createRunAndOutbox(env, {
     id: model.runId, timestamp: model.generatedAt, triggerType: model.triggerType,
@@ -81,8 +96,20 @@ export async function enqueueNotifications(model, env, deps = {}) {
   return jobs.map((job) => ({ id: job.id, channel: job.channel, status: "pending" }));
 }
 
-/** Compatibility entry point for manual and scheduled reports. */
+/**
+ * Compatibility entry point for manual and scheduled reports.
+ *
+ * Holds a singleton execution lock across the forecast fan-out so a cron
+ * trigger and a concurrent manual trigger can never both call the upstream API
+ * for the same set of locations.
+ */
 export async function runAndSendReport(triggerType, env, deps = {}) {
+  const now = deps.now ?? Date.now();
+  const leaseToken = crypto.randomUUID();
+  const acquired = await db.claimReportLock(env, now, now + REPORT_LOCK_MS, leaseToken);
+  if (!acquired) {
+    throw new NotificationError("REPORT_IN_PROGRESS");
+  }
   try {
     const model = await generateReport(triggerType, env, deps);
     const jobs = await enqueueNotifications(model, env, deps);
@@ -91,8 +118,12 @@ export async function runAndSendReport(triggerType, env, deps = {}) {
   } catch (error) {
     // A report can fail before a run exists (for example, an absent forecast key).
     try {
-      await db.addRun(env, { id: crypto.randomUUID(), timestamp: deps.now ?? Date.now(), triggerType, status: "failure", locationsCount: 0, results: [], error: "REPORT_GENERATION_FAILED" });
+      await db.addRun(env, { id: crypto.randomUUID(), timestamp: now, triggerType, status: "failure", locationsCount: 0, results: [], error: "REPORT_GENERATION_FAILED" });
     } catch { /* Preserve the original operational error. */ }
     throw error;
+  } finally {
+    try {
+      await db.releaseReportLock(env, leaseToken);
+    } catch { /* Best-effort release; the lease expires on its own. */ }
   }
 }

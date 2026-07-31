@@ -31,7 +31,17 @@ validate
 
 A dry-run dispatch stops after `prepare`. Nothing is deployed or released.
 
-The production pipeline does not apply D1 schema changes. The personal database schema is maintained via `schema.sql` when needed locally (`npm run db:schema:local`). Access (Zero Trust) setup is also outside this pipeline; use the local `access:*` scripts.
+The production pipeline does not apply D1 schema changes. The personal database schema is maintained via `schema.sql`. Apply it locally with `npm run db:schema:local` and to production with `npm run db:schema:remote`. Both scripts are idempotent because every statement uses `IF NOT EXISTS`. `prepare-deployment.mjs` will fail the workflow if any required table is missing.
+
+### Schema change sequence
+
+For any change that adds tables, columns, or indexes:
+
+1. Snapshot production D1 with Cloudflare **Time Travel** first.
+2. Run `npm run db:schema:remote` locally (or from a trusted environment with `CLOUDFLARE_API_TOKEN`) to apply the new `schema.sql`. It is idempotent and never drops or mutates data.
+3. Trigger the `Production` workflow. The preflight check confirms the required tables exist before Wrangler ships Worker code that would depend on them.
+
+Access (Zero Trust) setup is also outside this pipeline; use the local `access:*` scripts.
 
 If `D1_DATABASE_ID` or any other required instance variable is missing, `config:generate:strict` fails with the variable **name** only and the deploy does not proceed.
 

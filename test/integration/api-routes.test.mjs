@@ -8,6 +8,8 @@ import { makeRequest } from "../helpers.mjs";
 
 const NOW = Date.parse("2026-07-15T12:00:00Z");
 const AUTH_CONTEXT = { authenticated: true, authorized: true, email: "owner@example.com" };
+const LOCATION_ID_A = "10000000-0000-0000-0000-00000000000a";
+const LOCATION_ID_B = "10000000-0000-0000-0000-00000000000b";
 
 async function withApi(fn, { locations = [], routes = {}, envOverrides = {} } = {}) {
   const local = await createLocalD1();
@@ -18,6 +20,7 @@ async function withApi(fn, { locations = [], routes = {}, envOverrides = {} } = 
     GMAIL_USER: "reports@example.com",
     GMAIL_APP_PASSWORD: "fake-app-password",
     EMAIL_TO: "owner@example.com",
+    CONTACT_EMAIL: "contact@example.com",
     DB: local.DB,
     ...envOverrides
   };
@@ -55,7 +58,7 @@ test("GET /api/locations returns stored locations", async () => {
       const body = await response.json();
       assert.deepEqual(body.map((row) => row.name), ["Beach"]);
     },
-    { locations: [{ id: "a", name: "Beach", latitude: 1, longitude: 2, createdAt: 1 }] }
+    { locations: [{ id: LOCATION_ID_A, name: "Beach", latitude: 1, longitude: 2, createdAt: 1 }] }
   );
 });
 
@@ -68,6 +71,17 @@ test("POST /api/locations validates required fields", async () => {
       assert.equal(payload.error.code, "BAD_REQUEST");
     }
     assert.deepEqual(await db.getLocations(env), []);
+  });
+});
+
+test("POST /api/locations rejects unknown fields and out-of-range coordinates", async () => {
+  await withApi(async ({ call }) => {
+    const unknown = await call("/api/locations", { method: "POST", body: { name: "Summit", latitude: 44, longitude: -71, extra: "no" } });
+    assert.equal(unknown.status, 400);
+    const outOfRange = await call("/api/locations", { method: "POST", body: { name: "Summit", latitude: 91, longitude: -71 } });
+    assert.equal(outOfRange.status, 400);
+    const controlChars = await call("/api/locations", { method: "POST", body: { name: "line\u0000break", latitude: 44, longitude: -71 } });
+    assert.equal(controlChars.status, 400);
   });
 });
 
@@ -88,36 +102,72 @@ test("POST /api/locations creates a location with a generated id", async () => {
   });
 });
 
+test("POST /api/locations enforces the 10-location cap atomically", async () => {
+  const locations = Array.from({ length: 10 }, (_, index) => ({
+    id: `20000000-0000-0000-0000-0000000000${index.toString(16).padStart(2, "0")}`,
+    name: `Spot ${index}`,
+    latitude: 40 + index * 0.1,
+    longitude: -74,
+    createdAt: index
+  }));
+  await withApi(
+    async ({ call }) => {
+      const response = await call("/api/locations", { method: "POST", body: { name: "Overflow", latitude: 41, longitude: -74 } });
+      assert.equal(response.status, 409);
+      assert.equal((await response.json()).error.code, "LOCATION_LIMIT_REACHED");
+    },
+    { locations }
+  );
+});
+
 test("PUT and DELETE /api/locations/:id mutate the addressed row", async () => {
   await withApi(
     async ({ call, env }) => {
-      const updated = await call("/api/locations/a", {
+      const updated = await call(`/api/locations/${LOCATION_ID_A}`, {
         method: "PUT",
         body: { name: "Beach North", latitude: 43, longitude: -71 }
       });
       assert.equal(updated.status, 200);
       assert.equal((await db.getLocations(env))[0].name, "Beach North");
 
-      const deleted = await call("/api/locations/a", { method: "DELETE" });
+      const deleted = await call(`/api/locations/${LOCATION_ID_A}`, { method: "DELETE" });
       assert.equal(deleted.status, 200);
       assert.deepEqual(await db.getLocations(env), []);
     },
-    { locations: [{ id: "a", name: "Beach", latitude: 1, longitude: 2, createdAt: 1 }] }
+    { locations: [{ id: LOCATION_ID_A, name: "Beach", latitude: 1, longitude: 2, createdAt: 1 }] }
   );
 });
 
-test("PUT /api/locations/:id validates the body", async () => {
+test("PUT /api/locations/:id validates the body and 404s a missing row", async () => {
   await withApi(async ({ call }) => {
-    const response = await call("/api/locations/a", { method: "PUT", body: { name: "Only name" } });
-    assert.equal(response.status, 400);
-    assert.equal((await response.json()).error.code, "BAD_REQUEST");
+    const invalid = await call(`/api/locations/${LOCATION_ID_A}`, { method: "PUT", body: { name: "Only name" } });
+    assert.equal(invalid.status, 400);
+    assert.equal((await invalid.json()).error.code, "BAD_REQUEST");
+    const missing = await call(`/api/locations/${LOCATION_ID_A}`, { method: "PUT", body: { name: "Beach", latitude: 42, longitude: -71 } });
+    assert.equal(missing.status, 404);
+  });
+});
+
+test("DELETE /api/locations/:id 404s when the row is not present", async () => {
+  await withApi(async ({ call }) => {
+    const response = await call(`/api/locations/${LOCATION_ID_A}`, { method: "DELETE" });
+    assert.equal(response.status, 404);
+  });
+});
+
+test("location routes reject non-UUID ids", async () => {
+  await withApi(async ({ call }) => {
+    for (const method of ["PUT", "DELETE"]) {
+      const response = await call("/api/locations/not-a-uuid", { method, body: method === "PUT" ? { name: "X", latitude: 0, longitude: 0 } : undefined });
+      assert.equal(response.status, 400, method);
+    }
   });
 });
 
 test("unsupported methods return 405 with an Allow header", async () => {
   const expectations = [
     { path: "/api/locations", method: "DELETE", allow: "GET, POST" },
-    { path: "/api/locations/a", method: "GET", allow: "PUT, DELETE" },
+    { path: `/api/locations/${LOCATION_ID_A}`, method: "GET", allow: "PUT, DELETE" },
     { path: "/api/runs", method: "POST", allow: "GET" },
     { path: "/api/getApiCredits", method: "POST", allow: "GET" },
     { path: "/api/searchCoordinates", method: "GET", allow: "POST" },
@@ -206,7 +256,15 @@ test("POST /api/searchCoordinates requires a query", async () => {
   });
 });
 
-test("POST /api/searchCoordinates proxies Nominatim results with a contact User-Agent", async () => {
+test("POST /api/searchCoordinates rejects control characters in the query", async () => {
+  await withApi(async ({ call, fetchFake }) => {
+    const response = await call("/api/searchCoordinates", { method: "POST", body: { query: "Portsmouth\u0000NH" } });
+    assert.equal(response.status, 400);
+    assert.equal(fetchFake.calls.length, 0);
+  });
+});
+
+test("POST /api/searchCoordinates uses CONTACT_EMAIL for the Nominatim User-Agent", async () => {
   let seenUserAgent = null;
   await withApi(
     async ({ call }) => {
@@ -217,7 +275,7 @@ test("POST /api/searchCoordinates proxies Nominatim results with a contact User-
       assert.equal(response.status, 200);
       const body = await response.json();
       assert.equal(body[0].display_name, "Portsmouth, NH");
-      assert.match(seenUserAgent, /^SunsethueHelper\/1\.0 \(.+\)$/);
+      assert.equal(seenUserAgent, "SunsethueHelper/1.0 (contact@example.com)");
     },
     {
       routes: {
@@ -225,6 +283,29 @@ test("POST /api/searchCoordinates proxies Nominatim results with a contact User-
           seenUserAgent = new Headers(init.headers).get("user-agent");
           assert.equal(url.searchParams.get("q"), "Portsmouth NH");
           return jsonOk([{ display_name: "Portsmouth, NH", lat: "43.07", lon: "-70.76" }]);
+        }
+      }
+    }
+  );
+});
+
+test("POST /api/searchCoordinates falls back to a public identifier when CONTACT_EMAIL is unset", async () => {
+  let seenUserAgent = null;
+  await withApi(
+    async ({ call }) => {
+      const response = await call("/api/searchCoordinates", {
+        method: "POST",
+        body: { query: "somewhere" }
+      });
+      assert.equal(response.status, 200);
+      assert.equal(seenUserAgent, "SunsethueHelper/1.0 (https://github.com/andrewtryder/sunsethue-helper)");
+    },
+    {
+      envOverrides: { CONTACT_EMAIL: "" },
+      routes: {
+        "nominatim.openstreetmap.org": (url, init) => {
+          seenUserAgent = new Headers(init.headers).get("user-agent");
+          return jsonOk([]);
         }
       }
     }
@@ -251,14 +332,62 @@ test("a Nominatim outage maps to 502 without leaking upstream detail", async () 
   );
 });
 
-test("malformed JSON bodies map to a generic 500 rather than a parser error", async () => {
+test("malformed JSON bodies are rejected with a stable 400 error", async () => {
   await withApi(async ({ call }) => {
     const response = await call("/api/searchCoordinates", { method: "POST", body: "{not json" });
-    assert.equal(response.status, 500);
+    assert.equal(response.status, 400);
     const body = await response.json();
-    assert.equal(body.error.code, "INTERNAL_ERROR");
-    assert.doesNotMatch(JSON.stringify(body), /JSON|token|position/i);
+    assert.equal(body.error.code, "BAD_REQUEST");
+    assert.doesNotMatch(JSON.stringify(body), /token|position|SyntaxError/i);
   });
+});
+
+test("POST /api/autocomplete proxies Photon through the Worker", async () => {
+  let seenUserAgent = null;
+  await withApi(
+    async ({ call, fetchFake }) => {
+      const response = await call("/api/autocomplete", { method: "POST", body: { query: "New York" } });
+      assert.equal(response.status, 200);
+      const body = await response.json();
+      assert.equal(body.features.length, 1);
+      assert.equal(body.features[0].properties.name, "New York");
+      assert.match(seenUserAgent, /^SunsethueHelper\/1\.0 \(.+\)$/);
+      assert.equal(fetchFake.calls[0].host, "photon.komoot.io");
+    },
+    {
+      routes: {
+        "photon.komoot.io": (url, init) => {
+          seenUserAgent = new Headers(init.headers).get("user-agent");
+          assert.equal(url.searchParams.get("q"), "New York");
+          return jsonOk({ features: [{ properties: { name: "New York" }, geometry: { coordinates: [-74, 40.7] } }] });
+        }
+      }
+    }
+  );
+});
+
+test("POST /api/autocomplete validates the query and rate-limits repeat requests", async () => {
+  await withApi(async ({ call, fetchFake }) => {
+    const invalid = await call("/api/autocomplete", { method: "POST", body: { query: "" } });
+    assert.equal(invalid.status, 400);
+    assert.equal(fetchFake.calls.length, 0);
+  });
+});
+
+test("POST /api/autocomplete returns 502 when Photon fails", async () => {
+  await withApi(
+    async ({ call }) => {
+      const response = await call("/api/autocomplete", { method: "POST", body: { query: "somewhere" } });
+      assert.equal(response.status, 502);
+      const body = await response.json();
+      assert.equal(body.error.code, "UPSTREAM_ERROR");
+    },
+    {
+      routes: {
+        "photon.komoot.io": () => new Response("no", { status: 500 })
+      }
+    }
+  );
 });
 
 test("POST /api/triggerReport runs a manual report through the faked mailer", async () => {
@@ -276,7 +405,7 @@ test("POST /api/triggerReport runs a manual report through the faked mailer", as
       assert.match(mailer.sent[0].subject, /On-Demand Test/);
     },
     {
-      locations: [{ id: "a", name: "Beach", latitude: 1, longitude: 2, createdAt: 1 }],
+      locations: [{ id: LOCATION_ID_A, name: "Beach", latitude: 1, longitude: 2, createdAt: 1 }],
       routes: {
         "api.sunsethue.com": () => jsonOk(sunsethueForecast({ baseTime: NOW }))
       }
@@ -294,7 +423,7 @@ test("a missing email secret leaves notification delivery disabled by default", 
       assert.deepEqual(body.jobs, []);
     },
     {
-      locations: [{ id: "a", name: "Beach", latitude: 1, longitude: 2, createdAt: 1 }],
+      locations: [{ id: LOCATION_ID_B, name: "Beach", latitude: 1, longitude: 2, createdAt: 1 }],
       envOverrides: { GMAIL_APP_PASSWORD: "" }
     }
   );

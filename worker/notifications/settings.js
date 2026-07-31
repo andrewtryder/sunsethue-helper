@@ -82,6 +82,15 @@ export function validateSettingsInput(input) {
 
 export async function saveSettings(env, input, now = Date.now()) {
   const settings = validateSettingsInput(input);
+  // Fail closed when the owner tries to enable a channel whose transport
+  // secrets are not configured. Prevents saving an "enabled" setting that
+  // would otherwise silently drop every future notification.
+  if (settings.emailEnabled && !hasEmailTransport(env)) {
+    throw new NotificationError("PROVIDER_NOT_CONFIGURED");
+  }
+  if (settings.pushoverEnabled && !hasPushoverTransport(env)) {
+    throw new NotificationError("PROVIDER_NOT_CONFIGURED");
+  }
   await db.upsertNotificationSettings(env, { ...settings, updatedAt: now });
   return settings;
 }

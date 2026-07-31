@@ -284,14 +284,14 @@ test("POST /api/triggerReport runs a manual report through the faked mailer", as
   );
 });
 
-test("a failing manual report maps to a generic 500", async () => {
+test("a missing email secret leaves notification delivery disabled by default", async () => {
   await withApi(
     async ({ call }) => {
       const response = await call("/api/triggerReport", { method: "POST" });
-      assert.equal(response.status, 500);
+      assert.equal(response.status, 200);
       const body = await response.json();
-      assert.equal(body.error.code, "INTERNAL_ERROR");
-      assert.doesNotMatch(JSON.stringify(body), /GMAIL|password|smtp/i);
+      assert.equal(body.success, true);
+      assert.deepEqual(body.jobs, []);
     },
     {
       locations: [{ id: "a", name: "Beach", latitude: 1, longitude: 2, createdAt: 1 }],

@@ -1,6 +1,8 @@
 import { fetchApiCredits } from "./sunsethue.js";
-import { runAndSendReport } from "./report.js";
+import { enqueueNotifications, runAndSendReport } from "./report.js";
 import * as db from "./db.js";
+import { dispatchPendingNotifications } from "./notifications/dispatcher.js";
+import { getSettings, hasEmailTransport, hasPushoverTransport, publicSettings, saveSettings } from "./notifications/settings.js";
 import {
   createRequestId,
   jsonResponse,
@@ -23,6 +25,63 @@ export async function handleHttpRequest(request, env, authContext = null, deps =
   const path = url.pathname;
 
   try {
+    async function jsonBody() {
+      if (!request.headers.get("content-type")?.toLowerCase().startsWith("application/json")) {
+        return null;
+      }
+      return request.json();
+    }
+
+    if (path === "/api/notification-settings") {
+      if (request.method === "GET") {
+        return jsonResponse(publicSettings(await getSettings(env), env), 200, requestId);
+      }
+      if (request.method !== "PUT") return methodNotAllowed("GET, PUT", requestId);
+      const body = await jsonBody();
+      if (body === null) return errorResponse("UNSUPPORTED_MEDIA_TYPE", "Content-Type must be application/json.", 415, requestId);
+      try {
+        const settings = await saveSettings(env, body, deps.now ?? Date.now());
+        return jsonResponse(publicSettings(settings, env), 200, requestId);
+      } catch (error) {
+        return errorResponse(error.code || "INVALID_SETTINGS", "Invalid notification settings.", 400, requestId);
+      }
+    }
+
+    if (path === "/api/notification-deliveries") {
+      if (request.method !== "GET") return methodNotAllowed("GET", requestId);
+      return jsonResponse(await db.getNotificationDeliveries(env), 200, requestId);
+    }
+
+    if (path.startsWith("/api/notification-deliveries/") && path.endsWith("/retry")) {
+      if (request.method !== "POST") return methodNotAllowed("POST", requestId);
+      const id = path.slice("/api/notification-deliveries/".length, -"/retry".length);
+      if (!id) return errorResponse("BAD_REQUEST", "Missing delivery ID.", 400, requestId);
+      const now = deps.now ?? Date.now();
+      if (!await db.retryFailedDelivery(env, id, now)) return errorResponse("NOT_RETRYABLE", "Delivery is not failed.", 409, requestId);
+      const outcomes = await dispatchPendingNotifications(env, deps);
+      return jsonResponse({ id, status: outcomes.find((item) => item.id === id)?.status || "pending" }, 200, requestId);
+    }
+
+    if (path === "/api/notifications/test") {
+      if (request.method !== "POST") return methodNotAllowed("POST", requestId);
+      const body = await jsonBody();
+      if (body === null) return errorResponse("UNSUPPORTED_MEDIA_TYPE", "Content-Type must be application/json.", 415, requestId);
+      if (!body || typeof body !== "object" || Object.keys(body).length !== 1 || !["email", "pushover"].includes(body.channel)) {
+        return errorResponse("BAD_REQUEST", "Choose an available notification channel.", 400, requestId);
+      }
+      const now = deps.now ?? Date.now();
+      if (!await db.claimNotificationTestSlot(env, now)) return errorResponse("RATE_LIMITED", "Try again in a minute.", 429, requestId);
+      const settings = await getSettings(env);
+      if (body.channel === "email" && (!settings.emailEnabled || !hasEmailTransport(env))) return errorResponse("PROVIDER_NOT_CONFIGURED", "Email is not configured.", 409, requestId);
+      if (body.channel === "pushover" && (!settings.pushoverEnabled || !hasPushoverTransport(env))) return errorResponse("PROVIDER_NOT_CONFIGURED", "Pushover is not configured.", 409, requestId);
+      const jobs = await enqueueNotifications({ runId: crypto.randomUUID(), triggerType: "TEST", generatedAt: now, dashboardUrl: env.WEBAPP_URL || null, locationsCount: 0, results: [] }, env, {
+        settings: { ...settings, emailEnabled: body.channel === "email" ? 1 : 0, pushoverEnabled: body.channel === "pushover" ? 1 : 0 }
+      });
+      const outcomes = await dispatchPendingNotifications(env, deps);
+      const job = jobs[0];
+      return jsonResponse({ id: job.id, status: outcomes.find((item) => item.id === job.id)?.status || "pending" }, 202, requestId);
+    }
+
     // 1. GET /api/getApiCredits
     if (path === "/api/getApiCredits") {
       if (request.method !== "GET") return methodNotAllowed("GET", requestId);
@@ -66,9 +125,9 @@ export async function handleHttpRequest(request, env, authContext = null, deps =
     // 3. POST /api/triggerReport
     if (path === "/api/triggerReport") {
       if (request.method !== "POST") return methodNotAllowed("POST", requestId);
-      await runAndSendReport("Manual Test", env, deps);
+      const report = await runAndSendReport("Manual Test", env, deps);
       return jsonResponse(
-        { success: true, message: "Report processed and email sent." },
+        { success: true, runId: report.runId, jobs: report.jobs },
         200,
         requestId
       );

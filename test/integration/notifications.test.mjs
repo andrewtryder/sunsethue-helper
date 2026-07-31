@@ -1,0 +1,207 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import * as db from "../../worker/db.js";
+import { enqueueNotifications } from "../../worker/report.js";
+import { dispatchPendingNotifications, nextAttemptAt } from "../../worker/notifications/dispatcher.js";
+import { sendPushover } from "../../worker/notifications/pushover.js";
+import { asNotificationError, NotificationError } from "../../worker/notifications/errors.js";
+import { buildPushoverContent, parseNotificationPayload } from "../../worker/notifications/payload.js";
+import { getSettings, publicSettings, saveSettings } from "../../worker/notifications/settings.js";
+import { handleHttpRequest } from "../../worker/api.js";
+import { createLocalD1 } from "../support/local-d1.mjs";
+import { createFetchFake, createMailerFake, jsonOk } from "../support/fakes.mjs";
+import { makeRequest } from "../helpers.mjs";
+
+const NOW = Date.parse("2026-07-15T12:00:00Z");
+
+async function withEnv(fn) {
+  const local = await createLocalD1();
+  const env = {
+    DB: local.DB, GMAIL_USER: "reports@example.com", GMAIL_APP_PASSWORD: "fake-password",
+    EMAIL_TO: "owner@example.com", EMAIL_FROM: "Sunsethue <reports@example.com>",
+    PUSHOVER_APP_TOKEN: "fake-pushover-app", PUSHOVER_USER_KEY: "fake-pushover-user",
+    WEBAPP_URL: "https://dashboard.example.test"
+  };
+  try { await fn(env); } finally { local.close(); }
+}
+
+function model(runId = crypto.randomUUID()) {
+  return {
+    runId, triggerType: "AM", generatedAt: NOW, dashboardUrl: "https://dashboard.example.test",
+    locationsCount: 1,
+    results: [{ name: "Private beach", sunrise: { time: "2026-07-15T09:00:00Z", quality: 0.7, quality_text: "Good" }, sunset: { time: "2026-07-15T23:00:00Z", quality: 0.5, quality_text: "Fair" }, error: null }]
+  };
+}
+
+test("settings default to valid legacy email only and never expose secrets", async () => {
+  await withEnv(async (env) => {
+    const settings = await getSettings(env);
+    assert.equal(settings.emailEnabled, 1);
+    assert.equal(settings.pushoverEnabled, 0);
+    const visible = publicSettings(settings, env);
+    assert.equal(visible.emailConfigured, true);
+    assert.equal(visible.pushoverConfigured, true);
+    assert.doesNotMatch(JSON.stringify(visible), /fake-password|fake-pushover/);
+  });
+});
+
+test("settings support both channels and reject injection, emergency priority, and unknown fields", async () => {
+  await withEnv(async (env) => {
+    const input = { emailEnabled: true, emailTo: "owner@example.com", pushoverEnabled: true, pushoverDevice: "phone-1", pushoverPriority: 1, pushoverSound: "cosmic" };
+    const saved = await saveSettings(env, input, NOW);
+    assert.equal(saved.pushoverEnabled, 1);
+    await assert.rejects(() => saveSettings(env, { ...input, emailTo: "owner@example.com\r\nBcc:x", unexpected: true }), /UNKNOWN_SETTINGS_FIELD/);
+    await assert.rejects(() => saveSettings(env, { ...input, pushoverPriority: 2 }), /INVALID_PUSHOVER_PRIORITY/);
+  });
+});
+
+test("run and outbox creation is atomic and creates one job per enabled channel", async () => {
+  await withEnv(async (env) => {
+    await saveSettings(env, { emailEnabled: true, emailTo: "owner@example.com", pushoverEnabled: true, pushoverDevice: null, pushoverPriority: 0, pushoverSound: null }, NOW);
+    const report = model("run-both");
+    const jobs = await enqueueNotifications(report, env);
+    assert.deepEqual(jobs.map((job) => job.channel).sort(), ["email", "pushover"]);
+    assert.equal((await db.getRuns(env))[0].id, "run-both");
+    await assert.rejects(() => enqueueNotifications(report, env));
+    assert.equal((await db.getNotificationDeliveries(env)).length, 2);
+  });
+});
+
+test("dispatcher claims once, sends email through the injected mailer, and records only safe status", async () => {
+  await withEnv(async (env) => {
+    const jobs = await enqueueNotifications(model("run-email"), env);
+    const mailer = createMailerFake();
+    const outcomes = await dispatchPendingNotifications(env, { now: NOW, loadMailer: mailer.loadMailer });
+    assert.equal(outcomes[0].status, "sent");
+    assert.equal(mailer.sent.length, 1);
+    const stored = await db.getOutboxJob(env, jobs[0].id);
+    assert.equal(stored.status, "sent");
+    assert.equal(stored.payload.includes("fake-password"), false);
+    assert.equal(await db.claimOutboxJob(env, jobs[0].id, NOW, NOW + 60_000), false);
+  });
+});
+
+test("notification logs omit synthetic provider secrets, recipient data, and location names", async () => {
+  await withEnv(async (env) => {
+    env.GMAIL_APP_PASSWORD = "synthetic-secret-password";
+    env.EMAIL_TO = "private-recipient@example.test";
+    const privateModel = model("private-log-run");
+    privateModel.results[0].name = "Secret Observatory";
+    await enqueueNotifications(privateModel, env);
+    const mailer = createMailerFake();
+    const lines = [];
+    const originalLog = console.log;
+    console.log = (...parts) => lines.push(parts.join(" "));
+    try {
+      await dispatchPendingNotifications(env, { now: NOW, loadMailer: mailer.loadMailer });
+    } finally { console.log = originalLog; }
+    const output = lines.join("\n");
+    assert.doesNotMatch(output, /synthetic-secret-password|private-recipient|Secret Observatory/);
+    assert.match(output, /NOTIFICATION_SENT/);
+  });
+});
+
+test("expired leases recover and transient Pushover failures follow the retry schedule", async () => {
+  await withEnv(async (env) => {
+    await saveSettings(env, { emailEnabled: false, emailTo: null, pushoverEnabled: true, pushoverDevice: null, pushoverPriority: 0, pushoverSound: null }, NOW);
+    const [job] = await enqueueNotifications(model("run-push"), env);
+    assert.equal(await db.claimOutboxJob(env, job.id, NOW, NOW + 1), true);
+    const fetchFake = createFetchFake({ "api.pushover.net": () => new Response("busy", { status: 429 }) });
+    const outcomes = await dispatchPendingNotifications(env, { now: NOW + 2, fetch: fetchFake });
+    assert.equal(outcomes[0].status, "pending");
+    const stored = await db.getOutboxJob(env, job.id);
+    assert.equal(stored.attempts, 1);
+    assert.equal(stored.nextAttemptAt, nextAttemptAt(NOW + 2, 1));
+    assert.equal(stored.lastErrorCode, "PUSHOVER_RETRYABLE");
+  });
+});
+
+test("Pushover payload is bounded and successful provider request IDs are safe", async () => {
+  await withEnv(async (env) => {
+    const long = model("run-push-success");
+    long.results[0].name = "x".repeat(2_000);
+    await saveSettings(env, { emailEnabled: false, emailTo: null, pushoverEnabled: true, pushoverDevice: "phone", pushoverPriority: -1, pushoverSound: "none" }, NOW);
+    const [job] = await enqueueNotifications(long, env);
+    const stored = await db.getOutboxJob(env, job.id);
+    const fetchFake = createFetchFake({ "api.pushover.net": (url, init) => {
+      assert.equal(url.pathname, "/1/messages.json");
+      const body = new URLSearchParams(init.body);
+      assert.ok(body.get("title").length <= 250);
+      assert.ok(body.get("message").length <= 1024);
+      return jsonOk({ status: 1, request: "safe-request-id" });
+    } });
+    const result = await sendPushover({ ...stored, settings: await getSettings(env) }, env, { fetch: fetchFake });
+    assert.equal(result.providerMessageId, "safe-request-id");
+  });
+});
+
+test("notification helpers classify failures and reject malformed payloads without provider details", () => {
+  assert.equal(asNotificationError(new Error("provider said secret")).code, "PROVIDER_UNAVAILABLE");
+  assert.equal(asNotificationError(new NotificationError("KNOWN")).code, "KNOWN");
+  assert.throws(() => parseNotificationPayload("not json"), /INVALID_NOTIFICATION_PAYLOAD/);
+  assert.throws(() => parseNotificationPayload(JSON.stringify({ version: 2, locations: null })), /INVALID_NOTIFICATION_PAYLOAD/);
+  const content = buildPushoverContent({ triggerType: "AM", locations: [{ name: "A", errorCode: "FORECAST_UNAVAILABLE" }] });
+  assert.match(content.message, /unavailable/);
+  assert.equal(buildPushoverContent({ triggerType: "AM", locations: [] }).message, "Forecast report generated.");
+  assert.equal(nextAttemptAt(NOW, 9), NOW + 2 * 60 * 60_000);
+});
+
+test("Pushover rejects invalid credentials and normalizes timeout failures", async () => {
+  await withEnv(async (env) => {
+    await saveSettings(env, { emailEnabled: false, emailTo: null, pushoverEnabled: true, pushoverDevice: null, pushoverPriority: 0, pushoverSound: null }, NOW);
+    const [job] = await enqueueNotifications(model("push-errors"), env);
+    const stored = await db.getOutboxJob(env, job.id);
+    const delivery = { ...stored, settings: await getSettings(env) };
+    await assert.rejects(() => sendPushover(delivery, env, { fetch: async () => new Response("no", { status: 401 }) }), /PUSHOVER_REJECTED/);
+    await assert.rejects(() => sendPushover(delivery, env, { fetch: async () => { const error = new Error("aborted"); error.name = "AbortError"; throw error; } }), /PUSHOVER_TIMEOUT/);
+  });
+});
+
+test("settings reject invalid email and Pushover option values", async () => {
+  await withEnv(async (env) => {
+    const valid = { emailEnabled: false, emailTo: null, pushoverEnabled: false, pushoverDevice: null, pushoverPriority: 0, pushoverSound: null };
+    await assert.rejects(() => saveSettings(env, { ...valid, emailEnabled: true, emailTo: "bad address" }), /INVALID_EMAIL_ADDRESS/);
+    await assert.rejects(() => saveSettings(env, { ...valid, pushoverSound: "bad\nvalue" }), /INVALID_PUSHOVER_OPTION/);
+    await assert.rejects(() => saveSettings(env, null), /INVALID_SETTINGS/);
+  });
+});
+
+test("notification settings and delivery history routes validate bodies and redact payloads", async () => {
+  await withEnv(async (env) => {
+    const call = (path, options, deps = {}) => handleHttpRequest(makeRequest(path, options), env, { authorized: true }, { now: NOW, ...deps });
+    const initial = await call("/api/notification-settings");
+    assert.equal(initial.status, 200);
+    assert.equal((await initial.json()).emailEnabled, true);
+    const invalidType = await call("/api/notification-settings", { method: "PUT", headers: { "content-type": "text/plain" }, body: "{}" });
+    assert.equal(invalidType.status, 415);
+    const invalid = await call("/api/notification-settings", { method: "PUT", body: { emailEnabled: true, emailTo: "owner@example.com", pushoverEnabled: false, pushoverDevice: null, pushoverPriority: 2, pushoverSound: null } });
+    assert.equal(invalid.status, 400);
+    const saved = await call("/api/notification-settings", { method: "PUT", body: { emailEnabled: false, emailTo: null, pushoverEnabled: true, pushoverDevice: null, pushoverPriority: -2, pushoverSound: null } });
+    assert.equal(saved.status, 200);
+    const history = await call("/api/notification-deliveries");
+    assert.deepEqual(await history.json(), []);
+    assert.equal((await call("/api/notification-deliveries", { method: "POST" })).status, 405);
+  });
+});
+
+test("test and manual-retry routes use the dispatcher, enforce rate limiting, and do not expose payloads", async () => {
+  await withEnv(async (env) => {
+    const mailer = createMailerFake();
+    const call = (path, options, deps = {}) => handleHttpRequest(makeRequest(path, options), env, { authorized: true }, { now: NOW, loadMailer: mailer.loadMailer, ...deps });
+    const bad = await call("/api/notifications/test", { method: "POST", body: { channel: "unknown" } });
+    assert.equal(bad.status, 400);
+    const testEmail = await call("/api/notifications/test", { method: "POST", body: { channel: "email" } });
+    assert.equal(testEmail.status, 202);
+    assert.equal((await testEmail.json()).status, "sent");
+    assert.equal((await call("/api/notifications/test", { method: "POST", body: { channel: "email" } })).status, 429);
+
+    const [job] = await enqueueNotifications(model("retry-route"), env);
+    await db.claimOutboxJob(env, job.id, NOW, NOW + 10);
+    await db.failOutboxJob(env, job.id, { attempts: 5, nextAttemptAt: NOW, code: "SMTP_DELIVERY_FAILED", terminal: true });
+    const retried = await call(`/api/notification-deliveries/${job.id}/retry`, { method: "POST" }, { now: NOW + 61_000 });
+    assert.equal(retried.status, 200);
+    const deliveries = await (await call("/api/notification-deliveries")).json();
+    assert.equal("payload" in deliveries[0], false);
+    assert.equal((await call("/api/notification-deliveries/nope/retry", { method: "POST" })).status, 409);
+  });
+});

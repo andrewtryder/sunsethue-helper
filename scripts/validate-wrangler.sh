@@ -61,7 +61,7 @@ require_line "$PAGES_CONFIG" '^binding[[:space:]]*=[[:space:]]*"API_SERVICE"' 'A
 require_line "$PAGES_CONFIG" "^service[[:space:]]*=[[:space:]]*\"${EXPECTED_WORKER}\"" "API_SERVICE targets ${EXPECTED_WORKER}" || failures=1
 
 # Secrets must never be committed as plaintext vars.
-for forbidden in SUNSETHUE_API_KEY GMAIL_APP_PASSWORD GMAIL_USER POLICY_AUD TEAM_DOMAIN AUTHORIZED_EMAIL CONTACT_EMAIL; do
+for forbidden in SUNSETHUE_API_KEY GMAIL_APP_PASSWORD GMAIL_USER PUSHOVER_APP_TOKEN PUSHOVER_USER_KEY POLICY_AUD TEAM_DOMAIN AUTHORIZED_EMAIL CONTACT_EMAIL; do
   if grep -Eq "^[[:space:]]*${forbidden}[[:space:]]*=" "$WORKER_CONFIG" "$PAGES_CONFIG"; then
     echo "FORBIDDEN: ${forbidden} is set as a plaintext var; it must be a Worker secret" >&2
     failures=1

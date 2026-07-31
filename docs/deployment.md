@@ -71,6 +71,8 @@ All of these live in the `production` environment. Values are never logged.
 | `GMAIL_APP_PASSWORD` | Worker secret during deploy |
 | `EMAIL_TO` | Worker secret during deploy |
 | `EMAIL_FROM` | Worker secret during deploy |
+| `PUSHOVER_APP_TOKEN` | Optional Worker secret for Pushover delivery |
+| `PUSHOVER_USER_KEY` | Optional Worker secret for Pushover delivery |
 
 Access policy changes are not part of this workflow. See [cloudflare-credentials.md](cloudflare-credentials.md) for one-time Access setup with the same token.
 

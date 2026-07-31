@@ -31,6 +31,7 @@
           <button class="nav-tab active" data-tab="main" id="nav-main" role="tab" aria-selected="true" aria-controls="pane-main">Main Forecast</button>
           <button class="nav-tab" data-tab="locations" id="nav-locations" role="tab" aria-selected="false" aria-controls="pane-locations">Manage Locations</button>
           <button class="nav-tab" data-tab="logs" id="nav-logs" role="tab" aria-selected="false" aria-controls="pane-logs">Execution Logs</button>
+          <button class="nav-tab" data-tab="notifications" id="nav-notifications" role="tab" aria-selected="false" aria-controls="pane-notifications">Notifications</button>
         </nav>
       </div>
     </header>
@@ -43,6 +44,7 @@
         <button class="nav-tab active" data-tab="main" role="tab" aria-selected="true" aria-controls="pane-main">Main Forecast</button>
         <button class="nav-tab" data-tab="locations" role="tab" aria-selected="false" aria-controls="pane-locations">Manage Locations</button>
         <button class="nav-tab" data-tab="logs" role="tab" aria-selected="false" aria-controls="pane-logs">Execution Logs</button>
+        <button class="nav-tab" data-tab="notifications" role="tab" aria-selected="false" aria-controls="pane-notifications">Notifications</button>
       </nav>
 
       <div id="pane-main" class="tab-pane active" role="tabpanel" aria-labelledby="nav-main">
@@ -143,13 +145,28 @@
           </div>
         </div>
       </div>
+
+      <div id="pane-notifications" class="tab-pane" role="tabpanel" aria-labelledby="nav-notifications">
+        <div class="pane-header"><h2>Notification settings</h2></div>
+        <p class="pane-subtext">Provider credentials are Worker secrets and are never shown here.</p>
+        <form id="notification-settings-form" class="form-card" novalidate>
+          <div class="form-group"><label><input id="notification-email-enabled" type="checkbox"> Enable email</label><span id="notification-email-status" class="action-status" role="status"></span></div>
+          <div class="form-group"><label for="notification-email-to">Email destination</label><input id="notification-email-to" class="form-input" type="email" autocomplete="email" aria-describedby="notification-email-help"><small id="notification-email-help">Email transport credentials are configured as Worker secrets.</small></div>
+          <div class="form-group"><label><input id="notification-pushover-enabled" type="checkbox"> Enable Pushover</label><span id="notification-pushover-status" class="action-status" role="status"></span></div>
+          <div class="form-group"><label for="notification-device">Pushover device (optional)</label><input id="notification-device" class="form-input" maxlength="64"></div>
+          <div class="form-group"><label for="notification-priority">Pushover priority</label><select id="notification-priority" class="form-input"><option value="-2">Lowest</option><option value="-1">Low</option><option value="0">Normal</option><option value="1">High</option></select></div>
+          <div class="form-group"><label for="notification-sound">Pushover sound (optional)</label><input id="notification-sound" class="form-input" maxlength="64"></div>
+          <div class="form-actions"><button type="submit" class="btn btn-primary">Save notifications</button><button type="button" id="test-email-btn" class="btn btn-secondary">Test Email</button><button type="button" id="test-pushover-btn" class="btn btn-secondary">Test Pushover</button></div>
+        </form>
+        <section aria-labelledby="delivery-history-title"><div class="pane-header"><h3 id="delivery-history-title">Recent delivery status</h3></div><div id="notification-deliveries" class="logs-container" role="status" aria-live="polite">Loading deliveries…</div></section>
+      </div>
     </main>
 
     <footer id="app-footer">
       <div class="footer-inner">
         <span>Manual Run</span>
         <span>—</span>
-        <button type="button" id="trigger-test-btn" class="footer-link-btn">Send Test Email Now</button>
+        <button type="button" id="trigger-test-btn" class="footer-link-btn">Run report now</button>
         <span id="trigger-status" class="action-status hidden" aria-hidden="true">
           <span class="spinner"></span>
           <span id="trigger-status-text">Sending email…</span>
@@ -170,6 +187,7 @@
         <span class="material-symbols-outlined" aria-hidden="true">assignment</span>
         <span>Logs</span>
       </button>
+      <button class="bottom-nav-item" data-tab="notifications" role="tab" aria-selected="false" aria-controls="pane-notifications"><span class="material-symbols-outlined" aria-hidden="true">notifications</span><span>Alerts</span></button>
     </nav>
   </div>
 

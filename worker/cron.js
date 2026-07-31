@@ -1,4 +1,5 @@
 import { runAndSendReport } from "./report.js";
+import { dispatchPendingNotifications } from "./notifications/dispatcher.js";
 
 // ⚡ Bolt Performance Optimization:
 // Caching Intl.DateTimeFormat instances at the module level prevents the V8 engine
@@ -17,13 +18,20 @@ const minuteFormatterET = new Intl.DateTimeFormat("en-US", {
 /**
  * @param {object} event
  * @param {object} env
- * @param {{ now?: number | Date, runAndSendReport?: typeof runAndSendReport }} [deps]
+ * @param {{ now?: number | Date, runAndSendReport?: typeof runAndSendReport, dispatchPendingNotifications?: typeof dispatchPendingNotifications }} [deps]
  *   Injection seam so tests can pin the instant and observe dispatch without
  *   sending email. Production callers omit it.
  */
 export async function handleScheduledReport(event, env, deps = {}) {
   const now = deps.now === undefined ? new Date() : new Date(deps.now);
   const runReport = deps.runAndSendReport || runAndSendReport;
+  const dispatch = deps.dispatchPendingNotifications || dispatchPendingNotifications;
+
+  try {
+    await dispatch(env, { ...deps, now: now.getTime() });
+  } catch {
+    // A later hourly cron recovers expired leases and pending work.
+  }
 
   // Format to Eastern Time hour and minute
   const hourStr = hourFormatterET.format(now);

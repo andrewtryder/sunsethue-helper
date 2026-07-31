@@ -298,7 +298,9 @@ gmailCredentialsForm?.addEventListener("submit", async (event) => {
     });
     if (!response.ok) {
       const payload = await response.json().catch(() => null);
-      throw new Error(payload?.error?.message || "Unable to save Gmail credentials.");
+      const message = payload?.error?.message || "Unable to save Gmail credentials.";
+      const code = payload?.error?.code;
+      throw new Error(code ? `${message} (${code})` : message);
     }
     if (gmailAppPasswordInput) gmailAppPasswordInput.value = "";
     showBanner(dbSuccessBanner, "Gmail credentials saved.");
@@ -323,7 +325,12 @@ document.getElementById("remove-gmail-credentials-btn")?.addEventListener("click
       method: "DELETE",
       headers: { ...CREDENTIAL_ADMIN_HEADER }
     });
-    if (!response.ok) throw new Error("Unable to remove Gmail credentials.");
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null);
+      const message = payload?.error?.message || "Unable to remove Gmail credentials.";
+      const code = payload?.error?.code;
+      throw new Error(code ? `${message} (${code})` : message);
+    }
     showBanner(dbSuccessBanner, "Gmail credentials removed.");
     await Promise.all([fetchProviderCredentials(), fetchNotificationSettings()]);
   } catch (error) {
@@ -350,7 +357,9 @@ pushoverCredentialsForm?.addEventListener("submit", async (event) => {
     });
     if (!response.ok) {
       const payload = await response.json().catch(() => null);
-      throw new Error(payload?.error?.message || "Unable to save Pushover credentials.");
+      const message = payload?.error?.message || "Unable to save Pushover credentials.";
+      const code = payload?.error?.code;
+      throw new Error(code ? `${message} (${code})` : message);
     }
     if (pushoverAppTokenInput) pushoverAppTokenInput.value = "";
     if (pushoverUserKeyInput) pushoverUserKeyInput.value = "";
@@ -376,7 +385,12 @@ document.getElementById("remove-pushover-credentials-btn")?.addEventListener("cl
       method: "DELETE",
       headers: { ...CREDENTIAL_ADMIN_HEADER }
     });
-    if (!response.ok) throw new Error("Unable to remove Pushover credentials.");
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null);
+      const message = payload?.error?.message || "Unable to remove Pushover credentials.";
+      const code = payload?.error?.code;
+      throw new Error(code ? `${message} (${code})` : message);
+    }
     showBanner(dbSuccessBanner, "Pushover credentials removed.");
     await Promise.all([fetchProviderCredentials(), fetchNotificationSettings()]);
   } catch (error) {

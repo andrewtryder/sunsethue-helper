@@ -36,6 +36,7 @@
     "ci": "npm run lint && npm run audit && npm run lint:shell && npm run lint:workflows && npm run validate:wrangler && npm run test:coverage",
     "db:schema:local": "node scripts/db-schema-local.mjs",
     "db:schema:remote": "node scripts/db-schema-remote.mjs",
+    "secrets:upload": "node scripts/upload-worker-secrets.mjs",
     "deploy:prepare": "node scripts/prepare-deployment.mjs",
     "verify:production": "node scripts/verify-production.mjs",
     "rollback:production": "node scripts/rollback-production.mjs",

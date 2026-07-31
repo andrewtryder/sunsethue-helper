@@ -122,30 +122,12 @@ jobs:
           DEPLOY_REPOSITORY: ${{ vars.DEPLOY_REPOSITORY }}
         run: npm run config:generate:strict
 
-      # The Worker deploys first and must stay backward compatible, because the
-      # previous Pages frontend keeps calling it until the next job finishes.
-      - name: Deploy Worker
-        uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          packageManager: npm
-          wranglerVersion: "4.115.0"
-          command: deploy --minify --keep-vars --config wrangler.worker.toml
-          secrets: |
-            AUTHORIZED_EMAIL
-            TEAM_DOMAIN
-            POLICY_AUD
-            SUNSETHUE_API_KEY
-            GMAIL_USER
-            GMAIL_APP_PASSWORD
-            EMAIL_TO
-            EMAIL_FROM
-            PUSHOVER_APP_TOKEN
-            PUSHOVER_USER_KEY
-            CONTACT_EMAIL
-            WEBAPP_URL
+      # Upload secrets against wrangler.worker.toml (not the Pages wrangler.toml).
+      # Optional Pushover credentials are skipped when unset so deploy stays green.
+      - name: Upload Worker secrets
         env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           AUTHORIZED_EMAIL: ${{ secrets.AUTHORIZED_EMAIL }}
           TEAM_DOMAIN: ${{ secrets.TEAM_DOMAIN }}
           POLICY_AUD: ${{ secrets.POLICY_AUD }}
@@ -158,6 +140,18 @@ jobs:
           PUSHOVER_USER_KEY: ${{ secrets.PUSHOVER_USER_KEY }}
           CONTACT_EMAIL: ${{ secrets.CONTACT_EMAIL }}
           WEBAPP_URL: ${{ vars.PRODUCTION_URL }}
+        run: node scripts/upload-worker-secrets.mjs
+
+      # The Worker deploys first and must stay backward compatible, because the
+      # previous Pages frontend keeps calling it until the next job finishes.
+      - name: Deploy Worker
+        uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          packageManager: npm
+          wranglerVersion: "4.115.0"
+          command: deploy --minify --keep-vars --config wrangler.worker.toml
 
       - name: Record the deployed Worker version
         id: worker_state

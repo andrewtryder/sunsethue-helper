@@ -25,7 +25,7 @@ test("every workflow passes the repository security policy", () => {
 test("the expected workflow set is present", () => {
   assert.deepEqual(
     workflows.map((entry) => entry.name).sort(),
-    ["production.yml", "rollback.yml", "validate.yml"]
+    ["production.yml", "rollback.yml", "security.yml", "validate.yml"]
   );
 });
 
@@ -96,7 +96,7 @@ test("every production job that touches Cloudflare uses the production environme
 
 test("every Cloudflare-touching workflow uses the single CLOUDFLARE_API_TOKEN", () => {
   for (const entry of workflows) {
-    if (entry.name === "validate.yml") {
+    if (entry.name === "validate.yml" || entry.name === "security.yml") {
       assert.doesNotMatch(entry.text, /secrets\.CLOUDFLARE_/);
       continue;
     }
@@ -108,6 +108,33 @@ test("every Cloudflare-touching workflow uses the single CLOUDFLARE_API_TOKEN", 
     assert.doesNotMatch(entry.text, /CLOUDFLARE_DEPLOY_API_TOKEN/);
     assert.doesNotMatch(entry.text, /CLOUDFLARE_ZEROTRUST_API_TOKEN/);
   }
+});
+
+test("security audit is scheduled or manual, read-only, and secret-free", () => {
+  const security = workflow("security.yml");
+  const securityEntry = workflows.find((entry) => entry.name === "security.yml");
+  assert.ok(securityEntry);
+
+  assert.deepEqual(triggers(security).sort(), ["schedule", "workflow_dispatch"]);
+  assert.deepEqual(security.permissions, { contents: "read" });
+  assert.equal(security.concurrency.group, "security-audit");
+
+  for (const [name, job] of Object.entries(security.jobs)) {
+    assert.equal(job.environment, undefined, `${name} must not use a deployment environment`);
+  }
+
+  const secretRefs = [...securityEntry.text.matchAll(/secrets\.([A-Z0-9_]+)/g)].map(
+    (match) => match[1]
+  );
+  assert.deepEqual(
+    secretRefs.filter((name) => name !== "GITHUB_TOKEN"),
+    [],
+    "security.yml must not read production secrets"
+  );
+
+  assert.match(securityEntry.text, /gitleaks\/gitleaks@sha256:[0-9a-f]{64}/);
+  assert.match(securityEntry.text, /trufflesecurity\/trufflehog@sha256:[0-9a-f]{64}/);
+  assert.match(securityEntry.text, /npm run audit:release -- --ci/);
 });
 
 test("rollback is manual, requires a reason, and shares the production concurrency group", () => {

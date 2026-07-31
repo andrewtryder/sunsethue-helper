@@ -1,6 +1,6 @@
-const pluginSecurity = require("eslint-plugin-security");
+import pluginSecurity from "eslint-plugin-security";
 
-module.exports = [
+export default [
   pluginSecurity.configs.recommended,
   {
     ignores: [

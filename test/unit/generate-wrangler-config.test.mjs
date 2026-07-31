@@ -7,7 +7,39 @@ import {
   generateWranglerConfig,
   renderTemplate
 } from "../../scripts/generate-wrangler-config.mjs";
-import { missingRequired, resolveProject } from "../../scripts/lib/project-config.mjs";
+import {
+  loadLocalEnv,
+  missingRequired,
+  resolveProject
+} from "../../scripts/lib/project-config.mjs";
+
+function clearProjectEnv() {
+  // Ensure .env has been consumed once so later deletes are not overwritten by
+  // a deferred process.loadEnvFile during resolveProject.
+  loadLocalEnv();
+  for (const name of [
+    "PAGES_PROJECT_NAME",
+    "WORKER_NAME",
+    "D1_DATABASE_NAME",
+    "D1_DATABASE_ID",
+    "PRODUCTION_HOSTNAME",
+    "AUTHORIZED_EMAIL",
+    "DEPLOY_REPOSITORY",
+    "CONTACT_EMAIL",
+    "ACCESS_HOSTNAME",
+    "PRODUCTION_URL",
+    "PRODUCTION_BRANCH"
+  ]) {
+    delete process.env[name];
+  }
+}
+
+function restoreEnv(previous) {
+  for (const key of Object.keys(process.env)) {
+    if (!(key in previous)) delete process.env[key];
+  }
+  Object.assign(process.env, previous);
+}
 
 test("renderTemplate substitutes known tokens and rejects leftovers", () => {
   const rendered = renderTemplate('name = "{{WORKER_NAME}}"\nid = "{{D1_DATABASE_ID}}"\n', {
@@ -25,7 +57,10 @@ test("renderTemplate substitutes known tokens and rejects leftovers", () => {
 
 test("non-strict generation writes placeholder configs without printing the D1 id", async () => {
   const temp = await mkdtemp(join(tmpdir(), "sunsethue-gen-"));
+  const previous = { ...process.env };
   try {
+    clearProjectEnv();
+
     await writeFile(
       join(temp, "wrangler.example.toml"),
       'name = "{{PAGES_PROJECT_NAME}}"\nservice = "{{WORKER_NAME}}"\n'
@@ -44,6 +79,7 @@ test("non-strict generation writes placeholder configs without printing the D1 i
     assert.match(worker, /00000000-0000-0000-0000-000000000000/);
     assert.match(worker, /sunsethue-helper-worker/);
   } finally {
+    restoreEnv(previous);
     await rm(temp, { recursive: true, force: true });
   }
 });
@@ -51,17 +87,7 @@ test("non-strict generation writes placeholder configs without printing the D1 i
 test("strict resolveProject names missing variables and never echoes values", () => {
   const previous = { ...process.env };
   try {
-    for (const name of [
-      "PAGES_PROJECT_NAME",
-      "WORKER_NAME",
-      "D1_DATABASE_NAME",
-      "D1_DATABASE_ID",
-      "PRODUCTION_HOSTNAME",
-      "AUTHORIZED_EMAIL",
-      "DEPLOY_REPOSITORY"
-    ]) {
-      delete process.env[name];
-    }
+    clearProjectEnv();
 
     const missing = missingRequired();
     assert.ok(missing.includes("D1_DATABASE_ID"));
@@ -75,10 +101,7 @@ test("strict resolveProject names missing variables and never echoes values", ()
       return true;
     });
   } finally {
-    for (const key of Object.keys(process.env)) {
-      if (!(key in previous)) delete process.env[key];
-    }
-    Object.assign(process.env, previous);
+    restoreEnv(previous);
   }
 });
 
@@ -92,13 +115,13 @@ test("strict generation fails closed when D1_DATABASE_ID is missing", async () =
       'database_id = "{{D1_DATABASE_ID}}"\n'
     );
 
+    clearProjectEnv();
     process.env.PAGES_PROJECT_NAME = "demo-pages";
     process.env.WORKER_NAME = "demo-worker";
     process.env.D1_DATABASE_NAME = "demo-db";
     process.env.PRODUCTION_HOSTNAME = "demo.pages.dev";
     process.env.AUTHORIZED_EMAIL = "owner@example.com";
     process.env.DEPLOY_REPOSITORY = "org/demo";
-    delete process.env.D1_DATABASE_ID;
 
     await assert.rejects(
       () => generateWranglerConfig({ strict: true, root: temp }),
@@ -109,10 +132,7 @@ test("strict generation fails closed when D1_DATABASE_ID is missing", async () =
       }
     );
   } finally {
-    for (const key of Object.keys(process.env)) {
-      if (!(key in previous)) delete process.env[key];
-    }
-    Object.assign(process.env, previous);
+    restoreEnv(previous);
     await rm(temp, { recursive: true, force: true });
   }
 });

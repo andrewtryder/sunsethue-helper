@@ -93,13 +93,23 @@ Never paste a token into chat, a pull request, documentation, a test fixture, or
 
 ## Secret scanning
 
-Scan the local repository (including history) with TruffleHog:
+For a full public-release gate (working tree, full history including tags,
+high-entropy sweep, and private-identifier needles), use the pinned audit:
 
 ```bash
-brew install trufflehog   # once
+brew install gitleaks trufflehog   # must match scripts/lib/scanner-versions.mjs
+npm run audit:release
+```
+
+A lighter TruffleHog-only history scan remains available:
+
+```bash
 npm run security:scan
 ```
 
-`security:scan` is intentionally **not** part of `npm run ci`, because TruffleHog is not installed on the GitHub-hosted runners.
+Neither command is part of `npm run ci`. The weekly/manual
+[security workflow](../.github/workflows/security.yml) runs the same
+digest-pinned scanners without production secrets. See
+[docs/public-release-checklist.md](public-release-checklist.md).
 
 A one-time history rewrite removed personal email addresses and the previously committed production D1 database id from every reachable commit. Treat that D1 id as previously disclosed inventory: it is not a credential, but it must live only in the `D1_DATABASE_ID` GitHub environment secret going forward. GitHub may keep unreachable objects addressable by SHA until its own garbage collection runs; contact GitHub Support if a complete purge of cached views is required.

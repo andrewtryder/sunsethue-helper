@@ -1,0 +1,13 @@
+# Regexes matched against filesystem paths for TruffleHog excludes.
+# One pattern per line.
+\.env
+\.dev\.vars
+\.release-audit\.local\.json
+(^|/)wrangler\.toml$
+(^|/)wrangler\.worker\.toml$
+node_modules
+\.git/
+\.tmp/
+coverage/
+package-lock\.json
+\.gitleaks\.toml

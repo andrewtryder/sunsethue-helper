@@ -1,7 +1,10 @@
-const test = require("node:test");
-const assert = require("node:assert");
-const fs = require("node:fs");
-const path = require("path");
+import test from "node:test";
+import assert from "node:assert";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 test("Frontend File Structure & Integrity Checks", () => {
   const publicDir = path.join(__dirname, "..", "public");
@@ -24,7 +27,7 @@ test("Frontend File Structure & Integrity Checks", () => {
 
   // 3. Structural validation of index.html (asserting essential DOM bindings are present)
   const htmlContent = fs.readFileSync(htmlPath, "utf8");
-  
+
   const requiredIds = [
     // Loader view
     "loading-overlay",
@@ -70,7 +73,7 @@ test("Frontend File Structure & Integrity Checks", () => {
 
   requiredIds.forEach(id => {
     assert.ok(
-      htmlContent.includes(`id="${id}"`) || htmlContent.includes(`id='${id}'`), 
+      htmlContent.includes(`id="${id}"`) || htmlContent.includes(`id='${id}'`),
       `index.html must contain an element with id="${id}"`
     );
   });
@@ -89,7 +92,7 @@ test("Frontend File Structure & Integrity Checks", () => {
 
   requiredCssSelectors.forEach(selector => {
     assert.ok(
-      cssContent.includes(selector), 
+      cssContent.includes(selector),
       `style.css must define styles for ${selector}`
     );
   });

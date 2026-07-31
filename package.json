@@ -1,7 +1,19 @@
 {
   "name": "sunsethue-helper",
   "version": "1.17.0",
+  "private": true,
+  "type": "module",
   "description": "Daily sunrise/sunset quality email notifier on Cloudflare Pages, Workers, D1, and Access.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/andrewtryder/sunsethue-helper.git"
+  },
+  "bugs": {
+    "url": "https://github.com/andrewtryder/sunsethue-helper/issues"
+  },
+  "homepage": "https://github.com/andrewtryder/sunsethue-helper#readme",
+  "packageManager": "npm@11.17.0",
   "engines": {
     "node": ">=24"
   },
@@ -11,6 +23,7 @@
     "lint:shell": "bash scripts/lint-shell.sh",
     "lint:workflows": "node scripts/check-workflows.mjs",
     "audit": "npm audit --audit-level=high",
+    "audit:release": "node scripts/public-release-audit.mjs",
     "security:scan": "trufflehog git file://. --results=verified,unknown --fail",
     "config:generate": "node scripts/generate-wrangler-config.mjs",
     "config:generate:strict": "node scripts/generate-wrangler-config.mjs --strict",
@@ -34,7 +47,7 @@
   },
   "dependencies": {
     "jose": "6.2.5",
-    "worker-mailer": "^1.2.1"
+    "worker-mailer": "1.2.1"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.1",

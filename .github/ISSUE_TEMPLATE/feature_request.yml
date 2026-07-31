@@ -1,0 +1,33 @@
+name: Feature request
+description: Propose an enhancement
+title: "feat: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the problem and the proposed change. Keep production credentials out of this form.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user or operator problem does this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope notes
+      options:
+        - label: I understand production Access, secrets, and D1 identity stay outside tracked source.
+          required: true

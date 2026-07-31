@@ -59,6 +59,9 @@ playwright/.cache/
 .tmp/cloudflare-access/
 wrangler.jwt-public.toml
 
+# Local public-release audit needles (real identifiers; never commit)
+.release-audit.local.json
+
 # OS files
 .DS_Store
 Thumbs.db

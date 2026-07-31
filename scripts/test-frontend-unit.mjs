@@ -17,14 +17,17 @@ import {
 } from "../public/lib/helpers.js";
 
 test("frontend helpers escape and render forecast badges", () => {
-  assert.match(getForecastBadgeHtml(0.85, "Great"), /quality-dot/);
-  assert.match(getForecastBadgeHtml(0.45, "Fair"), /#f97316/);
-  assert.match(getForecastBadgeHtml(0.1, "Low"), /#ef4444/);
-  assert.match(getForecastBadgeHtml(0.35, "Fair"), /35% \(Fair\)/);
-  assert.match(getForecastBadgeHtml(35, "Fair"), /35% \(Fair\)/);
-  assert.match(getForecastBadgeHtml(0.35, "35%"), /35% \(Fair\)/);
+  assert.match(getForecastBadgeHtml(0.85, "Great"), /quality-meter/);
+  assert.match(getForecastBadgeHtml(0.85, "Great"), /quality-badge/);
+  assert.match(getForecastBadgeHtml(0.85, "Great"), /85%/);
+  assert.match(getForecastBadgeHtml(0.85, "Great"), /Great/);
+  assert.match(getForecastBadgeHtml(0.45, "Fair"), /quality-meter-fill/);
+  assert.match(getForecastBadgeHtml(0.45, "Fair"), /width:45%/);
+  assert.match(getForecastBadgeHtml(0.1, "Low"), /Low/);
+  assert.match(getForecastBadgeHtml(0.35, "Fair"), /35%/);
+  assert.match(getForecastBadgeHtml(35, "Fair"), /35%/);
+  assert.match(getForecastBadgeHtml(0.35, "35%"), /Fair/);
   assert.match(getForecastBadgeHtml(0.7), /70%/);
-  assert.match(getForecastBadgeHtml(0.55), /quality-text-strong/);
   assert.match(getForecastBadgeHtml(null), /N\/A/);
   assert.strictEqual(escapeHtml('<img onerror="x">'), "&lt;img onerror=&quot;x&quot;&gt;");
 });

@@ -58,6 +58,7 @@ const useCurrentLocationBtn = document.getElementById("use-current-location-btn"
 const searchSuggestions = document.getElementById("search-suggestions");
 
 const logsListContainer = document.getElementById("logs-list-container");
+const forecastLocationChips = document.getElementById("forecast-location-chips");
 
 const locationsListContainer = document.getElementById("locations-list-container");
 const emptyStateView = document.getElementById("empty-state-view");
@@ -65,6 +66,10 @@ const locationsCountBadge = document.getElementById("locations-count-badge");
 const forecastCardsContainer = document.getElementById("forecast-cards-container");
 const forecastEmptyState = document.getElementById("forecast-empty-state");
 const dashboardLastUpdated = document.getElementById("dashboard-last-updated");
+const locationDrawer = document.getElementById("location-drawer");
+const locationDrawerOverlay = document.getElementById("location-drawer-overlay");
+const openLocationDrawerBtn = document.getElementById("open-location-drawer-btn");
+const closeLocationDrawerBtn = document.getElementById("close-location-drawer-btn");
 
 const dbSuccessBanner = document.getElementById("db-success-banner");
 const dbErrorBanner = document.getElementById("db-error-banner");
@@ -88,7 +93,6 @@ const notificationPriority = document.getElementById("notification-priority");
 const notificationSound = document.getElementById("notification-sound");
 const notificationEmailStatus = document.getElementById("notification-email-status");
 const notificationPushoverStatus = document.getElementById("notification-pushover-status");
-const notificationDeliveries = document.getElementById("notification-deliveries");
 const gmailCredentialsForm = document.getElementById("gmail-credentials-form");
 const gmailCredentialsStatus = document.getElementById("gmail-credentials-status");
 const gmailUserInput = document.getElementById("gmail-user");
@@ -103,6 +107,10 @@ const CREDENTIAL_ADMIN_HEADER = { "X-Sunsethue-Admin": "credentials" };
 
 // State
 let locationsList = [];
+let activityFilter = "runs";
+let cachedRuns = [];
+let cachedDeliveries = [];
+let activeChipLocationId = null;
 
 // Banner Utility
 const bannerTimeouts = new Map();
@@ -172,8 +180,43 @@ if (emailSuccessModal) {
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && emailSuccessModal?.classList.contains("is-open")) {
     hideEmailSuccessModal();
+    return;
+  }
+  if (event.key === "Escape" && locationDrawer?.classList.contains("open")) {
+    closeLocationDrawer();
   }
 });
+
+function openLocationDrawer() {
+  if (!locationDrawer) return;
+  locationDrawer.classList.add("open");
+  locationDrawer.setAttribute("aria-hidden", "false");
+  if (locationDrawerOverlay) {
+    locationDrawerOverlay.hidden = false;
+    locationDrawerOverlay.classList.add("open");
+  }
+  document.body.classList.add("drawer-open");
+  locationNameInput?.focus();
+}
+
+function closeLocationDrawer() {
+  if (!locationDrawer) return;
+  locationDrawer.classList.remove("open");
+  locationDrawer.setAttribute("aria-hidden", "true");
+  if (locationDrawerOverlay) {
+    locationDrawerOverlay.classList.remove("open");
+    locationDrawerOverlay.hidden = true;
+  }
+  document.body.classList.remove("drawer-open");
+  resetForm();
+}
+
+openLocationDrawerBtn?.addEventListener("click", () => {
+  resetForm();
+  openLocationDrawer();
+});
+closeLocationDrawerBtn?.addEventListener("click", closeLocationDrawer);
+locationDrawerOverlay?.addEventListener("click", closeLocationDrawer);
 
 // Load Initial Data
 async function initApp() {
@@ -277,16 +320,10 @@ async function refreshProviderCredentialsAfterMutation(partialStatus) {
 async function fetchNotificationDeliveries() {
   const response = await fetch(`${API_BASE}/api/notification-deliveries`);
   if (!response.ok) throw new Error("Failed to load delivery history.");
-  const deliveries = await response.json();
-  notificationDeliveries.replaceChildren();
-  if (!deliveries.length) { notificationDeliveries.textContent = "No notification deliveries yet."; return; }
-  const list = document.createElement("ul");
-  deliveries.forEach((delivery) => {
-    const item = document.createElement("li");
-    item.textContent = `${delivery.channel}: ${delivery.status} · attempts ${delivery.attempts}${delivery.lastErrorCode ? ` · ${delivery.lastErrorCode}` : ""}`;
-    list.appendChild(item);
-  });
-  notificationDeliveries.appendChild(list);
+  cachedDeliveries = await response.json();
+  if (activityFilter === "deliveries") {
+    renderActivityList();
+  }
 }
 
 notificationSettingsForm?.addEventListener("submit", async (event) => {
@@ -471,8 +508,10 @@ async function fetchRuns() {
     if (!response.ok) {
       throw new Error(`Failed to load logs: ${response.statusText}`);
     }
-    const logs = await response.json();
-    renderLogs(logs);
+    cachedRuns = await response.json();
+    if (activityFilter === "runs") {
+      renderActivityList();
+    }
   } catch (error) {
     console.error("Error fetching logs:", error);
   }
@@ -600,13 +639,43 @@ function renderForecastDashboard() {
       if (child !== forecastEmptyState) child.remove();
     });
 
+    if (forecastLocationChips) {
+      forecastLocationChips.innerHTML = "";
+    }
+
     if (locationsList.length === 0) {
       if (forecastEmptyState) forecastEmptyState.classList.remove("hidden");
       if (dashboardLastUpdated) dashboardLastUpdated.textContent = "Last Run: N/A";
+      activeChipLocationId = null;
       return;
     }
 
     if (forecastEmptyState) forecastEmptyState.classList.add("hidden");
+
+    if (forecastLocationChips) {
+      const chipFragment = document.createDocumentFragment();
+      locationsList.forEach((location) => {
+        const chip = document.createElement("button");
+        chip.type = "button";
+        chip.className = "location-chip" + (activeChipLocationId === location.id ? " active" : "");
+        chip.textContent = location.name;
+        chip.setAttribute("data-location-id", location.id);
+        chip.addEventListener("click", () => {
+          activeChipLocationId = location.id;
+          document.querySelectorAll(".location-chip").forEach((el) => {
+            el.classList.toggle("active", el.getAttribute("data-location-id") === location.id);
+          });
+          const row = document.getElementById(`forecast-row-${location.id}`);
+          if (row) {
+            document.querySelectorAll(".forecast-table-row").forEach((r) => r.classList.remove("chip-highlight"));
+            row.classList.add("chip-highlight");
+            row.scrollIntoView({ behavior: "smooth", block: "nearest" });
+          }
+        });
+        chipFragment.appendChild(chip);
+      });
+      forecastLocationChips.appendChild(chipFragment);
+    }
 
     let maxTimestamp = 0;
     let headerSunriseTime = null;
@@ -681,7 +750,8 @@ function renderForecastDashboard() {
       }
 
       const row = document.createElement("div");
-      row.className = "forecast-table-row";
+      row.className = "forecast-table-row" + (activeChipLocationId === location.id ? " chip-highlight" : "");
+      row.id = `forecast-row-${location.id}`;
       row.innerHTML = `
         <div class="forecast-table-location">${escapeHtml(location.name)}</div>
         <div class="forecast-table-events">
@@ -746,7 +816,7 @@ locationForm.addEventListener("submit", async (e) => {
         throw new Error(await response.text());
       }
       showBanner(dbSuccessBanner, `Location "${name}" updated successfully.`);
-      resetForm();
+      closeLocationDrawer();
     } else {
       // Create mode via API
       if (!canAddLocation(locationsList.length)) {
@@ -762,7 +832,7 @@ locationForm.addEventListener("submit", async (e) => {
         throw new Error(await response.text());
       }
       showBanner(dbSuccessBanner, `Location "${name}" added successfully.`);
-      resetForm();
+      closeLocationDrawer();
     }
     await fetchLocations();
   } catch (error) {
@@ -785,7 +855,7 @@ function startEditLocation(id) {
   
   formTitle.textContent = "Edit Location";
   saveLocationBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;">save</span><span>Update Location</span>';
-  cancelEditBtn.classList.remove("hidden");
+  openLocationDrawer();
   locationNameInput.focus();
 }
 
@@ -797,10 +867,9 @@ function resetForm() {
   
   formTitle.textContent = "Add Location";
   saveLocationBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;">save</span><span>Save Location</span>';
-  cancelEditBtn.classList.add("hidden");
 }
 
-cancelEditBtn.addEventListener("click", resetForm);
+cancelEditBtn.addEventListener("click", closeLocationDrawer);
 
 async function deleteLocation(id) {
   const loc = locationsList.find(l => l.id === id);
@@ -833,12 +902,11 @@ triggerTestBtn.addEventListener("click", async () => {
     return;
   }
 
-  const originalTriggerLabel = triggerTestBtn.textContent;
-
   try {
     triggerTestBtn.disabled = true;
-    triggerTestBtn.textContent = "Sending…";
     triggerStatus.classList.remove("hidden");
+    triggerStatus.setAttribute("aria-hidden", "false");
+    if (triggerStatusText) triggerStatusText.textContent = "Sending…";
     
     const reportResponse = await fetch(`${API_BASE}/api/triggerReport`, {
       method: "POST"
@@ -861,8 +929,8 @@ triggerTestBtn.addEventListener("click", async () => {
     showBanner(dbErrorBanner, "Trigger Failed: " + error.message);
   } finally {
     triggerTestBtn.disabled = false;
-    triggerTestBtn.textContent = originalTriggerLabel;
     triggerStatus.classList.add("hidden");
+    triggerStatus.setAttribute("aria-hidden", "true");
   }
 });
 
@@ -1115,7 +1183,6 @@ document.addEventListener("click", (e) => {
   }
 });
 
-// Logs Rendering function
 function formatApiCreditsLabel(credits) {
   const limitPart = credits.limit != null ? ` / ${credits.limit}` : "";
   let label = `Requests remaining: ${credits.remaining}${limitPart}`;
@@ -1148,29 +1215,65 @@ async function fetchApiCreditsStatus() {
   }
 }
 
-function renderLogs(logs) {
+function buildActivityListItem({ timeText, badgeClass, badgeText, summaryHtml, detailsHtml = "" }) {
+  const logItem = document.createElement("div");
+  logItem.className = "log-item";
+  logItem.innerHTML = `
+    <div class="log-item-header">
+      <span class="log-time">${timeText}</span>
+      <span class="log-badge ${badgeClass}">${badgeText}</span>
+    </div>
+    <div class="log-summary-row">${summaryHtml}</div>
+    ${detailsHtml}
+  `;
+  return logItem;
+}
+
+function renderActivityList() {
+  if (!logsListContainer) return;
   logsListContainer.innerHTML = "";
-  
-  if (logs.length === 0) {
-    logsListContainer.innerHTML = '<div class="empty-state">No execution logs found yet.</div>';
+
+  if (activityFilter === "deliveries") {
+    if (!cachedDeliveries.length) {
+      logsListContainer.innerHTML = '<div class="empty-state"><span class="material-symbols-outlined" aria-hidden="true">notifications</span><p>No notification deliveries yet.</p></div>';
+      return;
+    }
+    const fragment = document.createDocumentFragment();
+    cachedDeliveries.forEach((delivery) => {
+      const status = String(delivery.status || "unknown").toLowerCase();
+      const badgeClass = status.includes("fail") || status.includes("error")
+        ? "failure"
+        : status.includes("warn") || status.includes("pending") || status.includes("retry")
+          ? "warning"
+          : "success";
+      const timeText = delivery.updatedAt || delivery.createdAt
+        ? dateTimeFormatterMedium.format(Date.parse(delivery.updatedAt || delivery.createdAt))
+        : "—";
+      fragment.appendChild(buildActivityListItem({
+        timeText,
+        badgeClass,
+        badgeText: escapeHtml(String(delivery.status || "UNKNOWN").toUpperCase()),
+        summaryHtml: `Channel: <strong>${escapeHtml(delivery.channel)}</strong> | Attempts: <strong>${delivery.attempts ?? 0}</strong>`,
+        detailsHtml: delivery.lastErrorCode
+          ? `<div class="log-details" style="color: var(--error);">Error: ${escapeHtml(delivery.lastErrorCode)}</div>`
+          : ""
+      }));
+    });
+    logsListContainer.appendChild(fragment);
     return;
   }
-  
-  // ⚡ Bolt Performance Optimization:
-  // Using a DocumentFragment avoids triggering a costly DOM reflow and repaint
-  // on every single loop iteration. Batching DOM insertions significantly reduces
-  // main thread blocking time.
-  const fragment = document.createDocumentFragment();
 
-  logs.forEach((log) => {
-    const logItem = document.createElement("div");
-    logItem.className = "log-item";
-    
+  if (!cachedRuns.length) {
+    logsListContainer.innerHTML = '<div class="empty-state"><span class="material-symbols-outlined" aria-hidden="true">history</span><p>No execution logs found yet.</p></div>';
+    return;
+  }
+
+  const fragment = document.createDocumentFragment();
+  cachedRuns.forEach((log) => {
     const dateText = dateTimeFormatterMedium.format(log.timestamp);
-    
-    let statusClass = getLogStatusClass(log.status);
+    const statusClass = getLogStatusClass(log.status);
     const statusText = log.status.toUpperCase();
-    
+
     let detailsHtml = "";
     if (log.error) {
       detailsHtml = `<div class="log-details" style="color: var(--error);">Error: ${escapeHtml(log.error)}</div>`;
@@ -1181,31 +1284,57 @@ function renderLogs(logs) {
       }).join("<br>");
       detailsHtml = `<div class="log-details">${resultsText}</div>`;
     }
-    
-    logItem.innerHTML = `
-      <div class="log-item-header">
-        <span class="log-time">${dateText}</span>
-        <span class="log-badge ${statusClass}">${statusText}</span>
-      </div>
-      <div class="log-summary-row">
-        Trigger: <strong>${escapeHtml(log.triggerType)}</strong> | Locations: <strong>${log.locationsCount}</strong>
-      </div>
-      ${detailsHtml}
-    `;
-    
-    fragment.appendChild(logItem);
+
+    fragment.appendChild(buildActivityListItem({
+      timeText: dateText,
+      badgeClass: statusClass,
+      badgeText: statusText,
+      summaryHtml: `Trigger: <strong>${escapeHtml(log.triggerType)}</strong> | Locations: <strong>${log.locationsCount}</strong>`,
+      detailsHtml
+    }));
   });
 
   logsListContainer.appendChild(fragment);
 }
 
+function setActivityFilter(filter) {
+  activityFilter = filter === "deliveries" ? "deliveries" : "runs";
+  document.querySelectorAll(".activity-filter-btn").forEach((btn) => {
+    const isActive = btn.getAttribute("data-activity-filter") === activityFilter;
+    btn.classList.toggle("active", isActive);
+    btn.setAttribute("aria-selected", isActive ? "true" : "false");
+  });
+  if (logsListContainer) {
+    logsListContainer.setAttribute(
+      "aria-labelledby",
+      activityFilter === "deliveries" ? "activity-filter-deliveries" : "activity-filter-runs"
+    );
+  }
+  renderActivityList();
+}
+
+document.querySelectorAll(".activity-filter-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const filter = btn.getAttribute("data-activity-filter");
+    if (filter) setActivityFilter(filter);
+  });
+});
+
 // Tab Switching logic
-const allNavButtons = document.querySelectorAll(".nav-tab, .bottom-nav-item");
+const allNavButtons = document.querySelectorAll(".nav-tab, .bottom-nav-item, .settings-gear-btn");
 const tabPanes = document.querySelectorAll(".tab-pane");
 
 function switchTab(targetTab) {
   allNavButtons.forEach(b => {
-    if (b.getAttribute("data-tab") === targetTab) {
+    const tab = b.getAttribute("data-tab");
+    const isActive = tab === targetTab;
+    // Bottom nav never includes settings — do not mark bottom items active for settings.
+    if (b.classList.contains("bottom-nav-item") && targetTab === "settings") {
+      b.classList.remove("active");
+      b.setAttribute("aria-selected", "false");
+      return;
+    }
+    if (isActive) {
       b.classList.add("active");
       b.setAttribute("aria-selected", "true");
     } else {
@@ -1217,8 +1346,9 @@ function switchTab(targetTab) {
   const activePane = document.getElementById(`pane-${targetTab}`);
   if (activePane) activePane.classList.add("active");
 
-  if (targetTab === "logs") {
+  if (targetTab === "activity") {
     fetchApiCreditsStatus();
+    renderActivityList();
   }
 }
 

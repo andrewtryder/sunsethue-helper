@@ -231,21 +231,18 @@ function formatCredentialUpdatedAt(value) {
   }
 }
 
-async function fetchProviderCredentials() {
-  const response = await fetch(`${API_BASE}/api/provider-credentials`);
-  if (!response.ok) throw new Error("Failed to load provider credentials.");
-  const status = await response.json();
-  if (gmailCredentialsStatus) {
-    if (status.email?.configured) {
+function applyProviderCredentialStatus(status, { merge = false } = {}) {
+  if (gmailCredentialsStatus && (!merge || status?.email !== undefined)) {
+    if (status?.email?.configured) {
       gmailCredentialsStatus.textContent = `Configured: ${status.email.gmailUserMasked || "masked"}${status.email.emailFromMasked ? ` · from ${status.email.emailFromMasked}` : ""}${formatCredentialUpdatedAt(status.email.updatedAt)}`;
-    } else {
+    } else if (!merge || status?.email) {
       gmailCredentialsStatus.textContent = "Not configured";
     }
   }
-  if (pushoverCredentialsStatus) {
-    if (status.pushover?.configured) {
+  if (pushoverCredentialsStatus && (!merge || status?.pushover !== undefined)) {
+    if (status?.pushover?.configured) {
       pushoverCredentialsStatus.textContent = `Configured · app token ${status.pushover.appTokenPresent ? "present" : "missing"} · user key ${status.pushover.userKeyPresent ? "present" : "missing"}${formatCredentialUpdatedAt(status.pushover.updatedAt)}`;
-    } else {
+    } else if (!merge || status?.pushover) {
       pushoverCredentialsStatus.textContent = "Not configured";
     }
   }
@@ -253,6 +250,28 @@ async function fetchProviderCredentials() {
   if (gmailAppPasswordInput) gmailAppPasswordInput.value = "";
   if (pushoverAppTokenInput) pushoverAppTokenInput.value = "";
   if (pushoverUserKeyInput) pushoverUserKeyInput.value = "";
+}
+
+async function fetchProviderCredentials() {
+  const response = await fetch(`${API_BASE}/api/provider-credentials`);
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null);
+    const message = payload?.error?.message || "Failed to load provider credentials.";
+    const code = payload?.error?.code;
+    throw new Error(code ? `${message} (${code})` : message);
+  }
+  applyProviderCredentialStatus(await response.json());
+}
+
+async function refreshProviderCredentialsAfterMutation(partialStatus) {
+  // Apply the mutation response immediately so the UI updates even if GET flakes.
+  if (partialStatus) applyProviderCredentialStatus(partialStatus, { merge: true });
+  try {
+    await fetchProviderCredentials();
+  } catch (error) {
+    // Keep the success banner / applied status; surface reload failure separately.
+    showBanner(dbErrorBanner, error.message);
+  }
 }
 
 async function fetchNotificationDeliveries() {
@@ -302,9 +321,11 @@ gmailCredentialsForm?.addEventListener("submit", async (event) => {
       const code = payload?.error?.code;
       throw new Error(code ? `${message} (${code})` : message);
     }
+    const payload = await response.json();
     if (gmailAppPasswordInput) gmailAppPasswordInput.value = "";
     showBanner(dbSuccessBanner, "Gmail credentials saved.");
-    await Promise.all([fetchProviderCredentials(), fetchNotificationSettings()]);
+    await refreshProviderCredentialsAfterMutation({ email: payload.email });
+    await fetchNotificationSettings().catch(() => {});
   } catch (error) {
     showBanner(dbErrorBanner, error.message);
   } finally {
@@ -331,8 +352,10 @@ document.getElementById("remove-gmail-credentials-btn")?.addEventListener("click
       const code = payload?.error?.code;
       throw new Error(code ? `${message} (${code})` : message);
     }
+    const payload = await response.json();
     showBanner(dbSuccessBanner, "Gmail credentials removed.");
-    await Promise.all([fetchProviderCredentials(), fetchNotificationSettings()]);
+    await refreshProviderCredentialsAfterMutation({ email: payload.email });
+    await fetchNotificationSettings().catch(() => {});
   } catch (error) {
     showBanner(dbErrorBanner, error.message);
   } finally {
@@ -361,10 +384,12 @@ pushoverCredentialsForm?.addEventListener("submit", async (event) => {
       const code = payload?.error?.code;
       throw new Error(code ? `${message} (${code})` : message);
     }
+    const payload = await response.json();
     if (pushoverAppTokenInput) pushoverAppTokenInput.value = "";
     if (pushoverUserKeyInput) pushoverUserKeyInput.value = "";
     showBanner(dbSuccessBanner, "Pushover credentials saved.");
-    await Promise.all([fetchProviderCredentials(), fetchNotificationSettings()]);
+    await refreshProviderCredentialsAfterMutation({ pushover: payload.pushover });
+    await fetchNotificationSettings().catch(() => {});
   } catch (error) {
     showBanner(dbErrorBanner, error.message);
   } finally {
@@ -391,8 +416,10 @@ document.getElementById("remove-pushover-credentials-btn")?.addEventListener("cl
       const code = payload?.error?.code;
       throw new Error(code ? `${message} (${code})` : message);
     }
+    const payload = await response.json();
     showBanner(dbSuccessBanner, "Pushover credentials removed.");
-    await Promise.all([fetchProviderCredentials(), fetchNotificationSettings()]);
+    await refreshProviderCredentialsAfterMutation({ pushover: payload.pushover });
+    await fetchNotificationSettings().catch(() => {});
   } catch (error) {
     showBanner(dbErrorBanner, error.message);
   } finally {
@@ -408,6 +435,9 @@ async function testNotification(channel) {
     const code = payload?.error?.code;
     if (code === "PROVIDER_NOT_CONFIGURED" || code === "EMAIL_NOT_CONFIGURED" || code === "PUSHOVER_NOT_CONFIGURED") {
       throw new Error("Credentials are not configured for this channel.");
+    }
+    if (code === "INVALID_EMAIL_ADDRESS") {
+      throw new Error(payload?.error?.message || "Set an email destination in notification settings before sending a test.");
     }
     if (code === "RATE_LIMITED") throw new Error("Rate limited. Try again in a minute.");
     throw new Error("Test notification could not be queued.");

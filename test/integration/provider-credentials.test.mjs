@@ -73,11 +73,12 @@ function credentialHeaders({ mutation = false, origin = WEBAPP_URL, site = "same
   return headers;
 }
 
-test("GET /api/provider-credentials requires Origin and never returns secret values", async () => {
+test("GET /api/provider-credentials allows same-origin without Origin and never returns secret values", async () => {
   await withCredentialsApi(async ({ call }) => {
-    const missingOrigin = await call("/api/provider-credentials");
-    assert.equal(missingOrigin.status, 403);
-    assert.equal(missingOrigin.headers.get("cache-control"), "no-store");
+    // Same-origin GET often omits Origin; empty Sec-Fetch-Site is allowed.
+    const withoutOrigin = await call("/api/provider-credentials");
+    assert.equal(withoutOrigin.status, 200);
+    assert.equal(withoutOrigin.headers.get("cache-control"), "no-store");
 
     const ok = await call("/api/provider-credentials", {
       headers: credentialHeaders()

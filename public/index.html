@@ -8,7 +8,7 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,1,0" rel="stylesheet">
 
   <link rel="stylesheet" href="style.css">
@@ -27,12 +27,19 @@
           <span class="logo-subtitle">Helper</span>
         </div>
 
-        <nav class="desktop-nav" aria-label="Main navigation" role="tablist">
-          <button class="nav-tab active" data-tab="main" id="nav-main" role="tab" aria-selected="true" aria-controls="pane-main">Main Forecast</button>
-          <button class="nav-tab" data-tab="locations" id="nav-locations" role="tab" aria-selected="false" aria-controls="pane-locations">Manage Locations</button>
-          <button class="nav-tab" data-tab="logs" id="nav-logs" role="tab" aria-selected="false" aria-controls="pane-logs">Execution Logs</button>
-          <button class="nav-tab" data-tab="notifications" id="nav-notifications" role="tab" aria-selected="false" aria-controls="pane-notifications">Notifications</button>
-        </nav>
+        <div class="top-bar-actions">
+          <nav class="desktop-nav" aria-label="Main navigation" role="tablist">
+            <button class="nav-tab active" data-tab="main" id="nav-main" role="tab" aria-selected="true" aria-controls="pane-main">Forecast</button>
+            <button class="nav-tab" data-tab="locations" id="nav-locations" role="tab" aria-selected="false" aria-controls="pane-locations">Locations</button>
+            <button class="nav-tab" data-tab="activity" id="nav-activity" role="tab" aria-selected="false" aria-controls="pane-activity">Activity</button>
+          </nav>
+          <button type="button" class="settings-gear-btn mobile-header-settings" data-tab="settings" id="nav-settings-mobile" role="tab" aria-selected="false" aria-controls="pane-settings" aria-label="Settings" title="Settings">
+            <span class="material-symbols-outlined" aria-hidden="true">settings</span>
+          </button>
+          <button type="button" class="settings-gear-btn desktop-settings" data-tab="settings" id="nav-settings" role="tab" aria-selected="false" aria-controls="pane-settings" aria-label="Settings" title="Settings">
+            <span class="material-symbols-outlined" aria-hidden="true">settings</span>
+          </button>
+        </div>
       </div>
     </header>
 
@@ -41,49 +48,67 @@
 
     <main id="app-main-canvas">
       <nav class="mobile-segment-nav" aria-label="Main navigation mobile" role="tablist">
-        <button class="nav-tab active" data-tab="main" role="tab" aria-selected="true" aria-controls="pane-main">Main Forecast</button>
-        <button class="nav-tab" data-tab="locations" role="tab" aria-selected="false" aria-controls="pane-locations">Manage Locations</button>
-        <button class="nav-tab" data-tab="logs" role="tab" aria-selected="false" aria-controls="pane-logs">Execution Logs</button>
-        <button class="nav-tab" data-tab="notifications" role="tab" aria-selected="false" aria-controls="pane-notifications">Notifications</button>
+        <button class="nav-tab active" data-tab="main" role="tab" aria-selected="true" aria-controls="pane-main">Forecast</button>
+        <button class="nav-tab" data-tab="locations" role="tab" aria-selected="false" aria-controls="pane-locations">Locations</button>
+        <button class="nav-tab" data-tab="activity" role="tab" aria-selected="false" aria-controls="pane-activity">Activity</button>
       </nav>
 
       <div id="pane-main" class="tab-pane active" role="tabpanel" aria-labelledby="nav-main">
         <div class="pane-header">
-          <h2>Forecast Dashboard</h2>
-          <span class="last-updated-badge" id="dashboard-last-updated">Last Run: N/A</span>
+          <h2>Forecast</h2>
+          <div class="pane-header-actions">
+            <span class="last-updated-badge" id="dashboard-last-updated">Last Run: N/A</span>
+            <button type="button" id="trigger-test-btn" class="icon-btn" title="Run report now" aria-label="Run report now">
+              <span class="material-symbols-outlined" aria-hidden="true">refresh</span>
+            </button>
+            <span id="trigger-status" class="action-status hidden" aria-hidden="true">
+              <span class="spinner"></span>
+              <span id="trigger-status-text">Sending…</span>
+            </span>
+          </div>
         </div>
         <p class="pane-subtext">
           Sunrise &amp; sunset quality forecasts cached from the last automated or manual run.
         </p>
 
+        <div id="forecast-location-chips" class="forecast-location-chips" aria-label="Jump to location"></div>
+
         <div id="forecast-cards-container">
           <div class="empty-state" id="forecast-empty-state">
             <span class="material-symbols-outlined" aria-hidden="true">location_off</span>
-            <p>No locations added yet.<br>Go to <strong>Manage Locations</strong> to add your first spot.</p>
+            <p>No locations added yet.<br>Go to <strong>Locations</strong> to add your first spot.</p>
           </div>
         </div>
       </div>
 
       <div id="pane-locations" class="tab-pane" role="tabpanel" aria-labelledby="nav-locations">
-        <div class="locations-grid">
+        <div class="locations-layout">
           <section>
             <div class="section-header">
               <h2>Monitored Locations</h2>
-              <span class="location-counter" id="locations-count-badge">0 / 10</span>
+              <div class="section-header-actions">
+                <span class="location-counter" id="locations-count-badge">0 / 10</span>
+                <button type="button" id="open-location-drawer-btn" class="btn btn-primary">Add location</button>
+              </div>
             </div>
 
             <div class="locations-list-container" id="locations-list-container">
               <div class="empty-state" id="empty-state-view">
                 <span class="material-symbols-outlined" aria-hidden="true">add_location_alt</span>
-                <p>No locations yet.<br>Use the form to add up to 10 coordinates.</p>
+                <p>No locations yet.<br>Add up to 10 coordinates to start monitoring.</p>
               </div>
             </div>
           </section>
 
-          <aside>
-            <div class="form-card">
+          <div id="location-drawer-overlay" class="drawer-overlay" hidden></div>
+          <aside id="location-drawer" class="location-drawer" aria-hidden="true" aria-labelledby="form-title">
+            <div class="drawer-header">
               <h3 id="form-title">Add Location</h3>
-
+              <button type="button" id="close-location-drawer-btn" class="icon-btn" aria-label="Close">
+                <span class="material-symbols-outlined" aria-hidden="true">close</span>
+              </button>
+            </div>
+            <div class="form-card">
               <form id="location-form" novalidate>
                 <input type="hidden" id="edit-location-id">
 
@@ -119,7 +144,7 @@
                 </div>
 
                 <div class="form-actions">
-                  <button type="button" id="cancel-edit-btn" class="btn btn-secondary hidden" style="flex:1;">Cancel</button>
+                  <button type="button" id="cancel-edit-btn" class="btn btn-secondary" style="flex:1;">Cancel</button>
                   <button type="submit" id="save-location-btn" class="btn btn-primary" style="flex:2;">
                     <span class="material-symbols-outlined" aria-hidden="true" style="font-size:18px;">save</span>
                     <span>Save Location</span>
@@ -131,14 +156,19 @@
         </div>
       </div>
 
-      <div id="pane-logs" class="tab-pane" role="tabpanel" aria-labelledby="nav-logs">
+      <div id="pane-activity" class="tab-pane" role="tabpanel" aria-labelledby="nav-activity">
         <div class="pane-header">
-          <h2>Execution Logs</h2>
+          <h2>Activity</h2>
           <span id="api-credits-status" class="api-credits-badge">Loading API credits…</span>
         </div>
-        <p class="pane-subtext">Status and results of the last 20 automated or manual forecast runs.</p>
+        <p class="pane-subtext">Forecast runs and notification delivery history.</p>
 
-        <div class="logs-container" id="logs-list-container">
+        <div class="activity-filter" role="tablist" aria-label="Activity filter">
+          <button type="button" class="activity-filter-btn active" data-activity-filter="runs" id="activity-filter-runs" role="tab" aria-selected="true" aria-controls="logs-list-container">Runs</button>
+          <button type="button" class="activity-filter-btn" data-activity-filter="deliveries" id="activity-filter-deliveries" role="tab" aria-selected="false" aria-controls="logs-list-container">Deliveries</button>
+        </div>
+
+        <div class="logs-container" id="logs-list-container" role="tabpanel" aria-labelledby="activity-filter-runs">
           <div class="empty-state">
             <span class="material-symbols-outlined" aria-hidden="true">history</span>
             <p>No execution logs found yet.</p>
@@ -146,9 +176,9 @@
         </div>
       </div>
 
-      <div id="pane-notifications" class="tab-pane" role="tabpanel" aria-labelledby="nav-notifications">
-        <div class="pane-header"><h2>Notification settings</h2></div>
-        <p class="pane-subtext">Channel preferences and delivery history. Provider credentials are stored in Cloudflare Secrets Store and are never shown in full.</p>
+      <div id="pane-settings" class="tab-pane" role="tabpanel" aria-labelledby="nav-settings">
+        <div class="pane-header"><h2>Settings</h2></div>
+        <p class="pane-subtext">Notification channels and provider credentials. Credentials are stored in Cloudflare Secrets Store and are never shown in full.</p>
 
         <section class="form-card" aria-labelledby="gmail-credentials-title">
           <h3 id="gmail-credentials-title">Gmail credentials</h3>
@@ -209,21 +239,8 @@
           <div class="form-group"><label for="notification-sound">Pushover sound (optional)</label><input id="notification-sound" class="form-input" maxlength="64"></div>
           <div class="form-actions"><button type="submit" class="btn btn-primary">Save notifications</button></div>
         </form>
-        <section aria-labelledby="delivery-history-title"><div class="pane-header"><h3 id="delivery-history-title">Recent delivery status</h3></div><div id="notification-deliveries" class="logs-container" role="status" aria-live="polite">Loading deliveries…</div></section>
       </div>
     </main>
-
-    <footer id="app-footer">
-      <div class="footer-inner">
-        <span>Manual Run</span>
-        <span>—</span>
-        <button type="button" id="trigger-test-btn" class="footer-link-btn">Run report now</button>
-        <span id="trigger-status" class="action-status hidden" aria-hidden="true">
-          <span class="spinner"></span>
-          <span id="trigger-status-text">Sending email…</span>
-        </span>
-      </div>
-    </footer>
 
     <nav id="bottom-nav" aria-label="Bottom navigation" role="tablist">
       <button class="bottom-nav-item active" data-tab="main" role="tab" aria-selected="true" aria-controls="pane-main">
@@ -234,11 +251,10 @@
         <span class="material-symbols-outlined" aria-hidden="true">location_on</span>
         <span>Locations</span>
       </button>
-      <button class="bottom-nav-item" data-tab="logs" role="tab" aria-selected="false" aria-controls="pane-logs">
-        <span class="material-symbols-outlined" aria-hidden="true">assignment</span>
-        <span>Logs</span>
+      <button class="bottom-nav-item" data-tab="activity" role="tab" aria-selected="false" aria-controls="pane-activity">
+        <span class="material-symbols-outlined" aria-hidden="true">history</span>
+        <span>Activity</span>
       </button>
-      <button class="bottom-nav-item" data-tab="notifications" role="tab" aria-selected="false" aria-controls="pane-notifications"><span class="material-symbols-outlined" aria-hidden="true">notifications</span><span>Alerts</span></button>
     </nav>
   </div>
 

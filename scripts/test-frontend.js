@@ -59,15 +59,17 @@ test("Frontend File Structure & Integrity Checks", () => {
     // Tab panes
     "pane-main",
     "pane-locations",
-    "pane-logs",
+    "pane-activity",
+    "pane-settings",
     // Dashboard
     "forecast-cards-container",
     "dashboard-last-updated",
+    "forecast-location-chips",
     // Locations list
     "locations-list-container",
     "empty-state-view",
     "locations-count-badge",
-    // Logs
+    // Activity
     "logs-list-container",
   ];
 
@@ -87,7 +89,7 @@ test("Frontend File Structure & Integrity Checks", () => {
     ".nav-tab.active",
     ".forecast-table",
     ".quality-indicator",
-    ".quality-dot",
+    ".quality-meter",
   ];
 
   requiredCssSelectors.forEach(selector => {

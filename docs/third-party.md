@@ -34,7 +34,7 @@ npx license-checker --production --summary
 | --- | --- | --- |
 | [Sunsethue API](https://sunsethue.com) | Sunrise/sunset quality forecasts | Subject to Sunsethue's API terms; an API key is required for production use and must not be committed |
 | [OpenStreetMap Nominatim](https://nominatim.openstreetmap.org) | Geocoding for location search | Data © OpenStreetMap contributors, [ODbL](https://opendatacommons.org/licenses/odbl/); respect the [Nominatim usage policy](https://operations.osmfoundation.org/policies/nominatim/) (valid User-Agent / contact, no heavy bulk scraping) |
-| Google Fonts (Hanken Grotesk, JetBrains Mono, Material Symbols) | Loaded at runtime via `fonts.googleapis.com` | Font files are served by Google; SIL Open Font License / Apache-2.0 as published by each family. No font binaries are vendored in this repository |
+| Google Fonts (Hanken Grotesk, Material Symbols) | Loaded at runtime via `fonts.googleapis.com` | Font files are served by Google; SIL Open Font License / Apache-2.0 as published by each family. No font binaries are vendored in this repository |
 
 ## Shipped assets audit
 

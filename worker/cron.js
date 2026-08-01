@@ -8,6 +8,7 @@ import {
   parseScheduleTimes
 } from "../shared/time-format.js";
 import { runAndSendReport } from "./report.js";
+import { maybeRunWeeklySelfTest } from "./notifications/selftest.js";
 
 /**
  * @param {object} event
@@ -18,7 +19,8 @@ import { runAndSendReport } from "./report.js";
  *   dispatchPendingNotifications?: typeof dispatchPendingNotifications,
  *   getApplicationSettings?: typeof getApplicationSettings,
  *   claimScheduledOccurrence?: typeof db.claimScheduledOccurrence,
- *   bindOccurrenceRun?: typeof db.bindOccurrenceRun
+ *   bindOccurrenceRun?: typeof db.bindOccurrenceRun,
+ *   maybeRunWeeklySelfTest?: typeof maybeRunWeeklySelfTest
  * }} [deps]
  */
 export async function handleScheduledReport(event, env, deps = {}) {
@@ -28,6 +30,7 @@ export async function handleScheduledReport(event, env, deps = {}) {
   const loadSettings = deps.getApplicationSettings || getApplicationSettings;
   const claimOccurrence = deps.claimScheduledOccurrence || db.claimScheduledOccurrence;
   const bindRun = deps.bindOccurrenceRun || db.bindOccurrenceRun;
+  const runSelfTest = deps.maybeRunWeeklySelfTest || maybeRunWeeklySelfTest;
 
   try {
     await dispatch(env, { ...deps, now: now.getTime() });
@@ -57,6 +60,12 @@ export async function handleScheduledReport(event, env, deps = {}) {
   const slot = `${String(parts.hour).padStart(2, "0")}:00`;
 
   console.log(`Cron trigger checking. Local ${timeZone}: ${parts.hour}:${String(parts.minute).padStart(2, "0")}`);
+
+  try {
+    await runSelfTest(env, { ...deps, now });
+  } catch (error) {
+    console.error("Weekly self-test failed:", error);
+  }
 
   if (parts.minute > 10) {
     console.log("Not near top of the hour. Skipping.");

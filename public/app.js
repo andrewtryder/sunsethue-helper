@@ -34,7 +34,75 @@ const timeFormatterShort = new Intl.DateTimeFormat("en-US", {
 
 // Same-origin API through Pages Functions -> private Worker service binding.
 // Local Pages (`npm run dev`) also uses relative /api/* via the service binding.
+const DEMO_MODE = new URLSearchParams(window.location.search).has("demo")
+  || window.__SUNSETHUE_DEMO__ === true
+  || document.documentElement.dataset.demo === "1";
+const DEMO_READ_ONLY = DEMO_MODE;
 const API_BASE = "";
+
+function createApiClient() {
+  return {
+    async get(path) {
+      const response = await fetch(`${API_BASE}${path}`);
+      if (!response.ok) throw new Error(`Request failed: ${path}`);
+      return response.json();
+    },
+    async send(path, init) {
+      if (DEMO_READ_ONLY && init?.method && init.method !== "GET") {
+        throw new Error("DEMO_READ_ONLY");
+      }
+      const response = await fetch(`${API_BASE}${path}`, init);
+      return response;
+    }
+  };
+}
+
+function createDemoClient(fixtures) {
+  return {
+    async get(path) {
+      if (path.startsWith("/api/notification-health")) return fixtures.notificationHealth;
+      if (path.startsWith("/api/setup-status")) return fixtures.setupStatus;
+      if (path.startsWith("/api/operational-status")) return fixtures.operationalStatus;
+      if (path.startsWith("/api/application-settings")) return fixtures.applicationSettings;
+      if (path.startsWith("/api/notification-settings")) return fixtures.notificationSettings;
+      if (path.startsWith("/api/locations")) return fixtures.locations;
+      if (path.startsWith("/api/runs")) return fixtures.runs;
+      if (path.startsWith("/api/location-notification-rules")) return fixtures.rules;
+      if (path.startsWith("/api/getApiCredits")) return fixtures.credits;
+      if (path.startsWith("/api/provider-credentials")) return fixtures.providerCredentials;
+      if (path.startsWith("/api/web-push")) return fixtures.webPush || { subscriptions: [] };
+      return {};
+    },
+    async send() {
+      throw new Error("DEMO_READ_ONLY");
+    }
+  };
+}
+
+const api = DEMO_MODE
+  ? createDemoClient(window.__SUNSETHUE_DEMO_FIXTURES__ || {})
+  : createApiClient();
+
+if (DEMO_MODE) {
+  const banner = document.getElementById("demo-banner");
+  if (banner) banner.hidden = false;
+  const fixtures = window.__SUNSETHUE_DEMO_FIXTURES__ || {};
+  const originalFetch = window.fetch.bind(window);
+  window.fetch = async (input, init = {}) => {
+    const url = typeof input === "string" ? input : input.url;
+    const path = url.replace(/^https?:\/\/[^/]+/, "").split("?")[0];
+    const method = (init.method || "GET").toUpperCase();
+    if (method !== "GET") {
+      return new Response(JSON.stringify({ code: "DEMO_READ_ONLY" }), { status: 403, headers: { "Content-Type": "application/json" } });
+    }
+    try {
+      const data = await api.get(path.startsWith("/api") ? path : `/api${path}`);
+      return new Response(JSON.stringify(data), { status: 200, headers: { "Content-Type": "application/json" } });
+    } catch {
+      return originalFetch(input, init);
+    }
+  };
+}
 
 // DOM Elements
 const appContainer = document.getElementById("app-container");
@@ -234,6 +302,8 @@ async function initApp() {
       fetchNotificationDeliveries(),
       fetchProviderCredentials(),
       fetchOperationalStatus(),
+      fetchSetupChecklist(),
+      refreshHistoryCounts(),
       fetchApplicationSettings(),
       fetchLocationRules(),
       fetchWebPushDevices()
@@ -284,30 +354,121 @@ async function fetchNotificationSettings() {
 }
 
 async function fetchOperationalStatus() {
-  const summary = document.getElementById("ops-status-summary");
-  const list = document.getElementById("ops-status-list");
-  if (!summary || !list) return;
-  const response = await fetch(`${API_BASE}/api/operational-status`);
-  if (!response.ok) throw new Error("Failed to load operational status.");
-  const status = await response.json();
-  summary.textContent = status.requiredTablesPresent
-    ? `Email: ${status.emailTransport} · Pushover: ${status.pushoverTransport}`
-    : "Schema preflight incomplete — required tables missing.";
-  const rows = [
-    ["Last scheduled run", status.lastScheduledRunAt || "Never"],
-    ["Last successful run", status.lastSuccessfulRunAt || "Never"],
-    ["Pending deliveries", String(status.pendingDeliveries)],
-    ["Failed deliveries", String(status.failedDeliveries)],
-    ["Oldest pending age (s)", String(status.oldestPendingDeliveryAgeSeconds)],
-    ["Required tables", status.requiredTablesPresent ? "Present" : "Missing"]
-  ];
-  list.replaceChildren();
-  for (const [label, value] of rows) {
-    const dt = document.createElement("dt");
-    dt.textContent = label;
-    const dd = document.createElement("dd");
-    dd.textContent = value;
-    list.append(dt, dd);
+  const summary = document.getElementById("notification-health-summary")
+    || document.getElementById("ops-status-summary");
+  const channelsHost = document.getElementById("notification-health-channels");
+  const scheduleHost = document.getElementById("notification-health-schedule");
+  const skipsHost = document.getElementById("notification-health-skips");
+  const selfTestHost = document.getElementById("notification-health-selftest");
+  const legacyList = document.getElementById("ops-status-list");
+  if (!summary) return;
+  try {
+    const health = await api.get("/api/notification-health");
+    const stateLabel = {
+      healthy: "Healthy",
+      degraded: "Degraded",
+      action_required: "Action required",
+      disabled: "Disabled"
+    }[health.state] || health.state;
+    summary.textContent = `${stateLabel} · last report ${health.lastReportAt || "never"}`;
+    if (channelsHost) {
+      channelsHost.innerHTML = (health.channels || []).map((ch) => `
+        <article class="health-channel-card">
+          <h4>${escapeHtml(ch.channel)}</h4>
+          <p>${ch.enabled ? "Enabled" : "Off"} · ${ch.configured ? "Configured" : "Not configured"}</p>
+          <p>Qualifying locations: ${ch.qualifyingLocationCount}</p>
+          <p>Pending ${ch.pending} · Failed ${ch.failed}</p>
+          <p>Last success: ${ch.lastSuccessAt || "—"}</p>
+          <p>Last failure: ${ch.lastFailureCode || "—"}</p>
+          ${ch.devicesEnabled != null ? `<p>Devices: ${ch.devicesEnabled} enabled · ${ch.devicesStale || 0} stale · ${ch.devicesRevoked || 0} revoked</p>` : ""}
+          ${ch.maskedHostname ? `<p>Host: ${escapeHtml(ch.maskedHostname)} · signing ${ch.signingEnabled ? "on" : "off"}</p>` : ""}
+        </article>`).join("");
+    }
+    if (scheduleHost && health.schedule) {
+      const q = health.schedule.quota || {};
+      scheduleHost.innerHTML = `<strong>Schedule</strong> (${escapeHtml(health.schedule.timeZone || "")}): ${(health.schedule.times || []).join(", ")}
+        <br>Quota estimate: ${q.estimatedRequestsPerDay ?? "—"}/day · next: ${health.nextScheduled?.slot || "—"}`;
+    }
+    if (skipsHost) {
+      const skips = health.skips || [];
+      skipsHost.innerHTML = skips.length
+        ? `<strong>Recent threshold skips</strong><ul>${skips.map((s) => `<li>${escapeHtml(s.channel)} · ${escapeHtml(s.code)} · ${escapeHtml(s.createdAt)}</li>`).join("")}</ul>`
+        : "<p class=\"pane-subtext\">No recent threshold skips.</p>";
+    }
+    if (selfTestHost) {
+      selfTestHost.textContent = health.selfTest
+        ? `Latest self-test: ${health.selfTest.checkType} · ${health.selfTest.status} · ${health.selfTest.code || ""}`
+        : "No self-test runs yet.";
+      window.__lastSelfTestSummary = selfTestHost.textContent;
+    }
+    if (legacyList) {
+      legacyList.replaceChildren();
+    }
+    const legacySummary = document.getElementById("ops-status-summary");
+    if (legacySummary && legacySummary !== summary) {
+      legacySummary.textContent = summary.textContent;
+    }
+  } catch {
+    summary.textContent = "Unable to load notification health.";
+  }
+}
+
+async function fetchSetupChecklist() {
+  const list = document.getElementById("setup-checklist");
+  if (!list) return;
+  try {
+    const status = await api.get("/api/setup-status");
+    const items = [
+      ["Access", "ready"],
+      ["Database tables", status.databaseTables],
+      ["Forecast API key", status.forecastApiKey],
+      ["Email", status.email],
+      ["Pushover", status.pushover],
+      ["Webhook", status.webhook],
+      ["Browser push", status.browserPushDevices]
+    ];
+    list.innerHTML = items.map(([label, state]) => {
+      const text = state === "ready" ? "Ready" : state === "missing" ? "Missing" : "Not configured";
+      return `<li><strong>${escapeHtml(label)}</strong>: ${text}</li>`;
+    }).join("");
+  } catch {
+    list.innerHTML = "<li>Unable to load setup status.</li>";
+  }
+}
+
+function selectedHistoryScopes() {
+  const all = document.querySelector("[data-history-scope=\"all\"]");
+  if (all?.checked) return ["all"];
+  return [...document.querySelectorAll("[data-history-scope]:checked")]
+    .map((el) => el.getAttribute("data-history-scope"))
+    .filter((s) => s && s !== "all");
+}
+
+async function refreshHistoryCounts() {
+  const host = document.getElementById("clear-history-counts");
+  const confirmWrap = document.getElementById("clear-history-confirm-wrap");
+  if (!host) return;
+  const scopes = selectedHistoryScopes();
+  if (confirmWrap) confirmWrap.hidden = !scopes.includes("all");
+  if (scopes.length === 0) {
+    host.textContent = "Select at least one scope.";
+    return;
+  }
+  try {
+    const response = await api.send("/api/history/clear", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ scopes, preview: true })
+    });
+    if (!response.ok) throw new Error("preview failed");
+    const data = await response.json();
+    host.textContent = Object.entries(data.counts || {})
+      .map(([k, v]) => `${k}: ${v}`)
+      .join(" · ");
+  } catch (error) {
+    host.textContent = error?.message === "DEMO_READ_ONLY"
+      ? "Demo mode — clear/export disabled."
+      : "Unable to preview counts.";
   }
 }
 
@@ -1355,6 +1516,12 @@ function renderActivityList() {
   if (!logsListContainer) return;
   logsListContainer.innerHTML = "";
 
+  const selfTestNote = document.getElementById("activity-selftest-summary");
+  if (selfTestNote && window.__lastSelfTestSummary) {
+    selfTestNote.textContent = window.__lastSelfTestSummary;
+    selfTestNote.hidden = false;
+  }
+
   if (activityFilter === "deliveries") {
     if (!cachedDeliveries.length) {
       logsListContainer.innerHTML = '<div class="empty-state"><span class="material-symbols-outlined" aria-hidden="true">notifications</span><p>No notification deliveries yet.</p></div>';
@@ -1543,6 +1710,14 @@ async function fetchApplicationSettings() {
     displayTz.hidden = data.displayTimezoneMode !== "selected";
   }
   renderScheduleCheckboxes(data.scheduleTimes || ["06:00", "12:00", "18:00"]);
+  const selfEnabled = document.getElementById("weekly-self-test-enabled");
+  if (selfEnabled) selfEnabled.checked = data.weeklySelfTestEnabled !== false;
+  const selfMode = document.getElementById("weekly-self-test-mode");
+  if (selfMode) selfMode.value = data.weeklySelfTestMode || "passive";
+  const selfDay = document.getElementById("weekly-self-test-day");
+  if (selfDay) selfDay.value = String(data.weeklySelfTestDay ?? 0);
+  const selfTime = document.getElementById("weekly-self-test-time");
+  if (selfTime) selfTime.value = data.weeklySelfTestTime || "10:00";
   const quota = document.getElementById("quota-estimator");
   if (quota && data.quota) {
     const q = data.quota;
@@ -1667,10 +1842,10 @@ document.getElementById("application-settings-form")?.addEventListener("submit",
     displayTimezoneMode: mode,
     displayTimezone: document.getElementById("display-timezone")?.value || null,
     scheduleTimes: selectedScheduleSlots(),
-    weeklySelfTestEnabled: true,
-    weeklySelfTestMode: "passive",
-    weeklySelfTestDay: 0,
-    weeklySelfTestTime: "10:00"
+    weeklySelfTestEnabled: document.getElementById("weekly-self-test-enabled")?.checked !== false,
+    weeklySelfTestMode: document.getElementById("weekly-self-test-mode")?.value || "passive",
+    weeklySelfTestDay: Number(document.getElementById("weekly-self-test-day")?.value || 0),
+    weeklySelfTestTime: document.getElementById("weekly-self-test-time")?.value || "10:00"
   };
   try {
     const response = await fetch(`${API_BASE}/api/application-settings`, {
@@ -1725,6 +1900,7 @@ document.getElementById("rules-reset-btn")?.addEventListener("click", async () =
 
 document.getElementById("enable-web-push-btn")?.addEventListener("click", async () => {
   try {
+    if (DEMO_READ_ONLY) throw new Error("DEMO_READ_ONLY");
     if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
       throw new Error("Browser push is not supported in this browser.");
     }
@@ -1822,4 +1998,62 @@ document.getElementById("remove-webhook-btn")?.addEventListener("click", async (
 populateTimezoneDatalist();
 
 // Run
+document.getElementById("clear-history-scopes")?.addEventListener("change", () => {
+  const all = document.querySelector("[data-history-scope=\"all\"]");
+  if (all?.checked) {
+    document.querySelectorAll("[data-history-scope]").forEach((el) => {
+      if (el !== all) el.checked = false;
+    });
+  }
+  refreshHistoryCounts();
+});
+
+document.getElementById("history-export-btn")?.addEventListener("click", async () => {
+  const status = document.getElementById("clear-history-status");
+  try {
+    if (DEMO_READ_ONLY) throw new Error("DEMO_READ_ONLY");
+    const scopes = selectedHistoryScopes();
+    const response = await fetch(`${API_BASE}/api/history/export?scopes=${encodeURIComponent(scopes.join(","))}`);
+    if (!response.ok) throw new Error("Export failed");
+    const data = await response.json();
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "sunsethue-history-export.json";
+    a.click();
+    URL.revokeObjectURL(url);
+    if (status) status.textContent = "Export downloaded.";
+  } catch (error) {
+    if (status) status.textContent = error?.message === "DEMO_READ_ONLY" ? "Demo mode — export disabled." : "Export failed.";
+  }
+});
+
+document.getElementById("history-clear-btn")?.addEventListener("click", async () => {
+  const status = document.getElementById("clear-history-status");
+  try {
+    if (DEMO_READ_ONLY) throw new Error("DEMO_READ_ONLY");
+    const scopes = selectedHistoryScopes();
+    if (scopes.length === 0) throw new Error("Select a scope");
+    const confirmValue = document.getElementById("clear-history-confirm")?.value || "";
+    const response = await fetch(`${API_BASE}/api/history/clear`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ scopes, confirm: confirmValue })
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.code || "Clear failed");
+    }
+    if (status) status.textContent = "History cleared.";
+    await Promise.all([fetchRuns(), fetchNotificationDeliveries(), fetchOperationalStatus(), refreshHistoryCounts()]);
+  } catch (error) {
+    if (status) {
+      status.textContent = error?.message === "DEMO_READ_ONLY"
+        ? "Demo mode — clear disabled."
+        : `Clear failed: ${error.message}`;
+    }
+  }
+});
+
 initApp();

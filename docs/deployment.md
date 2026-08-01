@@ -31,7 +31,9 @@ validate
 
 A dry-run dispatch stops after `prepare`. Nothing is deployed or released.
 
-The production pipeline does not apply D1 schema changes. The personal database schema is maintained via `schema.sql`. Apply it locally with `npm run db:schema:local` and to production with `npm run db:schema:remote`. Both scripts are idempotent because every statement uses `IF NOT EXISTS`. `prepare-deployment.mjs` will fail the workflow if any required table is missing.
+The production pipeline does not apply D1 schema changes. The personal database schema is maintained via `schema.sql`. Apply it locally with `npm run db:schema:local` and to production with `npm run db:schema:remote`. Both scripts are idempotent because every statement uses `IF NOT EXISTS`. Existing installs that predate R1–R3 use reviewed `npm run db:upgrade:rN` scripts (or `npm run upgrade`). `prepare-deployment.mjs` will fail the workflow if any required table is missing.
+
+First-time operators can run `npm run setup` (interactive) and later `npm run doctor` for a read-only checklist. Neither CLI collects Gmail/Pushover secrets.
 
 ### Schema change sequence
 

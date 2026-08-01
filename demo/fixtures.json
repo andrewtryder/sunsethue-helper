@@ -1,0 +1,158 @@
+{
+  "locations": [
+    {
+      "id": "demo-loc-1",
+      "name": "Demo Harbor",
+      "latitude": 40.7,
+      "longitude": -74.0,
+      "latestSunriseQuality": 0.72,
+      "latestSunriseText": "Great",
+      "latestSunriseTime": "2026-08-01T10:15:00.000Z",
+      "latestSunsetQuality": 0.81,
+      "latestSunsetText": "Great",
+      "latestSunsetTime": "2026-08-01T00:45:00.000Z",
+      "lastForecastUpdate": 1754040000000
+    }
+  ],
+  "runs": [
+    {
+      "id": "demo-run-1",
+      "timestamp": 1754040000000,
+      "triggerType": "SCHEDULED:06:00",
+      "status": "success",
+      "locationsCount": 1,
+      "results": [{ "name": "Demo Harbor", "status": "success" }],
+      "error": null
+    }
+  ],
+  "notificationSettings": {
+    "emailEnabled": true,
+    "emailConfigured": true,
+    "pushoverEnabled": true,
+    "pushoverConfigured": true,
+    "webhookEnabled": false,
+    "webhookConfigured": false
+  },
+  "applicationSettings": {
+    "scheduleTimezone": "America/New_York",
+    "displayTimezoneMode": "schedule",
+    "displayTimezone": null,
+    "scheduleTimes": ["06:00", "12:00", "18:00"],
+    "weeklySelfTestEnabled": true,
+    "weeklySelfTestMode": "passive",
+    "weeklySelfTestDay": 0,
+    "weeklySelfTestTime": "10:00",
+    "quota": {
+      "scheduledRunsPerDay": 3,
+      "activeLocations": 1,
+      "estimatedRequestsPerDay": 3,
+      "estimatedRequestsPer30Days": 90,
+      "remainingCredits": null
+    }
+  },
+  "rules": {
+    "rules": [
+      {
+        "locationId": "demo-loc-1",
+        "channel": "email",
+        "enabled": true,
+        "thresholdPercent": 50,
+        "eventScope": "either"
+      }
+    ]
+  },
+  "credits": { "remaining": 1000, "limit": 2000 },
+  "providerCredentials": {
+    "email": { "configured": true, "gmailUserMasked": "d***@example.com" },
+    "pushover": { "configured": true, "appTokenPresent": true, "userKeyPresent": true }
+  },
+  "operationalStatus": {
+    "requiredTablesPresent": true,
+    "emailTransport": "secrets_store",
+    "pushoverTransport": "secrets_store",
+    "pendingDeliveries": 0,
+    "failedDeliveries": 0,
+    "oldestPendingDeliveryAgeSeconds": 0,
+    "lastScheduledRunAt": "2026-08-01T10:00:00.000Z",
+    "lastSuccessfulRunAt": "2026-08-01T10:00:00.000Z"
+  },
+  "notificationHealth": {
+    "state": "healthy",
+    "lastReportAt": "2026-08-01T10:00:00.000Z",
+    "lastReportAgeSeconds": 3600,
+    "nextScheduled": { "slot": "12:00", "timeZone": "America/New_York" },
+    "channels": [
+      {
+        "channel": "email",
+        "enabled": true,
+        "configured": true,
+        "transport": "secrets_store",
+        "qualifyingLocationCount": 1,
+        "pending": 0,
+        "failed": 0,
+        "lastSuccessAt": "2026-08-01T10:00:05.000Z",
+        "lastFailureCode": null
+      },
+      {
+        "channel": "pushover",
+        "enabled": true,
+        "configured": true,
+        "transport": "secrets_store",
+        "qualifyingLocationCount": 1,
+        "pending": 0,
+        "failed": 0
+      },
+      {
+        "channel": "webpush",
+        "enabled": false,
+        "configured": false,
+        "devicesEnabled": 0,
+        "devicesStale": 0,
+        "devicesRevoked": 0,
+        "pending": 0,
+        "failed": 0,
+        "qualifyingLocationCount": 0
+      },
+      {
+        "channel": "webhook",
+        "enabled": false,
+        "configured": false,
+        "pending": 0,
+        "failed": 0,
+        "qualifyingLocationCount": 0,
+        "signingEnabled": false
+      }
+    ],
+    "schedule": {
+      "timeZone": "America/New_York",
+      "times": ["06:00", "12:00", "18:00"],
+      "quota": {
+        "scheduledRunsPerDay": 3,
+        "activeLocations": 1,
+        "estimatedRequestsPerDay": 3,
+        "estimatedRequestsPer30Days": 90
+      }
+    },
+    "skips": [],
+    "selfTest": {
+      "checkType": "weekly_passive",
+      "status": "pass",
+      "code": "PASS",
+      "completedAt": "2026-07-27T14:00:00.000Z"
+    },
+    "pendingDeliveries": 0,
+    "failedDeliveries": 0,
+    "requiredTablesPresent": true
+  },
+  "setupStatus": {
+    "accessReady": true,
+    "databaseTables": "ready",
+    "forecastApiKey": "ready",
+    "email": "ready",
+    "pushover": "ready",
+    "webhook": "not_configured",
+    "browserPushDevices": "not_configured",
+    "browserPushDeviceCount": 0
+  },
+  "webPush": { "subscriptions": [] }
+}

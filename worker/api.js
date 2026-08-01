@@ -28,6 +28,13 @@ import {
 import { CredentialError } from "./lib/transport-schema.js";
 import { emailTransportSource } from "./notifications/resolve-email-transport.js";
 import { pushoverTransportSource } from "./notifications/resolve-pushover-transport.js";
+import { getNotificationHealth } from "./notifications/health.js";
+import {
+  clearHistory,
+  countHistoryScopes,
+  exportHistory,
+  parseHistoryScopes
+} from "./notifications/history.js";
 import {
   createRequestId,
   jsonResponse,
@@ -746,6 +753,60 @@ export async function handleHttpRequest(request, env, authContext = null, deps =
       status.emailTransport = await emailTransportSource(env);
       status.pushoverTransport = await pushoverTransportSource(env);
       return jsonResponse(status, 200, requestId);
+    }
+
+    if (path === "/api/notification-health") {
+      if (request.method !== "GET") return methodNotAllowed("GET", requestId);
+      const health = await getNotificationHealth(env, { now: deps.now ?? Date.now() });
+      return jsonResponse(health, 200, requestId);
+    }
+
+    if (path === "/api/setup-status") {
+      if (request.method !== "GET") return methodNotAllowed("GET", requestId);
+      const setup = await db.getSetupStatus(env);
+      setup.forecastApiKey = typeof env.SUNSETHUE_API_KEY === "string" && env.SUNSETHUE_API_KEY.trim()
+        ? "ready"
+        : "missing";
+      return jsonResponse(setup, 200, requestId);
+    }
+
+    if (path === "/api/history/export") {
+      if (request.method !== "GET") return methodNotAllowed("GET", requestId);
+      try {
+        const url = new URL(request.url);
+        const scopes = parseHistoryScopes(url.searchParams.get("scopes") || "all");
+        const payload = await exportHistory(env, scopes);
+        return jsonResponse(payload, 200, requestId);
+      } catch (error) {
+        if (error instanceof NotificationError) {
+          return errorResponse(error.code, "Invalid history export request.", 400, requestId);
+        }
+        throw error;
+      }
+    }
+
+    if (path === "/api/history/clear") {
+      if (request.method !== "POST") return methodNotAllowed("POST", requestId);
+      const parsed = await readJsonBody(request);
+      if ("error" in parsed) return bodyErrorResponse(parsed.error, requestId);
+      try {
+        if (parsed.value?.preview === true) {
+          const scopes = parseHistoryScopes(parsed.value.scopes || ["all"]);
+          const counts = await countHistoryScopes(env, scopes);
+          return jsonResponse({ scopes, counts }, 200, requestId);
+        }
+        const result = await clearHistory(env, {
+          scopes: parsed.value?.scopes,
+          confirm: parsed.value?.confirm
+        }, deps.now ?? Date.now());
+        return jsonResponse(result, 200, requestId);
+      } catch (error) {
+        if (error instanceof NotificationError) {
+          const status = error.code === "CLEAR_CONFIRM_REQUIRED" ? 400 : 400;
+          return errorResponse(error.code, "Unable to clear history.", status, requestId);
+        }
+        throw error;
+      }
     }
 
     // Obsolete public config endpoint removed; keep a generic not-found.

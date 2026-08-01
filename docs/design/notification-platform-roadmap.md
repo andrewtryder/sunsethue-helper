@@ -1,8 +1,8 @@
 # Notification platform roadmap (Releases 3–4)
 
-This document captures planned work **after** Releases 1–2 (scheduling, thresholds, outbox rebuild, browser push, signed webhook). It is design guidance only — not an implementation checklist for the current tree.
+Releases 1–2 (scheduling, thresholds, outbox rebuild, browser push, signed webhook) and Releases 3–4 (notification health, weekly self-test, clear history, doctor/setup/upgrade CLIs, first-run checklist, GitHub Pages demo) are **implemented** in the main codebase.
 
-Releases 1–2 ship in code. Releases 3–4 stay here until separately scheduled.
+This document remains as design background and operator orientation.
 
 ## Defaults carried forward
 
@@ -132,10 +132,12 @@ Moving static frontend from Pages into Worker static assets could remove one dep
 
 ## Suggested sequencing after R1–R2
 
-1. Notification health API + UI
+All items below are implemented:
+
+1. Notification health API + UI — `GET /api/notification-health`
 2. Weekly self-test (passive then active)
-3. Clear history + export
-4. Setup wizard + doctor
-5. Guided upgrade command
-6. First-run checklist UI
-7. GitHub Pages demo + README links
+3. Clear history + export — `/api/history/*`
+4. Setup wizard + doctor — `npm run setup` / `npm run doctor`
+5. Guided upgrade command — `npm run upgrade`
+6. First-run checklist UI — `GET /api/setup-status`
+7. GitHub Pages demo + README links — `npm run demo:build` / `publish-demo.yml`

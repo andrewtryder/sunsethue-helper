@@ -1,7 +1,7 @@
 import { formatTimeOnlyET } from "../helpers.js";
 import { collapseWhitespace, truncateUtf8 } from "../validation.js";
 
-const ALLOWED_TRIGGER_TYPES = new Set(["AM", "PM", "NOON", "Manual Test", "TEST"]);
+const ALLOWED_TRIGGER_TYPES = new Set(["AM", "PM", "NOON", "Manual Test", "TEST", "WEEKLY_SELF_TEST"]);
 
 function isAllowedTriggerType(value) {
   if (ALLOWED_TRIGGER_TYPES.has(value)) return true;

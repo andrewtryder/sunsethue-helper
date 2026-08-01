@@ -32,6 +32,8 @@ test("schema.sql creates the tables and indexes the Worker queries", async () =>
       .all()
       .map((row) => row.name);
     assert.deepEqual(indexes, [
+      "idx_admin_audit_created",
+      "idx_health_check_runs_started",
       "idx_location_rules_channel",
       "idx_locations_createdAt",
       "idx_outbox_pending",

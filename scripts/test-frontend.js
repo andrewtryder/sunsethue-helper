@@ -65,6 +65,13 @@ test("Frontend File Structure & Integrity Checks", () => {
     "ops-status-title",
     "ops-status-summary",
     "ops-status-list",
+    "notification-health-title",
+    "notification-health-summary",
+    "notification-health-channels",
+    "setup-checklist",
+    "clear-history-section",
+    "weekly-self-test-fields",
+    "demo-banner",
     // Dashboard
     "forecast-cards-container",
     "dashboard-last-updated",

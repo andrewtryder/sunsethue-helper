@@ -259,6 +259,69 @@ test("GET /api/operational-status returns non-sensitive transport and queue fiel
   });
 });
 
+test("GET /api/notification-health and setup-status stay non-sensitive", async () => {
+  await withApi(async ({ call }) => {
+    const healthRes = await call("/api/notification-health");
+    assert.equal(healthRes.status, 200);
+    const health = await healthRes.json();
+    assert.ok(["healthy", "degraded", "action_required", "disabled"].includes(health.state));
+    assert.ok(Array.isArray(health.channels));
+    assert.equal(health.secretNames, undefined);
+    assert.equal(health.WEBHOOK_TRANSPORT_SECRET, undefined);
+    const setupRes = await call("/api/setup-status");
+    assert.equal(setupRes.status, 200);
+    const setup = await setupRes.json();
+    assert.ok(["ready", "missing", "not_configured", "unknown"].includes(setup.databaseTables) || setup.databaseTables === "ready");
+    assert.equal(setup.SUNSETHUE_API_KEY, undefined);
+  });
+});
+
+test("history export and clear keep pending jobs and write audit", async () => {
+  await withApi(async ({ call, env }) => {
+    await db.addRun(env, {
+      id: "run-hist",
+      timestamp: 1,
+      triggerType: "TEST",
+      status: "success",
+      locationsCount: 0,
+      results: [],
+      error: null
+    });
+    await env.DB.prepare(
+      `INSERT INTO notification_outbox
+        (id, runId, channel, status, payload, attempts, nextAttemptAt, createdAt)
+       VALUES ('pending-h', 'run-hist', 'email', 'pending', '{}', 0, 1, 1)`
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO notification_outbox
+        (id, runId, channel, status, payload, attempts, nextAttemptAt, createdAt, sentAt)
+       VALUES ('sent-h', 'run-hist', 'pushover', 'sent', '{}', 1, 1, 1, 2)`
+    ).run();
+    const exportRes = await call("/api/history/export?scopes=deliveries_completed");
+    assert.equal(exportRes.status, 200);
+    const denied = await call("/api/history/clear", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ scopes: ["all"], confirm: "nope" })
+    });
+    assert.equal(denied.status, 400);
+    const cleared = await call("/api/history/clear", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ scopes: ["all"], confirm: "CLEAR" })
+    });
+    assert.equal(cleared.status, 200);
+    const pending = await env.DB.prepare(
+      `SELECT COUNT(*) AS c FROM notification_outbox WHERE id = 'pending-h'`
+    ).first();
+    assert.equal(Number(pending.c), 1);
+    const audit = await env.DB.prepare(
+      `SELECT COUNT(*) AS c FROM admin_audit_events WHERE eventType = 'history_cleared'`
+    ).first();
+    assert.equal(Number(audit.c), 1);
+  });
+});
+
 test("GET /api/getApiCredits reads usage from the faked Sunsethue API", async () => {
   await withApi(
     async ({ call, fetchFake }) => {

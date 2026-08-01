@@ -18,11 +18,13 @@ async function read(relativePath) {
 
 test("deployment preflight uses the shared D1 table manifest", () => {
   assert.equal(PROJECT.requiredD1Tables, REQUIRED_D1_TABLES);
-  assert.equal(REQUIRED_D1_TABLES.length, 13);
+  assert.equal(REQUIRED_D1_TABLES.length, 15);
   assert.ok(REQUIRED_D1_TABLES.includes("autocomplete_limiter"));
   assert.ok(REQUIRED_D1_TABLES.includes("provider_credential_limiter"));
   assert.ok(REQUIRED_D1_TABLES.includes("application_settings"));
   assert.ok(REQUIRED_D1_TABLES.includes("web_push_subscriptions"));
+  assert.ok(REQUIRED_D1_TABLES.includes("health_check_runs"));
+  assert.ok(REQUIRED_D1_TABLES.includes("admin_audit_events"));
 });
 
 test("the Worker template keeps the Worker private with a cron and D1 binding", async () => {

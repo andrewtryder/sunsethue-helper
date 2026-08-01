@@ -17,6 +17,9 @@
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌅</text></svg>">
 </head>
 <body>
+  <div id="demo-banner" class="demo-banner" hidden role="status">
+    Static demo — read-only fixtures. Mutations are disabled.
+  </div>
   <div id="loading-overlay">
     <div class="spinner" style="width: 32px; height: 32px; border-width: 3.5px;"></div>
   </div>
@@ -159,6 +162,7 @@
           <span id="api-credits-status" class="api-credits-badge">Loading API credits…</span>
         </div>
         <p class="pane-subtext">Forecast runs and notification delivery history.</p>
+        <p id="activity-selftest-summary" class="pane-subtext" hidden></p>
 
         <div class="activity-filter" role="tablist" aria-label="Activity filter">
           <button type="button" class="activity-filter-btn active" data-activity-filter="runs" id="activity-filter-runs" role="tab" aria-selected="true" aria-controls="logs-list-container">Runs</button>
@@ -205,10 +209,72 @@
               </div>
             </div>
             <div id="quota-estimator" class="form-group" aria-live="polite"></div>
+            <fieldset class="form-group" id="weekly-self-test-fields">
+              <legend>Weekly self-test</legend>
+              <label><input id="weekly-self-test-enabled" type="checkbox" checked> Enable weekly self-test</label>
+              <label for="weekly-self-test-mode">Mode</label>
+              <select id="weekly-self-test-mode" class="form-input">
+                <option value="passive">Passive (no provider sends)</option>
+                <option value="active">Active (send test through enabled channels)</option>
+              </select>
+              <label for="weekly-self-test-day">Day (schedule timezone)</label>
+              <select id="weekly-self-test-day" class="form-input">
+                <option value="0">Sunday</option>
+                <option value="1">Monday</option>
+                <option value="2">Tuesday</option>
+                <option value="3">Wednesday</option>
+                <option value="4">Thursday</option>
+                <option value="5">Friday</option>
+                <option value="6">Saturday</option>
+              </select>
+              <label for="weekly-self-test-time">Time (whole hour)</label>
+              <input id="weekly-self-test-time" class="form-input" type="text" value="10:00" pattern="([01]\d|2[0-3]):00" placeholder="10:00">
+            </fieldset>
             <div class="form-actions">
               <button type="submit" class="btn btn-primary" id="save-application-settings-btn">Save schedule settings</button>
             </div>
           </form>
+        </section>
+
+        <section class="form-card" aria-labelledby="setup-checklist-title" id="setup-checklist-section">
+          <h3 id="setup-checklist-title">First-run setup checklist</h3>
+          <ul id="setup-checklist" class="setup-checklist"></ul>
+        </section>
+
+        <section class="form-card" aria-labelledby="notification-health-title" id="notification-health-section">
+          <h3 id="notification-health-title">Notification health</h3>
+          <p id="notification-health-summary" class="action-status" role="status">Loading…</p>
+          <div id="notification-health-channels" class="health-channel-grid"></div>
+          <div id="notification-health-schedule" class="form-group"></div>
+          <div id="notification-health-skips" class="form-group"></div>
+          <p id="notification-health-selftest" class="pane-subtext"></p>
+          <!-- Keep legacy ids for structural tests / backward compatibility -->
+          <h3 id="ops-status-title" class="visually-hidden">Operational status</h3>
+          <p id="ops-status-summary" class="visually-hidden"></p>
+          <dl id="ops-status-list" class="visually-hidden"></dl>
+        </section>
+
+        <section class="form-card" aria-labelledby="clear-history-title" id="clear-history-section">
+          <h3 id="clear-history-title">Clear history</h3>
+          <p class="pane-subtext">Removes terminal report and delivery records only. Locations, settings, credentials, and pending jobs are never deleted.</p>
+          <div id="clear-history-scopes" class="settings-field-grid">
+            <label><input type="checkbox" data-history-scope="runs" checked> Report history</label>
+            <label><input type="checkbox" data-history-scope="deliveries_completed" checked> Completed deliveries</label>
+            <label><input type="checkbox" data-history-scope="deliveries_failed" checked> Failed deliveries</label>
+            <label><input type="checkbox" data-history-scope="self_tests"> Self-test history</label>
+            <label><input type="checkbox" data-history-scope="credential_audit"> Credential audit history</label>
+            <label><input type="checkbox" data-history-scope="all"> All historical data</label>
+          </div>
+          <p id="clear-history-counts" class="pane-subtext" aria-live="polite"></p>
+          <div class="form-group" id="clear-history-confirm-wrap" hidden>
+            <label for="clear-history-confirm">Type CLEAR to confirm clearing all history</label>
+            <input id="clear-history-confirm" class="form-input" type="text" autocomplete="off">
+          </div>
+          <div class="form-actions form-actions-compact">
+            <button type="button" id="history-export-btn" class="btn btn-secondary">Export first</button>
+            <button type="button" id="history-clear-btn" class="btn btn-secondary">Clear history</button>
+          </div>
+          <p id="clear-history-status" class="action-status" role="status"></p>
         </section>
 
         <section class="form-card settings-card" aria-labelledby="location-rules-title">
@@ -219,12 +285,6 @@
             <button type="button" id="rules-copy-all-btn" class="btn btn-secondary">Copy first location’s rules to all</button>
             <button type="button" id="rules-reset-btn" class="btn btn-secondary">Reset to defaults (50%)</button>
           </div>
-        </section>
-
-        <section class="form-card" aria-labelledby="ops-status-title">
-          <h3 id="ops-status-title">Operational status</h3>
-          <p id="ops-status-summary" class="action-status" role="status">Loading…</p>
-          <dl id="ops-status-list" class="ops-status-list"></dl>
         </section>
 
         <section class="form-card settings-card" aria-labelledby="web-push-title">

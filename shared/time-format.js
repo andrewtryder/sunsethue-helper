@@ -85,15 +85,18 @@ export function getZonedParts(instant, timeZone) {
     day: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
+    weekday: "short",
     hourCycle: "h23"
   });
   const parts = Object.fromEntries(fmt.formatToParts(date).filter((p) => p.type !== "literal").map((p) => [p.type, p.value]));
+  const weekdayMap = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
   return {
     year: parts.year,
     month: parts.month,
     day: parts.day,
     hour: Number(parts.hour),
     minute: Number(parts.minute),
+    weekday: weekdayMap[parts.weekday] ?? 0,
     dateKey: `${parts.year}-${parts.month}-${parts.day}`
   };
 }

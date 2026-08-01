@@ -137,7 +137,7 @@ export async function enqueueNotifications(model, env, deps = {}) {
   }
 
   for (const plan of channelPlan) {
-    const isTest = model.triggerType === "TEST";
+    const isTest = model.triggerType === "TEST" || model.triggerType === "WEEKLY_SELF_TEST";
     const rulesForChannel = allRules
       .filter((r) => r.channel === plan.channel)
       .map((r) => ({

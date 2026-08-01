@@ -67,13 +67,17 @@ test("Frontend File Structure & Integrity Checks", () => {
     // Dashboard
     "forecast-cards-container",
     "dashboard-last-updated",
-    "forecast-location-chips",
     // Locations list
     "locations-list-container",
     "empty-state-view",
     "locations-count-badge",
+    "open-location-drawer-btn",
     // Activity
     "logs-list-container",
+    // Settings
+    "gmail-credentials-status",
+    "pushover-credentials-status",
+    "notification-settings-form",
   ];
 
   requiredIds.forEach(id => {
@@ -91,6 +95,13 @@ test("Frontend File Structure & Integrity Checks", () => {
     ".nav-tab",
     ".nav-tab.active",
     ".forecast-table",
+    ".forecast-table-header",
+    ".forecast-table-row",
+    ".location-row",
+    ".log-item-summary",
+    ".log-detail-chips",
+    ".settings-field-grid",
+    ".status-badge",
     ".quality-indicator",
     ".quality-meter",
   ];

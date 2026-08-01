@@ -68,8 +68,6 @@
           Sunrise &amp; sunset quality forecasts cached from the last automated or manual run.
         </p>
 
-        <div id="forecast-location-chips" class="forecast-location-chips" aria-label="Jump to location"></div>
-
         <div id="forecast-cards-container">
           <div class="empty-state" id="forecast-empty-state">
             <span class="material-symbols-outlined" aria-hidden="true">location_off</span>
@@ -183,26 +181,30 @@
           <dl id="ops-status-list" class="ops-status-list"></dl>
         </section>
 
-        <section class="form-card" aria-labelledby="gmail-credentials-title">
-          <h3 id="gmail-credentials-title">Gmail credentials</h3>
-          <p id="gmail-credentials-status" class="action-status" role="status">Loading…</p>
+        <section class="form-card settings-card" aria-labelledby="gmail-credentials-title">
+          <div class="settings-section-title">
+            <h3 id="gmail-credentials-title">Gmail credentials</h3>
+            <span id="gmail-credentials-status" class="status-badge muted" role="status">Loading…</span>
+          </div>
           <form id="gmail-credentials-form" novalidate>
-            <div class="form-group">
-              <label for="gmail-user">Gmail account</label>
-              <input id="gmail-user" class="form-input" type="email" autocomplete="username" aria-describedby="gmail-user-help">
-              <small id="gmail-user-help">Account used for SMTP authentication.</small>
-            </div>
-            <div class="form-group">
-              <label for="gmail-app-password">Gmail App Password</label>
-              <input id="gmail-app-password" class="form-input" type="password" autocomplete="new-password" aria-describedby="gmail-password-help">
-              <small id="gmail-password-help">16-character Google App Password. Spaces from Google's display format are OK. Leave blank when updating to keep the current password. Never prefilled.</small>
+            <div class="settings-field-grid">
+              <div class="form-group">
+                <label for="gmail-user">Gmail account</label>
+                <input id="gmail-user" class="form-input" type="email" autocomplete="username" aria-describedby="gmail-user-help">
+                <small id="gmail-user-help">SMTP login account</small>
+              </div>
+              <div class="form-group">
+                <label for="gmail-app-password">Gmail App Password</label>
+                <input id="gmail-app-password" class="form-input" type="password" autocomplete="new-password" aria-describedby="gmail-password-help">
+                <small id="gmail-password-help">16-char App Password. Leave blank to keep current.</small>
+              </div>
             </div>
             <div class="form-group">
               <label for="gmail-email-from">Sender mailbox</label>
               <input id="gmail-email-from" class="form-input" type="text" autocomplete="off" aria-describedby="gmail-from-help" placeholder="Sunsethue Helper &lt;you@example.com&gt;">
-              <small id="gmail-from-help">Display name and mailbox used in the From header.</small>
+              <small id="gmail-from-help">From display name and mailbox</small>
             </div>
-            <div class="form-actions">
+            <div class="form-actions form-actions-compact">
               <button type="submit" id="save-gmail-credentials-btn" class="btn btn-primary">Save Gmail credentials</button>
               <button type="button" id="remove-gmail-credentials-btn" class="btn btn-secondary">Remove Gmail credentials</button>
               <button type="button" id="test-email-btn" class="btn btn-secondary">Send test email</button>
@@ -210,21 +212,25 @@
           </form>
         </section>
 
-        <section class="form-card" aria-labelledby="pushover-credentials-title">
-          <h3 id="pushover-credentials-title">Pushover credentials</h3>
-          <p id="pushover-credentials-status" class="action-status" role="status">Loading…</p>
+        <section class="form-card settings-card" aria-labelledby="pushover-credentials-title">
+          <div class="settings-section-title">
+            <h3 id="pushover-credentials-title">Pushover credentials</h3>
+            <span id="pushover-credentials-status" class="status-badge muted" role="status">Loading…</span>
+          </div>
           <form id="pushover-credentials-form" novalidate>
-            <div class="form-group">
-              <label for="pushover-app-token">Application API token</label>
-              <input id="pushover-app-token" class="form-input" type="password" autocomplete="new-password" aria-describedby="pushover-token-help">
-              <small id="pushover-token-help">Identifies your registered Pushover application. Leave blank on update to keep the current token.</small>
+            <div class="settings-field-grid">
+              <div class="form-group">
+                <label for="pushover-app-token">Application API token</label>
+                <input id="pushover-app-token" class="form-input" type="password" autocomplete="new-password" aria-describedby="pushover-token-help">
+                <small id="pushover-token-help">App token. Leave blank to keep current.</small>
+              </div>
+              <div class="form-group">
+                <label for="pushover-user-key">User / group key</label>
+                <input id="pushover-user-key" class="form-input" type="password" autocomplete="new-password" aria-describedby="pushover-key-help">
+                <small id="pushover-key-help">Recipient user or group key</small>
+              </div>
             </div>
-            <div class="form-group">
-              <label for="pushover-user-key">User / group key</label>
-              <input id="pushover-user-key" class="form-input" type="password" autocomplete="new-password" aria-describedby="pushover-key-help">
-              <small id="pushover-key-help">Identifies the recipient user or group. Both values are required for initial setup.</small>
-            </div>
-            <div class="form-actions">
+            <div class="form-actions form-actions-compact">
               <button type="submit" id="save-pushover-credentials-btn" class="btn btn-primary">Save Pushover credentials</button>
               <button type="button" id="remove-pushover-credentials-btn" class="btn btn-secondary">Remove Pushover credentials</button>
               <button type="button" id="test-pushover-btn" class="btn btn-secondary">Send test Pushover notification</button>
@@ -232,15 +238,38 @@
           </form>
         </section>
 
-        <form id="notification-settings-form" class="form-card" novalidate>
-          <h3>Delivery preferences</h3>
-          <div class="form-group"><label><input id="notification-email-enabled" type="checkbox"> Enable email</label><span id="notification-email-status" class="action-status" role="status"></span></div>
-          <div class="form-group"><label for="notification-email-to">Email destination</label><input id="notification-email-to" class="form-input" type="email" autocomplete="email" aria-describedby="notification-email-help"><small id="notification-email-help">Recipient for forecast emails (not the SMTP password).</small></div>
-          <div class="form-group"><label><input id="notification-pushover-enabled" type="checkbox"> Enable Pushover</label><span id="notification-pushover-status" class="action-status" role="status"></span></div>
-          <div class="form-group"><label for="notification-device">Pushover device (optional)</label><input id="notification-device" class="form-input" maxlength="64"></div>
-          <div class="form-group"><label for="notification-priority">Pushover priority</label><select id="notification-priority" class="form-input"><option value="-2">Lowest</option><option value="-1">Low</option><option value="0">Normal</option><option value="1">High</option></select></div>
-          <div class="form-group"><label for="notification-sound">Pushover sound (optional)</label><input id="notification-sound" class="form-input" maxlength="64"></div>
-          <div class="form-actions"><button type="submit" class="btn btn-primary">Save notifications</button></div>
+        <form id="notification-settings-form" class="form-card settings-card" novalidate>
+          <div class="settings-section-title">
+            <h3>Delivery preferences</h3>
+          </div>
+          <div class="form-group settings-toggle-row">
+            <label><input id="notification-email-enabled" type="checkbox"> Enable email</label>
+            <span id="notification-email-status" class="status-badge muted" role="status"></span>
+          </div>
+          <div class="form-group">
+            <label for="notification-email-to">Email destination</label>
+            <input id="notification-email-to" class="form-input" type="email" autocomplete="email" aria-describedby="notification-email-help">
+            <small id="notification-email-help">Forecast email recipient</small>
+          </div>
+          <div class="form-group settings-toggle-row">
+            <label><input id="notification-pushover-enabled" type="checkbox"> Enable Pushover</label>
+            <span id="notification-pushover-status" class="status-badge muted" role="status"></span>
+          </div>
+          <div class="settings-field-grid">
+            <div class="form-group">
+              <label for="notification-device">Pushover device (optional)</label>
+              <input id="notification-device" class="form-input" maxlength="64">
+            </div>
+            <div class="form-group">
+              <label for="notification-priority">Pushover priority</label>
+              <select id="notification-priority" class="form-input"><option value="-2">Lowest</option><option value="-1">Low</option><option value="0">Normal</option><option value="1">High</option></select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="notification-sound">Pushover sound (optional)</label>
+            <input id="notification-sound" class="form-input" maxlength="64">
+          </div>
+          <div class="form-actions form-actions-compact"><button type="submit" class="btn btn-primary">Save notifications</button></div>
         </form>
       </div>
     </main>

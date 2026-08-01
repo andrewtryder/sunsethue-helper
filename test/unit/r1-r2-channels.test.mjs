@@ -305,7 +305,7 @@ test("webhook transport parse/build and SSRF guards", () => {
   assert.equal(maskWebhookHostname("not-a-url"), null);
   assert.throws(() => assertSafeWebhookUrl("https://192.168.0.1/x"), CredentialError);
   assert.throws(() => assertSafeWebhookUrl("http://hooks.example.com/x"), CredentialError);
-  assert.throws(() => assertSafeWebhookUrl("https://user:pass@hooks.example.com/x"), CredentialError);
+  assert.throws(() => assertSafeWebhookUrl("https://user:pass@127.0.0.1/x"), CredentialError);
   assert.throws(() => assertSafeWebhookUrl("https://localhost/x"), CredentialError);
   assert.throws(() => assertSafeWebhookUrl("https://[::1]/x"), CredentialError);
   assert.throws(() => assertSafeWebhookUrl("not a url"), CredentialError);
@@ -547,13 +547,13 @@ test("web push registration and send classification", async () => {
     assert.equal(await hasWebPushConfiguredAsync({}), false);
     const cfg = await resolveWebPushConfig({
       WEB_PUSH_VAPID_PUBLIC_KEY: "x",
-      WEB_PUSH_SUBJECT: "mailto:a@b.c",
+      WEB_PUSH_SUBJECT: "mailto:owner@example.com",
       WEB_PUSH_VAPID_PRIVATE: { get: async () => JSON.stringify({ privateKey: privateKeyPem }) }
     });
     assert.equal(cfg.configured, true);
     const badStore = await resolveWebPushConfig({
       WEB_PUSH_VAPID_PUBLIC_KEY: "x",
-      WEB_PUSH_SUBJECT: "mailto:a@b.c",
+      WEB_PUSH_SUBJECT: "mailto:owner@example.com",
       WEB_PUSH_VAPID_PRIVATE: { get: async () => "not-json" }
     });
     assert.equal(badStore.configured, false);

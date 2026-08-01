@@ -209,6 +209,8 @@ Use the **Rollback production** workflow with the exact Worker version id and Pa
 
 D1 recovery uses Time Travel or re-applying `schema.sql`; the rollback workflow does not modify the database.
 
+After a controlled recovery drill, record measured RTO/RPO in [docs/recovery-exercise.md](docs/recovery-exercise.md).
+
 ## Manual browser verification
 
 After deploy (CI only performs unauthenticated negative checks):

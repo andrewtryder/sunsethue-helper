@@ -4,6 +4,13 @@ All notable changes to this project are documented in this file.
 
 This changelog follows [Conventional Commits](https://www.conventionalcommits.org/) and is maintained by [release-please](https://github.com/googleapis/release-please). Release sections group changes by commit type (`feat`, `fix`, etc.). Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.21.0](https://github.com/andrewtryder/sunsethue-helper/compare/v1.20.0...v1.21.0) (2026-08-01)
+
+
+### Features
+
+* **frontend:** make logo navigate to forecast home ([#67](https://github.com/andrewtryder/sunsethue-helper/issues/67)) ([56257fe](https://github.com/andrewtryder/sunsethue-helper/commit/56257fe62d5f9f4eaee02cfd32267946d8bc916c))
+
 ## [1.20.0](https://github.com/andrewtryder/sunsethue-helper/compare/v1.19.0...v1.20.0) (2026-08-01)
 
 

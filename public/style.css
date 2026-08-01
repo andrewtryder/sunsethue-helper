@@ -218,21 +218,9 @@ input:disabled {
   align-items: center;
 }
 
-.desktop-settings {
-  display: none;
-}
-
 @media (min-width: 768px) {
   .desktop-nav {
     display: flex;
-  }
-
-  .desktop-settings {
-    display: inline-flex;
-  }
-
-  .mobile-header-settings {
-    display: none;
   }
 }
 
@@ -444,19 +432,20 @@ input:disabled {
 }
 
 .forecast-table-header-location {
-  width: 25%;
+  flex: 0 1 36%;
 }
 
 .forecast-table-header-events {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: var(--margin-desktop);
-  width: 75%;
+  gap: var(--space-md);
+  width: auto;
+  margin-left: auto;
 }
 
 .forecast-table-header-col {
-  flex: 1;
+  flex: 0 0 auto;
   text-align: right;
 }
 
@@ -493,7 +482,8 @@ input:disabled {
 @media (min-width: 768px) {
   .forecast-table-location {
     font-size: 24px;
-    width: 25%;
+    width: auto;
+    flex: 0 1 36%;
   }
 }
 
@@ -513,8 +503,9 @@ input:disabled {
     flex-direction: row;
     align-items: center;
     justify-content: flex-end;
-    gap: var(--margin-desktop);
-    width: 75%;
+    gap: var(--space-md);
+    width: auto;
+    margin-left: auto;
   }
 }
 
@@ -522,14 +513,15 @@ input:disabled {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-lg);
+  gap: var(--space-sm);
   width: 100%;
 }
 
 @media (min-width: 768px) {
   .forecast-event-col {
-    flex: 1;
+    flex: 0 0 auto;
     justify-content: flex-end;
+    gap: var(--space-sm);
     width: auto;
   }
 }
@@ -563,17 +555,18 @@ input:disabled {
 /* ---- Quality meter ---- */
 .quality-indicator {
   display: inline-flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: var(--space-xs);
-  min-width: 96px;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: var(--space-sm);
 }
 
 .quality-meter-row {
   display: inline-flex;
   align-items: center;
+  flex-wrap: nowrap;
   gap: var(--space-sm);
-  width: 100%;
+  width: auto;
 }
 
 .quality-percent {
@@ -586,9 +579,8 @@ input:disabled {
 }
 
 .quality-meter {
-  flex: 1;
-  min-width: 48px;
-  max-width: 72px;
+  flex: 0 0 60px;
+  width: 60px;
   height: 6px;
   border-radius: var(--radius-pill);
   background: var(--surface-raised);
@@ -605,6 +597,7 @@ input:disabled {
 .quality-badge {
   display: inline-flex;
   align-items: center;
+  flex-shrink: 0;
   padding: 2px 8px;
   border-radius: var(--radius-pill);
   background: var(--accent-muted);
@@ -612,6 +605,7 @@ input:disabled {
   font-size: 10px;
   font-weight: 500;
   letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 
 .quality-text {

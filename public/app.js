@@ -1469,5 +1469,10 @@ allNavButtons.forEach(btn => {
   });
 });
 
+const logoHomeBtn = document.getElementById("logo-home-btn");
+if (logoHomeBtn) {
+  logoHomeBtn.addEventListener("click", () => switchTab("main"));
+}
+
 // Run
 initApp();

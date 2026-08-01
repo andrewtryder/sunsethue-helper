@@ -33,6 +33,7 @@ test("Frontend File Structure & Integrity Checks", () => {
     "loading-overlay",
     // App view
     "app-container",
+    "logo-home-btn",
     // App banners
     "db-success-banner",
     "db-error-banner",

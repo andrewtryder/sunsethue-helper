@@ -270,10 +270,10 @@ test("scheduled execution reaches the report runner without any Access token", a
           })
       });
 
-      assert.equal(triggered, "PM");
+      assert.equal(triggered, "SCHEDULED:18:00");
       assert.equal(mailer.sent.length, 1);
       const runs = await db.getRuns(env);
-      assert.equal(runs[0].triggerType, "PM");
+      assert.equal(runs[0].triggerType, "SCHEDULED:18:00");
     },
     { locations: [location("a", "Beach", 1)] }
   );

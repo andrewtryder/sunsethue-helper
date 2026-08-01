@@ -1,6 +1,6 @@
 # Cloudflare credentials and Secrets Store
 
-Sunsethue Helper stores **provider transport credentials** (Gmail SMTP and Pushover) in **Cloudflare Secrets Store**, not in D1 and not in browser-visible APIs. The main Worker never receives Gmail or Pushover secrets; there is no legacy Worker-secret fallback.
+Sunsethue Helper stores **provider transport credentials** (Gmail SMTP, Pushover, webhook signing material, and Web Push VAPID private key) in **Cloudflare Secrets Store**, not in D1 and not in browser-visible APIs. The main Worker never receives Gmail or Pushover secrets; there is no legacy Worker-secret fallback.
 
 ## Architecture
 
@@ -16,8 +16,8 @@ Browser
 
 - The **main Worker** never receives `CLOUDFLARE_API_TOKEN`.
 - The **credential-administration Worker** is private (`workers_dev = false`, `preview_urls = false`) and has no public routes.
-- Provider adapters read credentials with `await env.EMAIL_TRANSPORT_SECRET.get()` / `await env.PUSHOVER_TRANSPORT_SECRET.get()`.
-- Delivery requires `configured === true` in the store document. An unconfigured or missing store secret fails closed with `EMAIL_NOT_CONFIGURED` / `PUSHOVER_NOT_CONFIGURED`.
+- Provider adapters read credentials with `await env.EMAIL_TRANSPORT_SECRET.get()` / `await env.PUSHOVER_TRANSPORT_SECRET.get()` / `await env.WEBHOOK_TRANSPORT_SECRET.get()` / `await env.WEB_PUSH_VAPID_PRIVATE.get()`.
+- Delivery requires `configured === true` in the store document. An unconfigured or missing store secret fails closed with `EMAIL_NOT_CONFIGURED` / `PUSHOVER_NOT_CONFIGURED` / `WEBHOOK_NOT_CONFIGURED`.
 
 ## Secrets Store JSON documents
 
@@ -25,6 +25,8 @@ Browser
 |-------------|---------|
 | `SUNSETHUE_EMAIL_TRANSPORT` | Gmail user, app password, sender mailbox |
 | `SUNSETHUE_PUSHOVER_TRANSPORT` | Pushover app token + user/group key |
+| `SUNSETHUE_WEBHOOK_TRANSPORT` | HTTPS webhook URL + HMAC signing secret |
+| `SUNSETHUE_WEB_PUSH_VAPID` | Web Push VAPID private key JSON (`{ "version": 1, "configured": true, "privateKey": "..." }`) |
 
 Unconfigured sentinel:
 
@@ -32,7 +34,20 @@ Unconfigured sentinel:
 { "version": 1, "configured": false }
 ```
 
-Recipient email, Pushover device/priority/sound remain D1 notification settings — never inside these secrets.
+Recipient email, Pushover device/priority/sound, webhook enable/masked hostname, and browser subscription metadata remain in D1 — never inside these secrets.
+
+Non-secret Web Push config on the Worker: `WEB_PUSH_VAPID_PUBLIC_KEY` and `WEB_PUSH_SUBJECT` (mailto: or https URL).
+
+## Schema upgrades (existing installs)
+
+New installs use [`schema.sql`](../schema.sql). Existing production D1 databases need reviewed operator scripts (Time Travel bookmark first):
+
+```bash
+npm run db:upgrade:r1 -- --remote    # application_settings, location rules, occurrences
+npm run db:upgrade:r2 -- --remote    # outbox rebuild, web_push_subscriptions, webhook columns
+```
+
+See [notification-platform-roadmap.md](design/notification-platform-roadmap.md) for Releases 3–4.
 
 ## One-time bootstrap
 

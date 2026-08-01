@@ -3,6 +3,8 @@ import { logSafe } from "../http.js";
 import { asNotificationError, NotificationError } from "./errors.js";
 import { sendEmail } from "./email.js";
 import { sendPushover } from "./pushover.js";
+import { sendWebhook } from "./webhook.js";
+import { sendWebPush } from "./webpush.js";
 
 // Longer than any per-provider timeout (SMTP ~30s, Pushover ~10s) so a slow
 // provider cannot expire its own lease and get double-invoked.
@@ -17,6 +19,8 @@ export function nextAttemptAt(now, attempts) {
 async function deliver(job, env, deps) {
   if (job.channel === "email") return sendEmail(job, env, deps);
   if (job.channel === "pushover") return sendPushover(job, env, deps);
+  if (job.channel === "webhook") return sendWebhook(job, env, deps);
+  if (job.channel === "webpush") return sendWebPush(job, env, deps);
   throw new NotificationError("UNSUPPORTED_CHANNEL");
 }
 

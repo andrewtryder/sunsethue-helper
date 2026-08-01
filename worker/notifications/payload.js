@@ -2,6 +2,11 @@ import { formatTimeOnlyET } from "../helpers.js";
 import { collapseWhitespace, truncateUtf8 } from "../validation.js";
 
 const ALLOWED_TRIGGER_TYPES = new Set(["AM", "PM", "NOON", "Manual Test", "TEST"]);
+
+function isAllowedTriggerType(value) {
+  if (ALLOWED_TRIGGER_TYPES.has(value)) return true;
+  return typeof value === "string" && /^SCHEDULED:\d{2}:00$/.test(value);
+}
 const ALLOWED_ERROR_CODES = new Set(["FORECAST_UNAVAILABLE"]);
 const MAX_LOCATIONS = 10;
 
@@ -33,16 +38,18 @@ export function buildNotificationPayload(model) {
     generatedAt: model.generatedAt,
     dashboardUrl: model.dashboardUrl || null,
     locations: model.results.map((result) => ({
+      id: result.locationId || result.id || null,
       name: normalizeLocationName(result.name),
+      triggeredEvents: Array.isArray(result.triggeredEvents) ? result.triggeredEvents.filter((e) => e === "sunrise" || e === "sunset") : [],
       sunrise: result.sunrise ? {
         time: result.sunrise.time || null,
         quality: result.sunrise.quality ?? null,
-        text: result.sunrise.quality_text || null
+        text: result.sunrise.quality_text || result.sunrise.text || null
       } : null,
       sunset: result.sunset ? {
         time: result.sunset.time || null,
         quality: result.sunset.quality ?? null,
-        text: result.sunset.quality_text || null
+        text: result.sunset.quality_text || result.sunset.text || null
       } : null,
       errorCode: result.error ? "FORECAST_UNAVAILABLE" : null
     }))
@@ -86,6 +93,10 @@ function validateLocation(location) {
   if (errorCode !== null && !ALLOWED_ERROR_CODES.has(errorCode)) invalid();
   return {
     name,
+    id: typeof location.id === "string" ? location.id : null,
+    triggeredEvents: Array.isArray(location.triggeredEvents)
+      ? location.triggeredEvents.filter((e) => e === "sunrise" || e === "sunset")
+      : [],
     sunrise: validateEvent(location.sunrise ?? null),
     sunset: validateEvent(location.sunset ?? null),
     errorCode
@@ -97,7 +108,7 @@ export function parseNotificationPayload(payload) {
   try { parsed = JSON.parse(payload); } catch { invalid(); }
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) invalid();
   if (parsed.version !== 1) invalid();
-  if (typeof parsed.triggerType !== "string" || !ALLOWED_TRIGGER_TYPES.has(parsed.triggerType)) invalid();
+  if (typeof parsed.triggerType !== "string" || !isAllowedTriggerType(parsed.triggerType)) invalid();
   if (!isFiniteNumber(parsed.generatedAt)) invalid();
   const dashboardUrl = validateDashboardUrl(parsed.dashboardUrl ?? null);
   if (!Array.isArray(parsed.locations)) invalid();

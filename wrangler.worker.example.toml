@@ -18,7 +18,7 @@ preview_urls = false
 # CLOUDFLARE_API_TOKEN must never be present on this Worker.
 
 [triggers]
-# Hourly UTC; worker/cron.js filters for 6am, 12pm, and 6pm Eastern.
+# Hourly UTC; worker/cron.js evaluates local scheduleTimes in scheduleTimezone.
 crons = ["0 * * * *"]
 
 [[d1_databases]]
@@ -40,3 +40,16 @@ secret_name = "SUNSETHUE_EMAIL_TRANSPORT"
 binding = "PUSHOVER_TRANSPORT_SECRET"
 store_id = "{{SECRETS_STORE_ID}}"
 secret_name = "SUNSETHUE_PUSHOVER_TRANSPORT"
+
+[[secrets_store_secrets]]
+binding = "WEBHOOK_TRANSPORT_SECRET"
+store_id = "{{SECRETS_STORE_ID}}"
+secret_name = "SUNSETHUE_WEBHOOK_TRANSPORT"
+
+[[secrets_store_secrets]]
+binding = "WEB_PUSH_VAPID_PRIVATE"
+store_id = "{{SECRETS_STORE_ID}}"
+secret_name = "SUNSETHUE_WEB_PUSH_VAPID"
+
+# Non-secret Web Push config (set via Wrangler vars / CI):
+# WEB_PUSH_VAPID_PUBLIC_KEY, WEB_PUSH_SUBJECT (mailto: or https URL)

@@ -21,7 +21,25 @@ export async function addLocation(env, loc) {
      SELECT ?, ?, ?, ?, ?
      WHERE (SELECT COUNT(*) FROM locations) < 10`
   ).bind(loc.id, loc.name, loc.latitude, loc.longitude, loc.createdAt).run();
-  return result.meta?.changes === 1;
+  if (result.meta?.changes !== 1) return false;
+  const threshold = loc.defaultThresholdPercent === undefined ? 50 : loc.defaultThresholdPercent;
+  const now = loc.createdAt;
+  const settings = await getNotificationSettingsRow(env);
+  const channels = [
+    { channel: "email", master: settings ? settings.emailEnabled : 1 },
+    { channel: "pushover", master: settings ? settings.pushoverEnabled : 1 },
+    { channel: "webpush", master: 1 },
+    { channel: "webhook", master: settings ? settings.webhookEnabled : 1 }
+  ];
+  for (const entry of channels) {
+    const enabled = Number(entry.master) === 1 ? 1 : 0;
+    await env.DB.prepare(
+      `INSERT OR IGNORE INTO location_notification_rules
+        (locationId, channel, enabled, thresholdPercent, eventScope, updatedAt)
+       VALUES (?, ?, ?, ?, 'either', ?)`
+    ).bind(loc.id, entry.channel, enabled, threshold, now).run();
+  }
+  return true;
 }
 
 /**
@@ -105,8 +123,9 @@ export async function getNotificationSettingsRow(env) {
 export async function upsertNotificationSettings(env, settings) {
   await env.DB.prepare(
     `INSERT INTO notification_settings
-      (id, emailEnabled, emailTo, pushoverEnabled, pushoverDevice, pushoverPriority, pushoverSound, updatedAt)
-     VALUES (1, ?, ?, ?, ?, ?, ?, ?)
+      (id, emailEnabled, emailTo, pushoverEnabled, pushoverDevice, pushoverPriority, pushoverSound,
+       webhookEnabled, webhookMaskedHostname, webhookLastSuccessAt, webhookLastFailureCode, updatedAt)
+     VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
        emailEnabled = excluded.emailEnabled,
        emailTo = excluded.emailTo,
@@ -114,6 +133,10 @@ export async function upsertNotificationSettings(env, settings) {
        pushoverDevice = excluded.pushoverDevice,
        pushoverPriority = excluded.pushoverPriority,
        pushoverSound = excluded.pushoverSound,
+       webhookEnabled = excluded.webhookEnabled,
+       webhookMaskedHostname = excluded.webhookMaskedHostname,
+       webhookLastSuccessAt = excluded.webhookLastSuccessAt,
+       webhookLastFailureCode = excluded.webhookLastFailureCode,
        updatedAt = excluded.updatedAt`
   ).bind(
     settings.emailEnabled,
@@ -122,8 +145,202 @@ export async function upsertNotificationSettings(env, settings) {
     settings.pushoverDevice,
     settings.pushoverPriority,
     settings.pushoverSound,
+    settings.webhookEnabled ?? 0,
+    settings.webhookMaskedHostname ?? null,
+    settings.webhookLastSuccessAt ?? null,
+    settings.webhookLastFailureCode ?? null,
     settings.updatedAt
   ).run();
+}
+
+export async function getApplicationSettingsRow(env) {
+  return env.DB.prepare("SELECT * FROM application_settings WHERE id = 1").first();
+}
+
+export async function upsertApplicationSettings(env, settings) {
+  await env.DB.prepare(
+    `INSERT INTO application_settings (
+      id, scheduleTimezone, displayTimezoneMode, displayTimezone, scheduleTimes,
+      weeklySelfTestEnabled, weeklySelfTestMode, weeklySelfTestDay, weeklySelfTestTime, updatedAt
+    ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET
+      scheduleTimezone = excluded.scheduleTimezone,
+      displayTimezoneMode = excluded.displayTimezoneMode,
+      displayTimezone = excluded.displayTimezone,
+      scheduleTimes = excluded.scheduleTimes,
+      weeklySelfTestEnabled = excluded.weeklySelfTestEnabled,
+      weeklySelfTestMode = excluded.weeklySelfTestMode,
+      weeklySelfTestDay = excluded.weeklySelfTestDay,
+      weeklySelfTestTime = excluded.weeklySelfTestTime,
+      updatedAt = excluded.updatedAt`
+  ).bind(
+    settings.scheduleTimezone,
+    settings.displayTimezoneMode,
+    settings.displayTimezone,
+    typeof settings.scheduleTimes === "string"
+      ? settings.scheduleTimes
+      : JSON.stringify(settings.scheduleTimes),
+    settings.weeklySelfTestEnabled ? 1 : 0,
+    settings.weeklySelfTestMode,
+    settings.weeklySelfTestDay,
+    settings.weeklySelfTestTime,
+    settings.updatedAt
+  ).run();
+}
+
+export async function listLocationNotificationRules(env) {
+  const { results } = await env.DB.prepare(
+    "SELECT * FROM location_notification_rules ORDER BY locationId, channel"
+  ).all();
+  return results || [];
+}
+
+export async function getLocationNotificationRules(env, locationId) {
+  const { results } = await env.DB.prepare(
+    "SELECT * FROM location_notification_rules WHERE locationId = ? ORDER BY channel"
+  ).bind(locationId).all();
+  return results || [];
+}
+
+export async function upsertLocationNotificationRule(env, rule) {
+  await env.DB.prepare(
+    `INSERT INTO location_notification_rules
+      (locationId, channel, enabled, thresholdPercent, eventScope, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT(locationId, channel) DO UPDATE SET
+       enabled = excluded.enabled,
+       thresholdPercent = excluded.thresholdPercent,
+       eventScope = excluded.eventScope,
+       updatedAt = excluded.updatedAt`
+  ).bind(
+    rule.locationId,
+    rule.channel,
+    rule.enabled ? 1 : 0,
+    rule.thresholdPercent ?? null,
+    rule.eventScope || "either",
+    rule.updatedAt
+  ).run();
+}
+
+export async function copyLocationRulesToAll(env, sourceLocationId, now) {
+  const source = await getLocationNotificationRules(env, sourceLocationId);
+  const locations = await getLocations(env);
+  for (const loc of locations) {
+    if (loc.id === sourceLocationId) continue;
+    for (const rule of source) {
+      await upsertLocationNotificationRule(env, {
+        locationId: loc.id,
+        channel: rule.channel,
+        enabled: Number(rule.enabled) === 1,
+        thresholdPercent: rule.thresholdPercent,
+        eventScope: rule.eventScope,
+        updatedAt: now
+      });
+    }
+  }
+}
+
+export async function setChannelEnabledForAllLocations(env, channel, enabled, now) {
+  await env.DB.prepare(
+    `UPDATE location_notification_rules SET enabled = ?, updatedAt = ? WHERE channel = ?`
+  ).bind(enabled ? 1 : 0, now, channel).run();
+}
+
+/**
+ * Claim a scheduled occurrence key. Returns true when this caller inserted the row.
+ */
+export async function claimScheduledOccurrence(env, occurrenceKey, startedAt, runId = null) {
+  try {
+    const result = await env.DB.prepare(
+      `INSERT INTO scheduled_occurrences (occurrenceKey, startedAt, runId) VALUES (?, ?, ?)`
+    ).bind(occurrenceKey, startedAt, runId).run();
+    return result.meta?.changes === 1;
+  } catch {
+    return false;
+  }
+}
+
+export async function bindOccurrenceRun(env, occurrenceKey, runId) {
+  await env.DB.prepare(
+    "UPDATE scheduled_occurrences SET runId = ? WHERE occurrenceKey = ?"
+  ).bind(runId, occurrenceKey).run();
+}
+
+export async function listWebPushSubscriptions(env, { enabledOnly = false } = {}) {
+  const sql = enabledOnly
+    ? "SELECT * FROM web_push_subscriptions WHERE enabled = 1 ORDER BY createdAt ASC"
+    : "SELECT * FROM web_push_subscriptions ORDER BY createdAt ASC";
+  const { results } = await env.DB.prepare(sql).all();
+  return results || [];
+}
+
+export async function getWebPushSubscription(env, id) {
+  return env.DB.prepare("SELECT * FROM web_push_subscriptions WHERE id = ?").bind(id).first();
+}
+
+export async function upsertWebPushSubscription(env, row) {
+  await env.DB.prepare(
+    `INSERT INTO web_push_subscriptions
+      (id, endpoint, p256dh, auth, deviceName, userAgentSummary, enabled, createdAt, lastSeenAt, lastSuccessAt, lastFailureCode)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(endpoint) DO UPDATE SET
+       p256dh = excluded.p256dh,
+       auth = excluded.auth,
+       deviceName = excluded.deviceName,
+       userAgentSummary = excluded.userAgentSummary,
+       enabled = excluded.enabled,
+       lastSeenAt = excluded.lastSeenAt,
+       lastFailureCode = NULL`
+  ).bind(
+    row.id,
+    row.endpoint,
+    row.p256dh,
+    row.auth,
+    row.deviceName,
+    row.userAgentSummary ?? null,
+    row.enabled ? 1 : 0,
+    row.createdAt,
+    row.lastSeenAt ?? row.createdAt,
+    row.lastSuccessAt ?? null,
+    row.lastFailureCode ?? null
+  ).run();
+}
+
+export async function updateWebPushSubscriptionMeta(env, id, patch) {
+  const row = await getWebPushSubscription(env, id);
+  if (!row) return false;
+  await env.DB.prepare(
+    `UPDATE web_push_subscriptions SET
+      deviceName = ?, enabled = ?, lastSeenAt = ?, lastSuccessAt = ?, lastFailureCode = ?
+     WHERE id = ?`
+  ).bind(
+    patch.deviceName ?? row.deviceName,
+    patch.enabled === undefined ? row.enabled : (patch.enabled ? 1 : 0),
+    patch.lastSeenAt ?? row.lastSeenAt,
+    patch.lastSuccessAt === undefined ? row.lastSuccessAt : patch.lastSuccessAt,
+    patch.lastFailureCode === undefined ? row.lastFailureCode : patch.lastFailureCode,
+    id
+  ).run();
+  return true;
+}
+
+export async function deleteWebPushSubscription(env, id) {
+  const result = await env.DB.prepare("DELETE FROM web_push_subscriptions WHERE id = ?").bind(id).run();
+  return result.meta?.changes === 1;
+}
+
+export async function publicWebPushSubscriptions(env) {
+  const rows = await listWebPushSubscriptions(env);
+  return rows.map((row) => ({
+    id: row.id,
+    deviceName: row.deviceName,
+    userAgentSummary: row.userAgentSummary,
+    enabled: Number(row.enabled) === 1,
+    createdAt: row.createdAt,
+    lastSeenAt: row.lastSeenAt,
+    lastSuccessAt: row.lastSuccessAt,
+    lastFailureCode: row.lastFailureCode
+  }));
 }
 
 export async function createRunAndOutbox(env, run, jobs) {
@@ -140,26 +357,32 @@ export async function createRunAndOutbox(env, run, jobs) {
       JSON.stringify(run.results),
       run.error ?? null
     ),
-    ...jobs.map((job) => env.DB.prepare(
-      `INSERT INTO notification_outbox
-        (id, runId, channel, status, payload, attempts, nextAttemptAt, lockedUntil, leaseToken, providerMessageId, lastErrorCode, createdAt, sentAt,
-         deliveryEmailTo, deliveryPushoverDevice, deliveryPushoverPriority, deliveryPushoverSound,
-         manualAttempts, lastManualRetryAt)
-       VALUES (?, ?, ?, 'pending', ?, 0, ?, NULL, NULL, NULL, NULL, ?, NULL,
-               ?, ?, ?, ?,
-               0, NULL)`
-    ).bind(
-      job.id,
-      job.runId,
-      job.channel,
-      job.payload,
-      job.nextAttemptAt,
-      job.createdAt,
-      job.deliveryEmailTo ?? null,
-      job.deliveryPushoverDevice ?? null,
-      job.deliveryPushoverPriority ?? null,
-      job.deliveryPushoverSound ?? null
-    ))
+    ...jobs.map((job) => {
+      const status = job.status || "pending";
+      return env.DB.prepare(
+        `INSERT INTO notification_outbox
+          (id, runId, channel, deliveryTargetId, status, payload, attempts, nextAttemptAt, lockedUntil, leaseToken, providerMessageId, lastErrorCode, createdAt, sentAt,
+           deliveryEmailTo, deliveryPushoverDevice, deliveryPushoverPriority, deliveryPushoverSound,
+           manualAttempts, lastManualRetryAt)
+         VALUES (?, ?, ?, ?, ?, ?, 0, ?, NULL, NULL, NULL, ?, ?, NULL,
+                 ?, ?, ?, ?,
+                 0, NULL)`
+      ).bind(
+        job.id,
+        job.runId,
+        job.channel,
+        job.deliveryTargetId ?? null,
+        status,
+        job.payload,
+        job.nextAttemptAt,
+        job.lastErrorCode ?? null,
+        job.createdAt,
+        job.deliveryEmailTo ?? null,
+        job.deliveryPushoverDevice ?? null,
+        job.deliveryPushoverPriority ?? null,
+        job.deliveryPushoverSound ?? null
+      );
+    })
   ];
   return env.DB.batch(statements);
 }
@@ -224,7 +447,7 @@ export async function failOutboxJob(env, id, leaseToken, { attempts, nextAttempt
 
 export async function getNotificationDeliveries(env, limit = 30) {
   const { results } = await env.DB.prepare(
-    `SELECT id, runId, channel, status, attempts, createdAt, sentAt, lastErrorCode
+    `SELECT id, runId, channel, deliveryTargetId, status, attempts, createdAt, sentAt, lastErrorCode
      FROM notification_outbox ORDER BY createdAt DESC LIMIT ?`
   ).bind(limit).all();
   return results;
@@ -410,6 +633,8 @@ export async function disableNotificationChannel(env, channel, now) {
     await upsertNotificationSettings(env, { ...row, emailEnabled: 0, updatedAt: now });
   } else if (channel === "pushover") {
     await upsertNotificationSettings(env, { ...row, pushoverEnabled: 0, updatedAt: now });
+  } else if (channel === "webhook") {
+    await upsertNotificationSettings(env, { ...row, webhookEnabled: 0, updatedAt: now });
   }
 }
 
@@ -417,7 +642,7 @@ export async function disableNotificationChannel(env, channel, now) {
 export async function getOperationalStatus(env, now = Date.now()) {
   const scheduled = await env.DB.prepare(
     `SELECT timestamp FROM runs
-     WHERE triggerType IN ('AM', 'NOON', 'PM')
+     WHERE triggerType LIKE 'SCHEDULED:%' OR triggerType IN ('AM', 'NOON', 'PM')
      ORDER BY timestamp DESC LIMIT 1`
   ).first();
   const successful = await env.DB.prepare(

@@ -31,7 +31,14 @@ test("schema.sql creates the tables and indexes the Worker queries", async () =>
       .prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name LIKE 'idx_%' ORDER BY name")
       .all()
       .map((row) => row.name);
-    assert.deepEqual(indexes, ["idx_locations_createdAt", "idx_outbox_pending", "idx_outbox_run_channel", "idx_runs_timestamp"]);
+    assert.deepEqual(indexes, [
+      "idx_location_rules_channel",
+      "idx_locations_createdAt",
+      "idx_outbox_pending",
+      "idx_outbox_run_channel_target",
+      "idx_runs_timestamp",
+      "idx_web_push_enabled"
+    ]);
 
     // IF NOT EXISTS makes re-application safe for local resets.
     local.database.exec(schema);

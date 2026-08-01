@@ -71,8 +71,12 @@ require_line "$WORKER_CONFIG" '^binding[[:space:]]*=[[:space:]]*"CREDENTIAL_ADMI
 require_line "$WORKER_CONFIG" "^service[[:space:]]*=[[:space:]]*\"${EXPECTED_ADMIN}\"" "CREDENTIAL_ADMIN targets ${EXPECTED_ADMIN}" || failures=1
 require_line "$WORKER_CONFIG" '^binding[[:space:]]*=[[:space:]]*"EMAIL_TRANSPORT_SECRET"' 'EMAIL_TRANSPORT_SECRET binding is declared' || failures=1
 require_line "$WORKER_CONFIG" '^binding[[:space:]]*=[[:space:]]*"PUSHOVER_TRANSPORT_SECRET"' 'PUSHOVER_TRANSPORT_SECRET binding is declared' || failures=1
+require_line "$WORKER_CONFIG" '^binding[[:space:]]*=[[:space:]]*"WEBHOOK_TRANSPORT_SECRET"' 'WEBHOOK_TRANSPORT_SECRET binding is declared' || failures=1
+require_line "$WORKER_CONFIG" '^binding[[:space:]]*=[[:space:]]*"WEB_PUSH_VAPID_PRIVATE"' 'WEB_PUSH_VAPID_PRIVATE binding is declared' || failures=1
 require_line "$WORKER_CONFIG" 'secret_name[[:space:]]*=[[:space:]]*"SUNSETHUE_EMAIL_TRANSPORT"' 'email Secrets Store secret name is declared' || failures=1
 require_line "$WORKER_CONFIG" 'secret_name[[:space:]]*=[[:space:]]*"SUNSETHUE_PUSHOVER_TRANSPORT"' 'pushover Secrets Store secret name is declared' || failures=1
+require_line "$WORKER_CONFIG" 'secret_name[[:space:]]*=[[:space:]]*"SUNSETHUE_WEBHOOK_TRANSPORT"' 'webhook Secrets Store secret name is declared' || failures=1
+require_line "$WORKER_CONFIG" 'secret_name[[:space:]]*=[[:space:]]*"SUNSETHUE_WEB_PUSH_VAPID"' 'web push VAPID Secrets Store secret name is declared' || failures=1
 
 require_line "$ADMIN_CONFIG" '^workers_dev[[:space:]]*=[[:space:]]*false' 'credential-admin workers_dev is disabled' || failures=1
 require_line "$ADMIN_CONFIG" '^preview_urls[[:space:]]*=[[:space:]]*false' 'credential-admin preview_urls is disabled' || failures=1

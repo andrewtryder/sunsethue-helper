@@ -50,10 +50,7 @@ async function withCredentialsApi(fn, { admin = fakeAdmin(), authContext = AUTH_
   const env = {
     DB: local.DB,
     WEBAPP_URL,
-    CREDENTIAL_ADMIN: admin,
-    GMAIL_USER: "reports@example.com",
-    GMAIL_APP_PASSWORD: "legacy-password",
-    EMAIL_TO: "owner@example.com"
+    CREDENTIAL_ADMIN: admin
   };
   const call = (path, options = {}) =>
     handleHttpRequest(makeRequest(path, options), env, authContext, { now: NOW });
@@ -88,7 +85,7 @@ test("GET /api/provider-credentials allows same-origin without Origin and never 
     const body = await ok.json();
     assert.equal(body.email.configured, false);
     assert.doesNotMatch(JSON.stringify(body), new RegExp(SECRET_NEEDLE));
-    assert.doesNotMatch(JSON.stringify(body), /legacy-password|CLOUDFLARE_API_TOKEN/);
+    assert.doesNotMatch(JSON.stringify(body), /CLOUDFLARE_API_TOKEN/);
   });
 });
 

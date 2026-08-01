@@ -29,7 +29,6 @@ function mockEnv(overrides = {}) {
   return {
     ...baseEnv(),
     SUNSETHUE_API_KEY: "test-key",
-    EMAIL_TO: AUTHORIZED_EMAIL,
     DB: {
       prepare(query) {
         return {
@@ -216,10 +215,7 @@ test("scheduled reports run without an Access HTTP token", async () => {
   // Force current time into a matching ET window by stubbing formatters via env side effects.
   // handleScheduledReport catches errors; we verify it can be invoked without JWT.
   await handleScheduledReport({}, mockEnv({
-    SUNSETHUE_API_KEY: "x",
-    GMAIL_USER: "x",
-    GMAIL_APP_PASSWORD: "x",
-    EMAIL_TO: AUTHORIZED_EMAIL
+    SUNSETHUE_API_KEY: "x"
   }));
   assert.equal(called, false);
   assert.equal(typeof originalDate, "function");

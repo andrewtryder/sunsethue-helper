@@ -2,8 +2,15 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { handleHttpRequest } from "../../worker/api.js";
 import * as db from "../../worker/db.js";
+import { saveSettings } from "../../worker/notifications/settings.js";
 import { createLocalD1 } from "../support/local-d1.mjs";
-import { createFetchFake, createMailerFake, jsonOk, sunsethueForecast } from "../support/fakes.mjs";
+import {
+  createFetchFake,
+  createMailerFake,
+  jsonOk,
+  sunsethueForecast,
+  transportBindings
+} from "../support/fakes.mjs";
 import { makeRequest } from "../helpers.mjs";
 
 const NOW = Date.parse("2026-07-15T12:00:00Z");
@@ -11,21 +18,32 @@ const AUTH_CONTEXT = { authenticated: true, authorized: true, email: "owner@exam
 const LOCATION_ID_A = "10000000-0000-0000-0000-00000000000a";
 const LOCATION_ID_B = "10000000-0000-0000-0000-00000000000b";
 
-async function withApi(fn, { locations = [], routes = {}, envOverrides = {} } = {}) {
+async function withApi(fn, { locations = [], routes = {}, envOverrides = {}, transportOverrides = {}, emailSettings = { emailEnabled: true, emailTo: "owner@example.com" } } = {}) {
   const local = await createLocalD1();
   const fetchFake = createFetchFake(routes);
   const mailer = createMailerFake();
   const env = {
     SUNSETHUE_API_KEY: "fake-sunsethue-key",
-    GMAIL_USER: "reports@example.com",
-    GMAIL_APP_PASSWORD: "fake-app-password",
-    EMAIL_TO: "owner@example.com",
     CONTACT_EMAIL: "contact@example.com",
+    ...transportBindings(transportOverrides),
     DB: local.DB,
     ...envOverrides
   };
   for (const location of locations) {
     await db.addLocation(env, location);
+  }
+  if (emailSettings) {
+    // Configure D1 notification settings so tests can trigger email delivery
+    // via the outbox. Pass `emailSettings: false` to leave the ship-safe
+    // default (channels disabled) in place.
+    await saveSettings(env, {
+      emailEnabled: Boolean(emailSettings.emailEnabled),
+      emailTo: emailSettings.emailTo ?? null,
+      pushoverEnabled: false,
+      pushoverDevice: null,
+      pushoverPriority: 0,
+      pushoverSound: null
+    }, NOW);
   }
 
   const call = (path, options) =>
@@ -413,7 +431,7 @@ test("POST /api/triggerReport runs a manual report through the faked mailer", as
   );
 });
 
-test("a missing email secret leaves notification delivery disabled by default", async () => {
+test("with the email channel disabled in settings the report enqueues no delivery jobs", async () => {
   await withApi(
     async ({ call }) => {
       const response = await call("/api/triggerReport", { method: "POST" });
@@ -424,7 +442,9 @@ test("a missing email secret leaves notification delivery disabled by default", 
     },
     {
       locations: [{ id: LOCATION_ID_B, name: "Beach", latitude: 1, longitude: 2, createdAt: 1 }],
-      envOverrides: { GMAIL_APP_PASSWORD: "" }
+      // Leave the ship-safe defaults (email disabled) so no outbox job is
+      // enqueued regardless of Secrets Store state.
+      emailSettings: false
     }
   );
 });

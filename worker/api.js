@@ -307,7 +307,7 @@ export async function handleHttpRequest(request, env, authContext = null, deps =
       // misconfigured channel cannot lock out a valid one for a full minute.
       if (body.channel === "email" && (!settings.emailEnabled || !(await hasEmailTransportAsync(env)))) return errorResponse("PROVIDER_NOT_CONFIGURED", "Email is not configured.", 409, requestId);
       if (body.channel === "pushover" && (!settings.pushoverEnabled || !(await hasPushoverTransportAsync(env)))) return errorResponse("PROVIDER_NOT_CONFIGURED", "Pushover is not configured.", 409, requestId);
-      if (body.channel === "email" && !(settings.emailTo || env.EMAIL_TO)) {
+      if (body.channel === "email" && !settings.emailTo) {
         return errorResponse("INVALID_EMAIL_ADDRESS", "Set an email destination in notification settings before sending a test.", 409, requestId);
       }
       if (!await db.claimNotificationTestSlot(env, now)) return errorResponse("RATE_LIMITED", "Try again in a minute.", 429, requestId);

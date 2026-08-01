@@ -1,5 +1,11 @@
 /**
- * Resolve Pushover credentials from Secrets Store (preferred) or legacy Worker secrets.
+ * Resolve Pushover credentials from Cloudflare Secrets Store.
+ *
+ * Production delivery requires the store-backed `PUSHOVER_TRANSPORT_SECRET`
+ * binding to hold a document with `configured === true`. There is no
+ * legacy Worker-secret fallback — an unconfigured or missing store secret
+ * fails closed with `PUSHOVER_NOT_CONFIGURED`.
+ *
  * Never logs returned credential objects.
  */
 
@@ -16,7 +22,7 @@ async function readStoreBinding(binding) {
 }
 
 /**
- * @returns {Promise<{ source: string, appToken: string, userKey: string }>}
+ * @returns {Promise<{ source: "secrets_store", appToken: string, userKey: string }>}
  */
 export async function resolvePushoverTransport(env) {
   const raw = await readStoreBinding(env.PUSHOVER_TRANSPORT_SECRET);
@@ -35,14 +41,6 @@ export async function resolvePushoverTransport(env) {
         throw new NotificationError("PUSHOVER_NOT_CONFIGURED");
       }
     }
-  }
-
-  if (env.PUSHOVER_APP_TOKEN && env.PUSHOVER_USER_KEY) {
-    return {
-      source: "legacy_worker_secret",
-      appToken: String(env.PUSHOVER_APP_TOKEN),
-      userKey: String(env.PUSHOVER_USER_KEY)
-    };
   }
 
   throw new NotificationError("PUSHOVER_NOT_CONFIGURED");

@@ -27,9 +27,6 @@ export const PROJECT = {
     "TEAM_DOMAIN",
     "POLICY_AUD",
     "SUNSETHUE_API_KEY",
-    "GMAIL_USER",
-    "GMAIL_APP_PASSWORD",
-    "EMAIL_TO",
     "CONTACT_EMAIL"
   ],
   requiredAdminSecretNames: ["CLOUDFLARE_API_TOKEN"],

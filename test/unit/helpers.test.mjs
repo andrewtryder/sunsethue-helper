@@ -189,20 +189,14 @@ test("selectNextSunEvents returns nulls when nothing is upcoming", () => {
 });
 
 test("report generation validation requires only the forecast credential", () => {
-  const complete = {
-    SUNSETHUE_API_KEY: "k",
-    GMAIL_USER: "u",
-    GMAIL_APP_PASSWORD: "p",
-    EMAIL_TO: "to@example.com"
-  };
+  const complete = { SUNSETHUE_API_KEY: "k" };
   assert.doesNotThrow(() => validateReportEnv(complete));
 
-  assert.throws(() => validateReportEnv({ ...complete, SUNSETHUE_API_KEY: "" }), /SUNSETHUE_API_KEY/);
+  assert.throws(() => validateReportEnv({ SUNSETHUE_API_KEY: "" }), /SUNSETHUE_API_KEY/);
   assert.throws(
-    () => validateReportEnv({ ...complete, SUNSETHUE_API_KEY: "PLACEHOLDER" }),
+    () => validateReportEnv({ SUNSETHUE_API_KEY: "PLACEHOLDER" }),
     /SUNSETHUE_API_KEY/
   );
-  assert.doesNotThrow(() => validateReportEnv({ ...complete, GMAIL_USER: "", GMAIL_APP_PASSWORD: "", EMAIL_TO: "" }));
 });
 
 test("email subjects describe the trigger type", () => {

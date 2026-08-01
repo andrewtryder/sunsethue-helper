@@ -12,8 +12,10 @@ Browser
   -> Pages Function
   -> private service binding (API_SERVICE)
   -> private Worker
-  -> D1 + Sunsethue API + email
+  -> D1 + Sunsethue API + Secrets Store (email/Pushover) + credential-admin Worker
 ```
+
+Provider Gmail and Pushover credentials live in **Cloudflare Secrets Store**, managed through a private credential-admin Worker. Recipients and delivery preferences live in D1.
 
 Scheduled reports continue to run from the Worker cron trigger and do **not** require a browser Access JWT.
 
@@ -119,6 +121,7 @@ Details:
 - [docs/branch-protection.md](docs/branch-protection.md) — recommended `main` settings
 - [docs/cloudflare-credentials.md](docs/cloudflare-credentials.md) — environment variables, secrets, and one-time Access setup
 - [docs/secrets-store-credentials.md](docs/secrets-store-credentials.md) — Secrets Store provider credentials and credential-admin Worker
+- [docs/operations.md](docs/operations.md) — operational status, alerts, retention
 
 ## Worker secrets
 
@@ -213,6 +216,18 @@ After deploy (CI only performs unauthenticated negative checks):
 1. Open the production URL in a private window and confirm Access challenges instead of rendering the app.
 2. Sign in as the authorized email with the Cloudflare identity provider.
 3. Confirm locations, logs, credits, address search, and manual report still work over same-origin `/api/*`.
+
+## Local browser E2E
+
+Playwright covers Horizon tabs, drawer focus, axe checks, and pane screenshots against the **local** stack only:
+
+```bash
+npm run e2e:install
+DEV_AUTH_BYPASS=true npm run dev   # separate terminal
+npm run test:e2e
+```
+
+Never point Playwright at production, real SMTP, Pushover, or Secrets Store.
 
 ## Toolchain
 

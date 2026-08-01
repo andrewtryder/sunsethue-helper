@@ -61,6 +61,9 @@ test("Frontend File Structure & Integrity Checks", () => {
     "pane-locations",
     "pane-activity",
     "pane-settings",
+    "ops-status-title",
+    "ops-status-summary",
+    "ops-status-list",
     // Dashboard
     "forecast-cards-container",
     "dashboard-last-updated",

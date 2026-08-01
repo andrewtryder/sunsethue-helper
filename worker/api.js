@@ -10,6 +10,8 @@ import {
   publicSettings,
   saveSettings
 } from "./notifications/settings.js";
+import { emailTransportSource } from "./notifications/resolve-email-transport.js";
+import { pushoverTransportSource } from "./notifications/resolve-pushover-transport.js";
 import {
   createRequestId,
   jsonResponse,
@@ -483,6 +485,14 @@ export async function handleHttpRequest(request, env, authContext = null, deps =
       if (request.method !== "GET") return methodNotAllowed("GET", requestId);
       const runs = await db.getRuns(env);
       return jsonResponse(runs, 200, requestId);
+    }
+
+    if (path === "/api/operational-status") {
+      if (request.method !== "GET") return methodNotAllowed("GET", requestId);
+      const status = await db.getOperationalStatus(env, deps.now ?? Date.now());
+      status.emailTransport = await emailTransportSource(env);
+      status.pushoverTransport = await pushoverTransportSource(env);
+      return jsonResponse(status, 200, requestId);
     }
 
     // Obsolete public config endpoint removed; keep a generic not-found.

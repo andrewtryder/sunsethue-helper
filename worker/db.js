@@ -410,3 +410,64 @@ export async function disableNotificationChannel(env, channel, now) {
     await upsertNotificationSettings(env, { ...row, pushoverEnabled: 0, updatedAt: now });
   }
 }
+
+const REQUIRED_TABLES = [
+  "locations",
+  "runs",
+  "notification_settings",
+  "notification_outbox",
+  "notification_test_limiter",
+  "report_execution_lock",
+  "autocomplete_limiter",
+  "provider_credential_status"
+];
+
+/** Non-sensitive operational snapshot for the authenticated status endpoint. */
+export async function getOperationalStatus(env, now = Date.now()) {
+  const scheduled = await env.DB.prepare(
+    `SELECT timestamp FROM runs
+     WHERE triggerType IN ('AM', 'NOON', 'PM')
+     ORDER BY timestamp DESC LIMIT 1`
+  ).first();
+  const successful = await env.DB.prepare(
+    `SELECT timestamp FROM runs WHERE status = 'success' ORDER BY timestamp DESC LIMIT 1`
+  ).first();
+  const pending = await env.DB.prepare(
+    `SELECT COUNT(*) AS c, MIN(createdAt) AS oldest
+     FROM notification_outbox WHERE status IN ('pending', 'processing')`
+  ).first();
+  const failed = await env.DB.prepare(
+    `SELECT COUNT(*) AS c FROM notification_outbox WHERE status = 'failed'`
+  ).first();
+  const tables = await env.DB.prepare(
+    `SELECT name FROM sqlite_master WHERE type = 'table'`
+  ).all();
+  const present = new Set((tables.results || []).map((row) => row.name));
+  const oldest = pending?.oldest == null ? null : Number(pending.oldest);
+  return {
+    lastScheduledRunAt: scheduled?.timestamp ? new Date(Number(scheduled.timestamp)).toISOString() : null,
+    lastSuccessfulRunAt: successful?.timestamp ? new Date(Number(successful.timestamp)).toISOString() : null,
+    oldestPendingDeliveryAgeSeconds:
+      oldest == null ? 0 : Math.max(0, Math.floor((now - oldest) / 1000)),
+    pendingDeliveries: Number(pending?.c || 0),
+    failedDeliveries: Number(failed?.c || 0),
+    requiredTablesPresent: REQUIRED_TABLES.every((name) => present.has(name))
+  };
+}
+
+/** Retain recent runs/outbox/credential metadata. Safe to call from cron. */
+export async function pruneOperationalData(env, now = Date.now(), retainMs = 90 * 24 * 60 * 60 * 1000) {
+  const cutoff = now - retainMs;
+  await env.DB.batch([
+    env.DB.prepare(
+      `DELETE FROM notification_outbox
+       WHERE createdAt < ? AND status IN ('sent', 'failed', 'skipped')`
+    ).bind(cutoff),
+    env.DB.prepare(`DELETE FROM runs WHERE timestamp < ?`).bind(cutoff),
+    env.DB.prepare(
+      `UPDATE provider_credential_status
+       SET lastValidationCode = NULL
+       WHERE updatedAt IS NOT NULL AND updatedAt < ?`
+    ).bind(cutoff)
+  ]);
+}

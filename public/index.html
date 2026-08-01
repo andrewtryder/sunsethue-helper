@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sunsethue Helper — Daily Sunrise &amp; Sunset Forecast</title>
-  <meta name="description" content="Monitor daily sunrise and sunset quality forecasts for your favourite locations and receive beautiful email notifications.">
+  <title>Sunsethue Helper — Sunrise &amp; Sunset Quality</title>
+  <meta name="description" content="Private sunrise and sunset quality forecasts with email and Pushover notifications on Cloudflare Workers, D1, Secrets Store, and Access.">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -176,6 +176,12 @@
       <div id="pane-settings" class="tab-pane" role="tabpanel" aria-labelledby="nav-settings">
         <div class="pane-header"><h2>Settings</h2></div>
         <p class="pane-subtext">Notification channels and provider credentials. Credentials are stored in Cloudflare Secrets Store and are never shown in full.</p>
+
+        <section class="form-card" aria-labelledby="ops-status-title">
+          <h3 id="ops-status-title">Operational status</h3>
+          <p id="ops-status-summary" class="action-status" role="status">Loading…</p>
+          <dl id="ops-status-list" class="ops-status-list"></dl>
+        </section>
 
         <section class="form-card" aria-labelledby="gmail-credentials-title">
           <h3 id="gmail-credentials-title">Gmail credentials</h3>

@@ -53,6 +53,10 @@ test-results/
 playwright-report/
 blob-report/
 playwright/.cache/
+test-results/
+playwright-report/
+blob-report/
+e2e/__screenshots__/
 
 # Generated previews and local Cloudflare rollback snapshots
 .tmp/

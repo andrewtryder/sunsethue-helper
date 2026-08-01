@@ -831,7 +831,24 @@ input:disabled {
   font-size: 20px;
   font-weight: 700;
   color: var(--text-primary);
-  margin-bottom: var(--space-md);
+  margin: 0 0 var(--space-md);
+}
+
+.ops-status-list {
+  display: grid;
+  grid-template-columns: minmax(8rem, 12rem) 1fr;
+  gap: 0.35rem 1rem;
+  margin: 0.75rem 0 0;
+}
+
+.ops-status-list dt {
+  color: var(--color-on-surface-variant, #5f6368);
+  font-size: 0.85rem;
+}
+
+.ops-status-list dd {
+  margin: 0;
+  font-size: 0.95rem;
 }
 
 .form-card {

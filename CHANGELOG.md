@@ -25,7 +25,6 @@ This changelog follows [Conventional Commits](https://www.conventionalcommits.or
 ### Features
 
 * add configurable notification outbox ([4802669](https://github.com/andrewtryder/sunsethue-helper/commit/4802669bbfb23d4df61f84cb041f7c23f42800c7))
-* configurable notification outbox ([bcadeca](https://github.com/andrewtryder/sunsethue-helper/commit/bcadeca4931ad069d5deadbf8f7d8fd35fdcb0db))
 * **credentials:** add secrets store provider credential administration ([a6b8bfd](https://github.com/andrewtryder/sunsethue-helper/commit/a6b8bfdd0ba432720d806dceec3e53b76e1528bc))
 
 

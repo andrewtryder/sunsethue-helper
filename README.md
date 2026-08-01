@@ -19,6 +19,8 @@ Sunsethue Helper checks sunrise and sunset photo-quality forecasts for the place
 
 Private sunrise/sunset quality notifier for a single authorized user.
 
+Planned notification-platform work (health dashboard, self-test, clear history, setup wizard, static demo): [docs/design/notification-platform-roadmap.md](docs/design/notification-platform-roadmap.md).
+
 ### Architecture
 
 ```text

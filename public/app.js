@@ -233,7 +233,10 @@ async function initApp() {
       fetchNotificationSettings(),
       fetchNotificationDeliveries(),
       fetchProviderCredentials(),
-      fetchOperationalStatus()
+      fetchOperationalStatus(),
+      fetchApplicationSettings(),
+      fetchLocationRules(),
+      fetchWebPushDevices()
     ]);
     for (const outcome of notificationOutcomes) {
       if (outcome.status === "rejected") {
@@ -262,6 +265,16 @@ async function fetchNotificationSettings() {
   notificationDevice.value = settings.pushoverDevice || "";
   notificationPriority.value = String(settings.pushoverPriority);
   notificationSound.value = settings.pushoverSound || "";
+  const webhookEnabledEl = document.getElementById("notification-webhook-enabled");
+  if (webhookEnabledEl) webhookEnabledEl.checked = Boolean(settings.webhookEnabled);
+  const webhookStatus = document.getElementById("webhook-credentials-status");
+  if (webhookStatus) {
+    webhookStatus.textContent = settings.webhookConfigured
+      ? (settings.webhookMaskedHostname ? `Configured · ${settings.webhookMaskedHostname}` : "Configured")
+      : "Not configured";
+    webhookStatus.classList.toggle("success", settings.webhookConfigured);
+    webhookStatus.classList.toggle("muted", !settings.webhookConfigured);
+  }
   notificationEmailStatus.textContent = settings.emailConfigured ? "Configured" : "Not configured";
   notificationEmailStatus.classList.toggle("success", settings.emailConfigured);
   notificationEmailStatus.classList.toggle("muted", !settings.emailConfigured);
@@ -374,7 +387,15 @@ async function fetchNotificationDeliveries() {
 
 notificationSettingsForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
-  const body = { emailEnabled: notificationEmailEnabled.checked, emailTo: notificationEmailTo.value || null, pushoverEnabled: notificationPushoverEnabled.checked, pushoverDevice: notificationDevice.value || null, pushoverPriority: Number(notificationPriority.value), pushoverSound: notificationSound.value || null };
+  const body = {
+    emailEnabled: notificationEmailEnabled.checked,
+    emailTo: notificationEmailTo.value || null,
+    pushoverEnabled: notificationPushoverEnabled.checked,
+    pushoverDevice: notificationDevice.value || null,
+    pushoverPriority: Number(notificationPriority.value),
+    pushoverSound: notificationSound.value || null,
+    webhookEnabled: Boolean(document.getElementById("notification-webhook-enabled")?.checked)
+  };
   try {
     const response = await fetch(`${API_BASE}/api/notification-settings`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     if (!response.ok) throw new Error("Notification settings were not accepted.");
@@ -1473,6 +1494,332 @@ const logoHomeBtn = document.getElementById("logo-home-btn");
 if (logoHomeBtn) {
   logoHomeBtn.addEventListener("click", () => switchTab("main"));
 }
+
+const HOUR_OPTIONS = Array.from({ length: 24 }, (_, hour) => `${String(hour).padStart(2, "0")}:00`);
+const SCHEDULE_PRESETS = {
+  once: ["06:00"],
+  twice: ["06:00", "18:00"],
+  three: ["06:00", "12:00", "18:00"],
+  four: ["00:00", "06:00", "12:00", "18:00"]
+};
+
+function populateTimezoneDatalist() {
+  const list = document.getElementById("iana-timezone-list");
+  if (!list || typeof Intl.supportedValuesOf !== "function") return;
+  list.innerHTML = Intl.supportedValuesOf("timeZone")
+    .map((tz) => `<option value="${tz}"></option>`)
+    .join("");
+}
+
+function renderScheduleCheckboxes(selected) {
+  const host = document.getElementById("schedule-times-checkboxes");
+  if (!host) return;
+  const set = new Set(selected || []);
+  host.innerHTML = HOUR_OPTIONS.map((slot) => {
+    const labelHour = Number(slot.slice(0, 2));
+    const ampm = labelHour === 0 ? "12:00 AM" : labelHour < 12 ? `${labelHour}:00 AM` : labelHour === 12 ? "12:00 PM" : `${labelHour - 12}:00 PM`;
+    return `<label><input type="checkbox" data-schedule-slot="${slot}" ${set.has(slot) ? "checked" : ""}> ${ampm}</label>`;
+  }).join("");
+}
+
+function selectedScheduleSlots() {
+  return [...document.querySelectorAll("[data-schedule-slot]:checked")].map((el) => el.getAttribute("data-schedule-slot"));
+}
+
+async function fetchApplicationSettings() {
+  const response = await fetch(`${API_BASE}/api/application-settings`);
+  if (!response.ok) throw new Error("Failed to load application settings.");
+  const data = await response.json();
+  const tzInput = document.getElementById("schedule-timezone");
+  if (tzInput) tzInput.value = data.scheduleTimezone || "America/New_York";
+  const label = document.getElementById("schedule-timezone-label");
+  if (label) label.textContent = `Timezone: ${data.scheduleTimezone || "America/New_York"}`;
+  for (const radio of document.querySelectorAll('input[name="display-timezone-mode"]')) {
+    radio.checked = radio.value === (data.displayTimezoneMode || "schedule");
+  }
+  const displayTz = document.getElementById("display-timezone");
+  if (displayTz) {
+    displayTz.value = data.displayTimezone || "";
+    displayTz.hidden = data.displayTimezoneMode !== "selected";
+  }
+  renderScheduleCheckboxes(data.scheduleTimes || ["06:00", "12:00", "18:00"]);
+  const quota = document.getElementById("quota-estimator");
+  if (quota && data.quota) {
+    const q = data.quota;
+    quota.innerHTML = `<strong>Estimated Sunsethue usage</strong><br>
+      ${q.scheduledRunsPerDay} runs/day × ${q.activeLocations} locations = ${q.estimatedRequestsPerDay} requests/day
+      (~${q.estimatedRequestsPer30Days}/30 days).
+      ${q.remainingCredits != null ? ` Remaining credits: ${q.remainingCredits}.` : ""}
+      <br><small>Channels, thresholds, and delivery retries do not add forecast quota. Manual reports are not included.</small>`;
+  }
+}
+
+async function fetchLocationRules() {
+  const response = await fetch(`${API_BASE}/api/location-notification-rules`);
+  if (!response.ok) throw new Error("Failed to load notification rules.");
+  const data = await response.json();
+  renderLocationRules(data.rules || []);
+}
+
+function renderLocationRules(rules) {
+  const host = document.getElementById("location-rules-grid");
+  if (!host) return;
+  const byLocation = new Map();
+  for (const rule of rules) {
+    if (!byLocation.has(rule.locationId)) byLocation.set(rule.locationId, []);
+    byLocation.get(rule.locationId).push(rule);
+  }
+  if (!locationsList.length) {
+    host.innerHTML = "<p class=\"pane-subtext\">Add locations to configure thresholds.</p>";
+    return;
+  }
+  const thresholdOptions = [
+    ["", "Always"],
+    ["20", "20%+"],
+    ["40", "40%+"],
+    ["50", "50%+"],
+    ["60", "60%+"],
+    ["70", "70%+"],
+    ["80", "80%+"],
+    ["off", "Off"]
+  ];
+  host.innerHTML = locationsList.map((loc) => {
+    const locRules = byLocation.get(loc.id) || [];
+    const cells = ["email", "pushover", "webpush", "webhook"].map((channel) => {
+      const rule = locRules.find((r) => r.channel === channel);
+      const enabled = rule?.enabled !== false && rule?.enabled !== 0;
+      const threshold = !enabled ? "off" : (rule?.thresholdPercent == null ? "" : String(rule.thresholdPercent));
+      const options = thresholdOptions.map(([value, label]) =>
+        `<option value="${value}" ${threshold === value ? "selected" : ""}>${label}</option>`
+      ).join("");
+      return `<label>${channel}<select data-rule-location="${loc.id}" data-rule-channel="${channel}">${options}</select></label>`;
+    }).join("");
+    return `<div class="form-card"><strong>${loc.name}</strong><div class="settings-field-grid">${cells}</div></div>`;
+  }).join("");
+  host.querySelectorAll("select[data-rule-location]").forEach((select) => {
+    select.addEventListener("change", async () => {
+      const locationId = select.getAttribute("data-rule-location");
+      const channel = select.getAttribute("data-rule-channel");
+      const value = select.value;
+      const enabled = value !== "off";
+      const thresholdPercent = !enabled || value === "" ? null : Number(value);
+      try {
+        const response = await fetch(`${API_BASE}/api/location-notification-rules`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ locationId, channel, enabled, thresholdPercent, eventScope: "either" })
+        });
+        if (!response.ok) throw new Error("Unable to save rule.");
+        showBanner(dbSuccessBanner, "Notification rule saved.");
+      } catch (error) {
+        showBanner(dbErrorBanner, error.message);
+      }
+    });
+  });
+}
+
+async function fetchWebPushDevices() {
+  const response = await fetch(`${API_BASE}/api/web-push/subscriptions`);
+  if (!response.ok) throw new Error("Failed to load browser devices.");
+  const data = await response.json();
+  const host = document.getElementById("web-push-devices");
+  if (!host) return;
+  const devices = data.devices || [];
+  if (!devices.length) {
+    host.innerHTML = "<p class=\"pane-subtext\">No devices registered yet.</p>";
+    return;
+  }
+  host.innerHTML = devices.map((device) =>
+    `<div class="settings-toggle-row"><span>${device.deviceName} — ${device.enabled ? "Enabled" : "Disabled"}</span>
+      <button type="button" class="btn btn-secondary" data-push-disable="${device.id}">Disable</button>
+      <button type="button" class="btn btn-secondary" data-push-remove="${device.id}">Remove</button></div>`
+  ).join("");
+  host.querySelectorAll("[data-push-disable]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      await fetch(`${API_BASE}/api/web-push/subscriptions/${btn.getAttribute("data-push-disable")}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: false })
+      });
+      await fetchWebPushDevices();
+    });
+  });
+  host.querySelectorAll("[data-push-remove]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      await fetch(`${API_BASE}/api/web-push/subscriptions/${btn.getAttribute("data-push-remove")}`, { method: "DELETE" });
+      await fetchWebPushDevices();
+    });
+  });
+}
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = atob(base64);
+  return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
+}
+
+document.getElementById("application-settings-form")?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const mode = document.querySelector('input[name="display-timezone-mode"]:checked')?.value || "schedule";
+  const body = {
+    scheduleTimezone: document.getElementById("schedule-timezone")?.value || "America/New_York",
+    displayTimezoneMode: mode,
+    displayTimezone: document.getElementById("display-timezone")?.value || null,
+    scheduleTimes: selectedScheduleSlots(),
+    weeklySelfTestEnabled: true,
+    weeklySelfTestMode: "passive",
+    weeklySelfTestDay: 0,
+    weeklySelfTestTime: "10:00"
+  };
+  try {
+    const response = await fetch(`${API_BASE}/api/application-settings`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    if (!response.ok) throw new Error("Schedule settings were not accepted.");
+    showBanner(dbSuccessBanner, "Schedule settings saved.");
+    await fetchApplicationSettings();
+  } catch (error) {
+    showBanner(dbErrorBanner, error.message);
+  }
+});
+
+document.querySelectorAll("[data-schedule-preset]").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const key = btn.getAttribute("data-schedule-preset");
+    renderScheduleCheckboxes(SCHEDULE_PRESETS[key] || SCHEDULE_PRESETS.three);
+  });
+});
+
+document.querySelectorAll('input[name="display-timezone-mode"]').forEach((radio) => {
+  radio.addEventListener("change", () => {
+    const displayTz = document.getElementById("display-timezone");
+    if (displayTz) displayTz.hidden = radio.value !== "selected" || !radio.checked
+      ? document.querySelector('input[name="display-timezone-mode"]:checked')?.value !== "selected"
+      : false;
+  });
+});
+
+document.getElementById("rules-copy-all-btn")?.addEventListener("click", async () => {
+  if (!locationsList[0]) return;
+  await fetch(`${API_BASE}/api/location-notification-rules`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "copy-to-all", sourceLocationId: locationsList[0].id })
+  });
+  await fetchLocationRules();
+  showBanner(dbSuccessBanner, "Rules copied to all locations.");
+});
+
+document.getElementById("rules-reset-btn")?.addEventListener("click", async () => {
+  await fetch(`${API_BASE}/api/location-notification-rules`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "reset-defaults" })
+  });
+  await fetchLocationRules();
+  showBanner(dbSuccessBanner, "Rules reset to 50% defaults.");
+});
+
+document.getElementById("enable-web-push-btn")?.addEventListener("click", async () => {
+  try {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+      throw new Error("Browser push is not supported in this browser.");
+    }
+    const reg = await navigator.serviceWorker.register("/service-worker.js");
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") throw new Error("Notification permission was not granted.");
+    const vapidRes = await fetch(`${API_BASE}/api/web-push/vapid-public-key`);
+    const vapid = await vapidRes.json();
+    if (!vapid.publicKey) throw new Error("Web Push is not configured on the server.");
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(vapid.publicKey)
+    });
+    const json = sub.toJSON();
+    const deviceName = window.prompt("Name this device", "This device") || "This device";
+    const response = await fetch(`${API_BASE}/api/web-push/subscriptions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        endpoint: json.endpoint,
+        keys: json.keys,
+        deviceName
+      })
+    });
+    if (!response.ok) throw new Error("Unable to register this device.");
+    showBanner(dbSuccessBanner, "Browser notifications enabled on this device.");
+    await fetchWebPushDevices();
+  } catch (error) {
+    showBanner(dbErrorBanner, error.message);
+  }
+});
+
+document.getElementById("webhook-credentials-form")?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  try {
+    const putRes = await fetch(`${API_BASE}/api/webhook-credentials`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", ...CREDENTIAL_ADMIN_HEADER },
+      body: JSON.stringify({
+        url: document.getElementById("webhook-url")?.value || "",
+        signingSecret: document.getElementById("webhook-signing-secret")?.value || ""
+      })
+    });
+    if (!putRes.ok) throw new Error("Unable to save webhook credentials.");
+    const enabled = Boolean(document.getElementById("notification-webhook-enabled")?.checked);
+    const settingsRes = await fetch(`${API_BASE}/api/notification-settings`);
+    const settings = await settingsRes.json();
+    await fetch(`${API_BASE}/api/notification-settings`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        emailEnabled: settings.emailEnabled,
+        emailTo: settings.emailTo,
+        pushoverEnabled: settings.pushoverEnabled,
+        pushoverDevice: settings.pushoverDevice,
+        pushoverPriority: settings.pushoverPriority,
+        pushoverSound: settings.pushoverSound,
+        webhookEnabled: enabled
+      })
+    });
+    showBanner(dbSuccessBanner, "Webhook saved.");
+    await fetchNotificationSettings();
+  } catch (error) {
+    showBanner(dbErrorBanner, error.message);
+  }
+});
+
+document.getElementById("test-webhook-btn")?.addEventListener("click", async () => {
+  try {
+    const response = await fetch(`${API_BASE}/api/notifications/test`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ channel: "webhook" })
+    });
+    if (!response.ok) throw new Error("Webhook test failed.");
+    showBanner(dbSuccessBanner, "Webhook test queued.");
+  } catch (error) {
+    showBanner(dbErrorBanner, error.message);
+  }
+});
+
+document.getElementById("remove-webhook-btn")?.addEventListener("click", async () => {
+  try {
+    await fetch(`${API_BASE}/api/webhook-credentials`, {
+      method: "DELETE",
+      headers: { ...CREDENTIAL_ADMIN_HEADER }
+    });
+    showBanner(dbSuccessBanner, "Webhook removed.");
+    await fetchNotificationSettings();
+  } catch (error) {
+    showBanner(dbErrorBanner, error.message);
+  }
+});
+
+populateTimezoneDatalist();
 
 // Run
 initApp();

@@ -11,6 +11,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,1,0" rel="stylesheet">
 
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#1a1a1a">
   <link rel="stylesheet" href="style.css">
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌅</text></svg>">
 </head>
@@ -173,12 +175,87 @@
 
       <div id="pane-settings" class="tab-pane" role="tabpanel" aria-labelledby="nav-settings">
         <div class="pane-header"><h2>Settings</h2></div>
-        <p class="pane-subtext">Notification channels and provider credentials. Credentials are stored in Cloudflare Secrets Store and are never shown in full.</p>
+        <p class="pane-subtext">Schedule, display timezone, notification channels, and provider credentials.</p>
+
+        <section class="form-card settings-card" aria-labelledby="general-settings-title">
+          <h3 id="general-settings-title">General</h3>
+          <form id="application-settings-form" novalidate>
+            <div class="form-group">
+              <label for="schedule-timezone">Application schedule timezone</label>
+              <input id="schedule-timezone" class="form-input" type="text" list="iana-timezone-list" autocomplete="off" value="America/New_York">
+            </div>
+            <fieldset class="form-group">
+              <legend>Display all forecast times in</legend>
+              <label><input type="radio" name="display-timezone-mode" value="schedule" checked> Schedule timezone</label>
+              <label><input type="radio" name="display-timezone-mode" value="device"> This device</label>
+              <label><input type="radio" name="display-timezone-mode" value="selected"> Another timezone</label>
+              <input id="display-timezone" class="form-input" type="text" list="iana-timezone-list" placeholder="IANA timezone" autocomplete="off" hidden>
+            </fieldset>
+            <datalist id="iana-timezone-list"></datalist>
+            <div class="form-group">
+              <span class="settings-section-title">Forecast update schedule</span>
+              <p class="pane-subtext" id="schedule-timezone-label">Timezone: America/New_York</p>
+              <div id="schedule-times-checkboxes" class="settings-field-grid"></div>
+              <p class="pane-subtext">Whole-hour slots only. Selecting 1:00 AM or 2:00 AM can be affected by DST.</p>
+              <div class="form-actions form-actions-compact">
+                <button type="button" class="btn btn-secondary" data-schedule-preset="once">Once daily</button>
+                <button type="button" class="btn btn-secondary" data-schedule-preset="twice">Twice daily</button>
+                <button type="button" class="btn btn-secondary" data-schedule-preset="three">Three times</button>
+                <button type="button" class="btn btn-secondary" data-schedule-preset="four">Four times</button>
+              </div>
+            </div>
+            <div id="quota-estimator" class="form-group" aria-live="polite"></div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary" id="save-application-settings-btn">Save schedule settings</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="form-card settings-card" aria-labelledby="location-rules-title">
+          <h3 id="location-rules-title">Per-location notification thresholds</h3>
+          <p class="pane-subtext">A location notifies a channel when sunrise or sunset meets that channel’s threshold. Notification channels do not change forecast quota.</p>
+          <div id="location-rules-grid"></div>
+          <div class="form-actions form-actions-compact">
+            <button type="button" id="rules-copy-all-btn" class="btn btn-secondary">Copy first location’s rules to all</button>
+            <button type="button" id="rules-reset-btn" class="btn btn-secondary">Reset to defaults (50%)</button>
+          </div>
+        </section>
 
         <section class="form-card" aria-labelledby="ops-status-title">
           <h3 id="ops-status-title">Operational status</h3>
           <p id="ops-status-summary" class="action-status" role="status">Loading…</p>
           <dl id="ops-status-list" class="ops-status-list"></dl>
+        </section>
+
+        <section class="form-card settings-card" aria-labelledby="web-push-title">
+          <h3 id="web-push-title">Browser notifications</h3>
+          <p class="pane-subtext">On iPhone/iPad, install this site to the Home Screen first. Permission is only requested when you click Enable.</p>
+          <button type="button" id="enable-web-push-btn" class="btn btn-primary">Enable browser notifications on this device</button>
+          <div id="web-push-devices" class="form-group"></div>
+        </section>
+
+        <section class="form-card settings-card" aria-labelledby="webhook-title">
+          <h3 id="webhook-title">Webhook</h3>
+          <p class="pane-subtext">One HTTPS destination. Requests are HMAC-signed. Never paste secrets into issues or commits.</p>
+          <form id="webhook-credentials-form" novalidate>
+            <div class="form-group settings-toggle-row">
+              <label><input id="notification-webhook-enabled" type="checkbox"> Enable webhook</label>
+              <span id="webhook-credentials-status" class="status-badge muted" role="status">Loading…</span>
+            </div>
+            <div class="form-group">
+              <label for="webhook-url">Webhook URL</label>
+              <input id="webhook-url" class="form-input" type="url" autocomplete="off" placeholder="https://example.com/hooks/sunsethue">
+            </div>
+            <div class="form-group">
+              <label for="webhook-signing-secret">Signing secret</label>
+              <input id="webhook-signing-secret" class="form-input" type="password" autocomplete="new-password">
+            </div>
+            <div class="form-actions form-actions-compact">
+              <button type="submit" class="btn btn-primary">Save webhook</button>
+              <button type="button" id="test-webhook-btn" class="btn btn-secondary">Send test webhook</button>
+              <button type="button" id="remove-webhook-btn" class="btn btn-secondary">Remove webhook</button>
+            </div>
+          </form>
         </section>
 
         <section class="form-card settings-card" aria-labelledby="gmail-credentials-title">

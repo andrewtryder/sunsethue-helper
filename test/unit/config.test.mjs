@@ -18,9 +18,11 @@ async function read(relativePath) {
 
 test("deployment preflight uses the shared D1 table manifest", () => {
   assert.equal(PROJECT.requiredD1Tables, REQUIRED_D1_TABLES);
-  assert.equal(REQUIRED_D1_TABLES.length, 9);
+  assert.equal(REQUIRED_D1_TABLES.length, 13);
   assert.ok(REQUIRED_D1_TABLES.includes("autocomplete_limiter"));
   assert.ok(REQUIRED_D1_TABLES.includes("provider_credential_limiter"));
+  assert.ok(REQUIRED_D1_TABLES.includes("application_settings"));
+  assert.ok(REQUIRED_D1_TABLES.includes("web_push_subscriptions"));
 });
 
 test("the Worker template keeps the Worker private with a cron and D1 binding", async () => {
@@ -31,6 +33,11 @@ test("the Worker template keeps the Worker private with a cron and D1 binding", 
   assert.match(config, /^binding\s*=\s*"DB"$/m);
   assert.match(config, /^binding\s*=\s*"CREDENTIAL_ADMIN"$/m);
   assert.match(config, /EMAIL_TRANSPORT_SECRET/);
+  assert.match(config, /PUSHOVER_TRANSPORT_SECRET/);
+  assert.match(config, /WEBHOOK_TRANSPORT_SECRET/);
+  assert.match(config, /WEB_PUSH_VAPID_PRIVATE/);
+  assert.match(config, /SUNSETHUE_WEBHOOK_TRANSPORT/);
+  assert.match(config, /SUNSETHUE_WEB_PUSH_VAPID/);
   assert.match(config, /database_id\s*=\s*"\{\{D1_DATABASE_ID\}\}"/);
   assert.doesNotMatch(config, /migrations_dir/, "versioned migrations are not used");
   assert.doesNotMatch(config, /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);

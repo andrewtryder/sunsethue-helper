@@ -8,7 +8,14 @@ import { accountPath, cfRequest, requireEnv, shortId, verifyToken } from "./clou
 
 export const EMAIL_SECRET_NAME = "SUNSETHUE_EMAIL_TRANSPORT";
 export const PUSHOVER_SECRET_NAME = "SUNSETHUE_PUSHOVER_TRANSPORT";
-export const PROVIDER_SECRET_NAMES = [EMAIL_SECRET_NAME, PUSHOVER_SECRET_NAME];
+export const WEBHOOK_SECRET_NAME = "SUNSETHUE_WEBHOOK_TRANSPORT";
+export const WEB_PUSH_VAPID_SECRET_NAME = "SUNSETHUE_WEB_PUSH_VAPID";
+export const PROVIDER_SECRET_NAMES = [
+  EMAIL_SECRET_NAME,
+  PUSHOVER_SECRET_NAME,
+  WEBHOOK_SECRET_NAME,
+  WEB_PUSH_VAPID_SECRET_NAME
+];
 
 export const SENTINEL_VALUE = JSON.stringify({ version: 1, configured: false });
 

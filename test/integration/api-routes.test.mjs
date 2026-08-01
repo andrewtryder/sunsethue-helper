@@ -492,3 +492,171 @@ test("a D1 outage maps to a generic 500", async () => {
   assert.equal(body.error.code, "INTERNAL_ERROR");
   assert.doesNotMatch(JSON.stringify(body), /D1_ERROR|no such table/i);
 });
+
+test("GET/PUT /api/application-settings round-trip schedule preferences", async () => {
+  await withApi(async ({ call }) => {
+    const getRes = await call("/api/application-settings");
+    assert.equal(getRes.status, 200);
+    const current = await getRes.json();
+    assert.ok(Array.isArray(current.scheduleTimes));
+    assert.ok(current.quota);
+    assert.equal(current.quotaNotes.manualReportsExcluded, true);
+
+    const putRes = await call("/api/application-settings", {
+      method: "PUT",
+      body: {
+        scheduleTimezone: "America/Denver",
+        displayTimezoneMode: "schedule",
+        displayTimezone: null,
+        scheduleTimes: ["06:00", "18:00"],
+        weeklySelfTestEnabled: true,
+        weeklySelfTestMode: "passive",
+        weeklySelfTestDay: 0,
+        weeklySelfTestTime: "10:00"
+      }
+    });
+    assert.equal(putRes.status, 200);
+    const saved = await putRes.json();
+    assert.equal(saved.scheduleTimezone, "America/Denver");
+  });
+});
+
+test("location notification rules APIs update and bulk-copy", async () => {
+  await withApi(
+    async ({ call }) => {
+      const list = await call("/api/location-notification-rules");
+      assert.equal(list.status, 200);
+      const put = await call("/api/location-notification-rules", {
+        method: "PUT",
+        body: {
+          locationId: LOCATION_ID_A,
+          channel: "email",
+          enabled: true,
+          thresholdPercent: 60,
+          eventScope: "either"
+        }
+      });
+      assert.equal(put.status, 200);
+      const rule = (await put.json()).rule;
+      assert.equal(rule.thresholdPercent, 60);
+
+      const copy = await call("/api/location-notification-rules", {
+        method: "POST",
+        body: { action: "copy-to-all", sourceLocationId: LOCATION_ID_A }
+      });
+      assert.equal(copy.status, 200);
+
+      const reset = await call("/api/location-notification-rules", {
+        method: "POST",
+        body: { action: "reset-defaults" }
+      });
+      assert.equal(reset.status, 200);
+
+      const enableAll = await call("/api/location-notification-rules", {
+        method: "POST",
+        body: { action: "set-channel-enabled", channel: "pushover", enabled: false }
+      });
+      assert.equal(enableAll.status, 200);
+    },
+    {
+      locations: [
+        { id: LOCATION_ID_A, name: "Beach", latitude: 1, longitude: 2, createdAt: 1 },
+        { id: LOCATION_ID_B, name: "Summit", latitude: 3, longitude: 4, createdAt: 2 }
+      ]
+    }
+  );
+});
+
+test("web push subscription APIs never return endpoints or keys", async () => {
+  await withApi(async ({ call }) => {
+    const vapid = await call("/api/web-push/vapid-public-key");
+    assert.equal(vapid.status, 200);
+
+    const created = await call("/api/web-push/subscriptions", {
+      method: "POST",
+      body: {
+        endpoint: "https://push.example.com/abc",
+        keys: { p256dh: "p256dh-value", auth: "auth-value" },
+        deviceName: "Laptop"
+      }
+    });
+    assert.equal(created.status, 201);
+    const device = (await created.json()).device;
+    assert.equal(device.deviceName, "Laptop");
+    assert.equal(device.endpoint, undefined);
+    assert.equal(device.keys, undefined);
+
+    const listed = await call("/api/web-push/subscriptions");
+    assert.equal(listed.status, 200);
+    const body = await listed.json();
+    assert.equal(body.devices[0].endpoint, undefined);
+
+    const patched = await call(`/api/web-push/subscriptions/${device.id}`, {
+      method: "PATCH",
+      body: { enabled: false, deviceName: "Laptop 2" }
+    });
+    assert.equal(patched.status, 200);
+
+    const deleted = await call(`/api/web-push/subscriptions/${device.id}`, { method: "DELETE" });
+    assert.equal(deleted.status, 200);
+  });
+});
+
+test("webhook credentials PUT/GET/DELETE use Secrets Store stub", async () => {
+  let stored = JSON.stringify({ version: 1, configured: false });
+  await withApi(
+    async ({ call, env }) => {
+      env.WEBHOOK_TRANSPORT_SECRET = {
+        get: async () => stored,
+        put: async (value) => {
+          stored = value;
+        }
+      };
+      const put = await handleHttpRequest(
+        makeRequest("/api/webhook-credentials", {
+          method: "PUT",
+          headers: {
+            "content-type": "application/json",
+            origin: "https://app.example.com",
+            "x-sunsethue-admin": "credentials"
+          },
+          body: {
+            url: "https://hooks.example.com/sunsethue",
+            signingSecret: "0123456789abcdef"
+          }
+        }),
+        {
+          ...env,
+          WEBAPP_URL: "https://app.example.com",
+          WEBHOOK_TRANSPORT_SECRET: {
+            get: async () => stored,
+            put: async (value) => {
+              stored = value;
+            }
+          }
+        },
+        AUTH_CONTEXT,
+        { now: NOW, putWebhookSecret: async (value) => { stored = value; } }
+      );
+      assert.equal(put.status, 200);
+      const get = await handleHttpRequest(
+        makeRequest("/api/webhook-credentials", {
+          method: "GET",
+          headers: { origin: "https://app.example.com" }
+        }),
+        {
+          ...env,
+          WEBAPP_URL: "https://app.example.com",
+          WEBHOOK_TRANSPORT_SECRET: { get: async () => stored }
+        },
+        AUTH_CONTEXT,
+        { now: NOW }
+      );
+      assert.equal(get.status, 200);
+      const status = await get.json();
+      assert.equal(status.configured, true);
+      assert.equal(status.maskedHostname, "hooks.example.com");
+    },
+    { envOverrides: { WEBAPP_URL: "https://app.example.com" }, emailSettings: false }
+  );
+});

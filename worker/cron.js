@@ -1,32 +1,33 @@
-import { runAndSendReport } from "./report.js";
+import * as db from "./db.js";
 import { dispatchPendingNotifications } from "./notifications/dispatcher.js";
 import { pruneOperationalData } from "./db.js";
-
-// ⚡ Bolt Performance Optimization:
-// Caching Intl.DateTimeFormat instances at the module level prevents the V8 engine
-// from expensively re-initializing them on every single cron invocation.
-const hourFormatterET = new Intl.DateTimeFormat("en-US", {
-  timeZone: "America/New_York",
-  hour: "numeric",
-  hour12: false
-});
-
-const minuteFormatterET = new Intl.DateTimeFormat("en-US", {
-  timeZone: "America/New_York",
-  minute: "numeric"
-});
+import { getApplicationSettings } from "./notifications/application-settings.js";
+import {
+  buildOccurrenceKey,
+  getZonedParts,
+  parseScheduleTimes
+} from "../shared/time-format.js";
+import { runAndSendReport } from "./report.js";
 
 /**
  * @param {object} event
  * @param {object} env
- * @param {{ now?: number | Date, runAndSendReport?: typeof runAndSendReport, dispatchPendingNotifications?: typeof dispatchPendingNotifications }} [deps]
- *   Injection seam so tests can pin the instant and observe dispatch without
- *   sending email. Production callers omit it.
+ * @param {{
+ *   now?: number | Date,
+ *   runAndSendReport?: typeof runAndSendReport,
+ *   dispatchPendingNotifications?: typeof dispatchPendingNotifications,
+ *   getApplicationSettings?: typeof getApplicationSettings,
+ *   claimScheduledOccurrence?: typeof db.claimScheduledOccurrence,
+ *   bindOccurrenceRun?: typeof db.bindOccurrenceRun
+ * }} [deps]
  */
 export async function handleScheduledReport(event, env, deps = {}) {
   const now = deps.now === undefined ? new Date() : new Date(deps.now);
   const runReport = deps.runAndSendReport || runAndSendReport;
   const dispatch = deps.dispatchPendingNotifications || dispatchPendingNotifications;
+  const loadSettings = deps.getApplicationSettings || getApplicationSettings;
+  const claimOccurrence = deps.claimScheduledOccurrence || db.claimScheduledOccurrence;
+  const bindRun = deps.bindOccurrenceRun || db.bindOccurrenceRun;
 
   try {
     await dispatch(env, { ...deps, now: now.getTime() });
@@ -40,41 +41,51 @@ export async function handleScheduledReport(event, env, deps = {}) {
     // Retention failures must not block scheduled reports.
   }
 
-  // Format to Eastern Time hour and minute
-  const hourStr = hourFormatterET.format(now);
-  const minuteStr = minuteFormatterET.format(now);
+  let settings;
+  try {
+    settings = await loadSettings(env);
+  } catch {
+    settings = {
+      scheduleTimezone: "America/New_York",
+      scheduleTimes: ["06:00", "12:00", "18:00"]
+    };
+  }
 
-  const currentHour = parseInt(hourStr, 10);
-  const currentMinute = parseInt(minuteStr, 10);
+  const timeZone = settings.scheduleTimezone || "America/New_York";
+  const scheduleTimes = parseScheduleTimes(settings.scheduleTimes);
+  const parts = getZonedParts(now, timeZone);
+  const slot = `${String(parts.hour).padStart(2, "0")}:00`;
 
-  console.log(`Cron trigger checking. Current Eastern Time: ${currentHour}:${currentMinute.toString().padStart(2, "0")}`);
+  console.log(`Cron trigger checking. Local ${timeZone}: ${parts.hour}:${String(parts.minute).padStart(2, "0")}`);
 
-  // Ensure we are triggering near the top of the hour (Wrangler/Cloudflare cron is hourly on the hour)
-  if (currentMinute > 10) {
+  if (parts.minute > 10) {
     console.log("Not near top of the hour. Skipping.");
     return null;
   }
 
-  let triggerType = null;
-  if (currentHour === 6) {
-    triggerType = "AM";
-  } else if (currentHour === 12) {
-    triggerType = "NOON";
-  } else if (currentHour === 18) {
-    triggerType = "PM";
+  if (!scheduleTimes.includes(slot)) {
+    console.log(`No scheduled report matched for hour ${parts.hour} in ${timeZone}.`);
+    return null;
   }
 
-  if (triggerType) {
-    console.log(`Time match: Running scheduled ${triggerType} report...`);
-    try {
-      await runReport(triggerType, env);
-      console.log(`Scheduled ${triggerType} report run successfully completed.`);
-    } catch (error) {
-      console.error(`Scheduled ${triggerType} report run failed:`, error);
+  const occurrenceKey = buildOccurrenceKey(timeZone, parts);
+  const claimed = await claimOccurrence(env, occurrenceKey, now.getTime(), null);
+  if (!claimed) {
+    console.log(`Occurrence already claimed: ${occurrenceKey}`);
+    return null;
+  }
+
+  const triggerType = `SCHEDULED:${slot}`;
+  console.log(`Time match: Running scheduled ${triggerType} (${occurrenceKey})...`);
+  try {
+    const result = await runReport(triggerType, env, deps);
+    if (result?.runId) {
+      await bindRun(env, occurrenceKey, result.runId);
     }
+    console.log(`Scheduled ${triggerType} report run successfully completed.`);
+    return triggerType;
+  } catch (error) {
+    console.error(`Scheduled ${triggerType} report run failed:`, error);
     return triggerType;
   }
-
-  console.log(`No scheduled report matched for hour ${currentHour} ET.`);
-  return null;
 }

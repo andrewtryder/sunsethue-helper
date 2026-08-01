@@ -79,6 +79,10 @@ test("Frontend File Structure & Integrity Checks", () => {
     "gmail-credentials-status",
     "pushover-credentials-status",
     "notification-settings-form",
+    "application-settings-form",
+    "location-rules-grid",
+    "enable-web-push-btn",
+    "webhook-credentials-form",
   ];
 
   requiredIds.forEach(id => {

@@ -2,10 +2,15 @@ import * as db from "../db.js";
 import { NotificationError } from "./errors.js";
 import { hasEmailTransportAsync } from "./resolve-email-transport.js";
 import { hasPushoverTransportAsync } from "./resolve-pushover-transport.js";
+import { hasWebhookTransportAsync } from "./webhook.js";
 
 const EMAIL_RE = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/;
 const SAFE_OPTION_RE = /^[A-Za-z0-9 _.-]{1,64}$/;
 const SETTINGS_FIELDS = new Set([
+  "emailEnabled", "emailTo", "pushoverEnabled", "pushoverDevice", "pushoverPriority", "pushoverSound",
+  "webhookEnabled"
+]);
+const REQUIRED_SETTINGS_FIELDS = new Set([
   "emailEnabled", "emailTo", "pushoverEnabled", "pushoverDevice", "pushoverPriority", "pushoverSound"
 ]);
 
@@ -49,7 +54,11 @@ export function getDefaultSettings() {
     pushoverEnabled: 0,
     pushoverDevice: null,
     pushoverPriority: 0,
-    pushoverSound: null
+    pushoverSound: null,
+    webhookEnabled: 0,
+    webhookMaskedHostname: null,
+    webhookLastSuccessAt: null,
+    webhookLastFailureCode: null
   };
 }
 
@@ -61,6 +70,7 @@ export async function getSettings(env) {
 export async function publicSettings(settings, env) {
   const emailConfigured = await hasEmailTransportAsync(env);
   const pushoverConfigured = await hasPushoverTransportAsync(env);
+  const webhookConfigured = await hasWebhookTransportAsync(env);
   return {
     emailEnabled: Boolean(settings.emailEnabled),
     emailTo: settings.emailTo || null,
@@ -68,8 +78,13 @@ export async function publicSettings(settings, env) {
     pushoverDevice: settings.pushoverDevice || null,
     pushoverPriority: settings.pushoverPriority,
     pushoverSound: settings.pushoverSound || null,
+    webhookEnabled: Boolean(settings.webhookEnabled),
+    webhookMaskedHostname: settings.webhookMaskedHostname || null,
+    webhookLastSuccessAt: settings.webhookLastSuccessAt || null,
+    webhookLastFailureCode: settings.webhookLastFailureCode || null,
     emailConfigured,
-    pushoverConfigured
+    pushoverConfigured,
+    webhookConfigured
   };
 }
 
@@ -80,9 +95,13 @@ export function validateSettingsInput(input) {
   for (const key of Object.keys(input)) {
     if (!SETTINGS_FIELDS.has(key)) throw new NotificationError("UNKNOWN_SETTINGS_FIELD");
   }
-  const required = [...SETTINGS_FIELDS];
+  const required = [...REQUIRED_SETTINGS_FIELDS];
   if (required.some((key) => !(key in input))) throw new NotificationError("INVALID_SETTINGS");
   if (typeof input.emailEnabled !== "boolean" || typeof input.pushoverEnabled !== "boolean") {
+    throw new NotificationError("INVALID_SETTINGS");
+  }
+  const webhookEnabled = input.webhookEnabled === undefined ? false : input.webhookEnabled;
+  if (typeof webhookEnabled !== "boolean") {
     throw new NotificationError("INVALID_SETTINGS");
   }
   const emailTo = input.emailTo === null || input.emailTo === "" ? null : text(input.emailTo);
@@ -97,7 +116,8 @@ export function validateSettingsInput(input) {
   return {
     emailEnabled: Number(input.emailEnabled), emailTo,
     pushoverEnabled: Number(input.pushoverEnabled), pushoverDevice: device,
-    pushoverPriority: input.pushoverPriority, pushoverSound: sound
+    pushoverPriority: input.pushoverPriority, pushoverSound: sound,
+    webhookEnabled: Number(webhookEnabled)
   };
 }
 
@@ -112,6 +132,14 @@ export async function saveSettings(env, input, now = Date.now()) {
   if (settings.pushoverEnabled && !(await hasPushoverTransportAsync(env))) {
     throw new NotificationError("PROVIDER_NOT_CONFIGURED");
   }
-  await db.upsertNotificationSettings(env, { ...settings, updatedAt: now });
+  if (settings.webhookEnabled && !(await hasWebhookTransportAsync(env))) {
+    throw new NotificationError("PROVIDER_NOT_CONFIGURED");
+  }
+  const existing = await getSettings(env);
+  await db.upsertNotificationSettings(env, {
+    ...existing,
+    ...settings,
+    updatedAt: now
+  });
   return settings;
 }

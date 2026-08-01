@@ -914,6 +914,49 @@ input:disabled {
   font-size: 0.95rem;
 }
 
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.health-channel-grid {
+  display: grid;
+  gap: var(--space-md);
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  margin: var(--space-md) 0;
+}
+
+.health-channel-card {
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-sm);
+}
+
+.health-channel-card h4 {
+  margin: 0 0 var(--space-xs);
+  text-transform: capitalize;
+}
+
+.setup-checklist {
+  margin: 0;
+  padding-left: 1.2rem;
+  color: var(--text-secondary);
+}
+
+.demo-banner {
+  background: #1f2937;
+  color: #f9fafb;
+  text-align: center;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+}
+
 .form-card {
   padding: var(--space-md);
   background: var(--surface);

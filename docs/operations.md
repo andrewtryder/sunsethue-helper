@@ -2,14 +2,26 @@
 
 ## Operational status
 
-Authenticated `GET /api/operational-status` returns a non-sensitive snapshot for the Settings panel:
+Authenticated `GET /api/operational-status` remains for backward compatibility.
 
-- `lastScheduledRunAt` / `lastSuccessfulRunAt`
-- `pendingDeliveries` / `failedDeliveries` / `oldestPendingDeliveryAgeSeconds`
-- `emailTransport` / `pushoverTransport` (`secrets_store` | `not_configured`)
-- `requiredTablesPresent`
+Prefer **Notification health** in Settings, backed by `GET /api/notification-health`:
 
-Never includes secret names, values, store IDs, Access configuration, or account identifiers.
+- Overall state: `healthy` | `degraded` | `action_required` | `disabled`
+- Per-channel cards, schedule/quota, threshold skip samples, latest self-test
+- Aggregates only — no secret names, endpoints, keys, store IDs, or Access config
+
+`GET /api/setup-status` powers the first-run checklist (Ready / Missing / Not configured).
+
+## Weekly self-test
+
+Configured in Settings → General (`weeklySelfTest*`). Cron claims `SELFTEST:…` occurrence keys:
+
+- **Passive:** readiness checks only; writes `health_check_runs`
+- **Active:** enqueues `WEEKLY_SELF_TEST` outbox jobs for enabled configured channels
+
+## Clear history
+
+`GET /api/history/export` and `POST /api/history/clear` remove terminal records only. Clearing all history requires `confirm: "CLEAR"`. An `admin_audit_events` row (`history_cleared`) survives the wipe. Pending/processing outbox, locations, settings, credentials, locks, and limiters are never deleted.
 
 ## Suggested alert conditions
 
@@ -29,6 +41,7 @@ Hourly cron prunes:
 - Outbox rows in `sent` / `failed` / `skipped` older than 90 days
 - `runs` older than 90 days
 - Stale `provider_credential_status.lastValidationCode` older than 90 days
+- `health_check_runs` older than 90 days
 
 Adjust `pruneOperationalData` retain window if needed.
 
@@ -36,4 +49,11 @@ Adjust `pruneOperationalData` retain window if needed.
 
 Report schedule times and timezone live in `application_settings`. The Worker keeps an hourly UTC cron and evaluates local whole-hour slots with occurrence dedupe (`scheduled_occurrences`). Per-location channel thresholds live in `location_notification_rules`. Skipped deliveries use `NO_LOCATION_ABOVE_THRESHOLD` when no location qualifies.
 
-Existing D1 installs: run `npm run db:upgrade:r1` then `npm run db:upgrade:r2` after a Time Travel bookmark (see [secrets-store-credentials.md](secrets-store-credentials.md)). Roadmap for health dashboard / self-test / clear history: [design/notification-platform-roadmap.md](design/notification-platform-roadmap.md).
+Existing D1 installs: run `npm run db:upgrade:r1`, `npm run db:upgrade:r2`, then `npm run db:upgrade:r3` after a Time Travel bookmark (or `npm run upgrade`). See [secrets-store-credentials.md](secrets-store-credentials.md).
+
+## Operator CLIs
+
+- `npm run doctor` — read-only checklist (token, D1 tables, Secrets Store, private Workers, Pages binding, cron, Access redirect)
+- `npm run setup` — interactive first-time orchestrator; never collects Gmail/Pushover in the terminal
+- `npm run upgrade` — pending reviewed `db:upgrade:rN` scripts, redeploy, verify, print rollback ids
+- `npm run demo:build` — static demo artifact for GitHub Pages

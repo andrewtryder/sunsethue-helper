@@ -1,0 +1,194 @@
+import { REQUIRED_D1_TABLES } from "../../shared/schema-manifest.js";
+import { estimateForecastQuota, getApplicationSettings } from "./application-settings.js";
+import { emailTransportSource } from "./resolve-email-transport.js";
+import { pushoverTransportSource } from "./resolve-pushover-transport.js";
+import { hasWebhookTransportAsync } from "./webhook.js";
+import { hasWebPushConfiguredAsync } from "./webpush.js";
+import * as db from "../db.js";
+
+const STALE_PUSH_MS = 30 * 24 * 60 * 60 * 1000;
+const PENDING_AGE_ACTION_MS = 6 * 60 * 60 * 1000;
+const PENDING_AGE_DEGRADED_MS = 30 * 60 * 1000;
+
+export function deriveHealthState(input) {
+  if (!input.requiredTablesPresent) return "action_required";
+  if (!input.anyChannelEnabled) return "disabled";
+  if (input.missingTransport) return "action_required";
+  if (input.failedDeliveries >= 5) return "action_required";
+  if (input.oldestPendingAgeMs != null && input.oldestPendingAgeMs >= PENDING_AGE_ACTION_MS) {
+    return "action_required";
+  }
+  if (input.failedDeliveries > 0) return "degraded";
+  if (input.oldestPendingAgeMs != null && input.oldestPendingAgeMs >= PENDING_AGE_DEGRADED_MS) {
+    return "degraded";
+  }
+  if (input.stalePushDevices > 0) return "degraded";
+  return "healthy";
+}
+
+export function nextScheduleSlot(settings, now) {
+  const times = Array.isArray(settings.scheduleTimes) ? [...settings.scheduleTimes].sort() : [];
+  const tz = settings.scheduleTimezone || "America/New_York";
+  if (times.length === 0) return null;
+  const hourPart = new Intl.DateTimeFormat("en-CA", {
+    timeZone: tz,
+    hour: "2-digit",
+    hourCycle: "h23"
+  }).formatToParts(now).find((p) => p.type === "hour");
+  const hourNow = Number(hourPart ? hourPart.value : 0);
+  const upcoming = times.find((slot) => Number(slot.slice(0, 2)) > hourNow) || times[0];
+  return { slot: upcoming, at: null, timeZone: tz };
+}
+
+function isoOrNull(value) {
+  if (value == null) return null;
+  return new Date(Number(value)).toISOString();
+}
+
+/**
+ * Aggregate non-sensitive notification health for the authenticated UI.
+ */
+export async function getNotificationHealth(env, deps = {}) {
+  const now = deps.now ?? Date.now();
+  const settings = deps.settings || await getApplicationSettings(env);
+  const notificationSettings = deps.notificationSettings || await db.getNotificationSettingsRow(env) || {};
+  const locations = deps.locations || await db.getLocations(env);
+  const rules = deps.rules || await db.listLocationNotificationRules(env);
+
+  const tables = await env.DB.prepare(`SELECT name FROM sqlite_master WHERE type = 'table'`).all();
+  const present = new Set((tables.results || []).map((row) => row.name));
+  const requiredTablesPresent = REQUIRED_D1_TABLES.every((name) => present.has(name));
+
+  const emailTransport = deps.emailTransport ?? await emailTransportSource(env);
+  const pushoverTransport = deps.pushoverTransport ?? await pushoverTransportSource(env);
+  const webhookConfigured = deps.webhookConfigured ?? await hasWebhookTransportAsync(env);
+  const webpushConfigured = deps.webpushConfigured ?? await hasWebPushConfiguredAsync(env);
+
+  const emailEnabled = Number(notificationSettings.emailEnabled) === 1;
+  const pushoverEnabled = Number(notificationSettings.pushoverEnabled) === 1;
+  const webhookEnabled = Number(notificationSettings.webhookEnabled) === 1;
+  const pushSubs = await db.listWebPushSubscriptions(env);
+  const pushEnabled = pushSubs.filter((s) => Number(s.enabled) === 1);
+  const pushStale = pushEnabled.filter((s) => now - Number(s.lastSeenAt || s.createdAt || 0) > STALE_PUSH_MS);
+  const webpushEnabled = pushEnabled.length > 0;
+
+  const pendingAgg = await env.DB.prepare(
+    `SELECT COUNT(*) AS c, MIN(createdAt) AS oldest
+     FROM notification_outbox WHERE status IN ('pending', 'processing')`
+  ).first();
+  const failedAgg = await env.DB.prepare(
+    `SELECT COUNT(*) AS c FROM notification_outbox WHERE status = 'failed'`
+  ).first();
+  const oldestPending = pendingAgg && pendingAgg.oldest != null ? Number(pendingAgg.oldest) : null;
+  const oldestPendingAgeMs = oldestPending == null ? null : Math.max(0, now - oldestPending);
+  const failedDeliveries = Number(failedAgg && failedAgg.c ? failedAgg.c : 0);
+
+  const anyChannelEnabled = emailEnabled || pushoverEnabled || webhookEnabled || webpushEnabled;
+  const missingTransport = (emailEnabled && emailTransport === "not_configured")
+    || (pushoverEnabled && pushoverTransport === "not_configured")
+    || (webhookEnabled && !webhookConfigured)
+    || (webpushEnabled && !webpushConfigured);
+
+  const state = deriveHealthState({
+    anyChannelEnabled,
+    missingTransport: Boolean(missingTransport),
+    requiredTablesPresent,
+    failedDeliveries,
+    oldestPendingAgeMs,
+    stalePushDevices: pushStale.length
+  });
+
+  const lastReport = await env.DB.prepare(
+    `SELECT timestamp FROM runs
+     WHERE triggerType LIKE 'SCHEDULED:%' OR triggerType IN ('AM', 'NOON', 'PM')
+     ORDER BY timestamp DESC LIMIT 1`
+  ).first();
+  const lastReportAt = lastReport && lastReport.timestamp ? Number(lastReport.timestamp) : null;
+
+  const skips = await env.DB.prepare(
+    `SELECT id, channel, createdAt, lastErrorCode
+     FROM notification_outbox
+     WHERE status = 'skipped' AND lastErrorCode = 'NO_LOCATION_ABOVE_THRESHOLD'
+     ORDER BY createdAt DESC LIMIT 8`
+  ).all();
+
+  const latestSelfTest = await db.getLatestHealthCheckRun(env);
+  const qualify = (channel) => rules.filter((r) => r.channel === channel && Number(r.enabled) === 1).length;
+
+  const channels = [
+    {
+      channel: "email",
+      enabled: emailEnabled,
+      configured: emailTransport !== "not_configured",
+      transport: emailTransport,
+      qualifyingLocationCount: qualify("email") || locations.length,
+      pending: 0,
+      failed: 0
+    },
+    {
+      channel: "pushover",
+      enabled: pushoverEnabled,
+      configured: pushoverTransport !== "not_configured",
+      transport: pushoverTransport,
+      qualifyingLocationCount: qualify("pushover") || locations.length,
+      pending: 0,
+      failed: 0
+    },
+    {
+      channel: "webpush",
+      enabled: webpushEnabled,
+      configured: webpushConfigured,
+      transport: webpushConfigured ? "vapid" : "not_configured",
+      qualifyingLocationCount: qualify("webpush") || pushEnabled.length,
+      devicesEnabled: pushEnabled.length,
+      devicesStale: pushStale.length,
+      devicesRevoked: pushSubs.length - pushEnabled.length,
+      pending: 0,
+      failed: 0
+    },
+    {
+      channel: "webhook",
+      enabled: webhookEnabled,
+      configured: webhookConfigured,
+      transport: webhookConfigured ? "secrets_store" : "not_configured",
+      qualifyingLocationCount: qualify("webhook") || locations.length,
+      maskedHostname: notificationSettings.webhookMaskedHostname || null,
+      signingEnabled: webhookConfigured,
+      pending: 0,
+      failed: 0
+    }
+  ];
+
+  return {
+    state,
+    lastReportAt: isoOrNull(lastReportAt),
+    lastReportAgeSeconds: lastReportAt == null ? null : Math.max(0, Math.floor((now - lastReportAt) / 1000)),
+    nextScheduled: nextScheduleSlot(settings, new Date(now)),
+    channels,
+    schedule: {
+      timeZone: settings.scheduleTimezone,
+      times: settings.scheduleTimes,
+      quota: estimateForecastQuota({
+        scheduleTimes: settings.scheduleTimes,
+        activeLocations: locations.length
+      })
+    },
+    skips: (skips.results || []).map((row) => ({
+      id: row.id,
+      channel: row.channel,
+      createdAt: isoOrNull(row.createdAt),
+      code: row.lastErrorCode
+    })),
+    selfTest: latestSelfTest
+      ? {
+        checkType: latestSelfTest.checkType,
+        status: latestSelfTest.status,
+        code: latestSelfTest.code,
+        completedAt: isoOrNull(latestSelfTest.completedAt)
+      }
+      : null,
+    pendingDeliveries: Number(pendingAgg && pendingAgg.c ? pendingAgg.c : 0),
+    failedDeliveries,
+    requiredTablesPresent
+  };
+}

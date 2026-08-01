@@ -1,9 +1,9 @@
 -- Local and production D1 schema.
 -- Safe to re-run for new installs: all statements use IF NOT EXISTS.
--- Existing production databases that predate R1/R2 must use the reviewed
--- upgrade scripts (scripts/db-upgrade-r1.mjs, scripts/db-upgrade-r2-outbox.mjs)
--- instead of relying on IF NOT EXISTS alone — SQLite cannot alter CHECK
--- constraints or add columns via this bootstrap file.
+-- Existing production databases that predate R1–R3 must use the reviewed
+-- upgrade scripts (scripts/db-upgrade-r1.mjs, scripts/db-upgrade-r2-outbox.mjs,
+-- scripts/db-upgrade-r3.mjs) instead of relying on IF NOT EXISTS alone —
+-- SQLite cannot alter CHECK constraints or add columns via this bootstrap file.
 -- Apply locally with: npm run db:schema:local
 -- Apply to production D1 with: npm run db:schema:remote
 --   (creates missing tables/indexes; never mutates existing rows).
@@ -184,3 +184,32 @@ CREATE TABLE IF NOT EXISTS provider_credential_limiter (
   id INTEGER PRIMARY KEY CHECK (id = 1),
   lastRequestedAt INTEGER NOT NULL
 );
+
+-- Weekly / manual self-test outcomes (non-sensitive details only).
+CREATE TABLE IF NOT EXISTS health_check_runs (
+  id TEXT PRIMARY KEY,
+  checkType TEXT NOT NULL
+    CHECK (checkType IN ('weekly_passive', 'weekly_active', 'manual')),
+  provider TEXT,
+  status TEXT NOT NULL,
+  code TEXT,
+  startedAt INTEGER NOT NULL,
+  completedAt INTEGER,
+  durationMs INTEGER,
+  details TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_health_check_runs_started
+  ON health_check_runs (startedAt DESC);
+
+-- Admin audit trail that survives clear-history of operational records.
+CREATE TABLE IF NOT EXISTS admin_audit_events (
+  id TEXT PRIMARY KEY,
+  eventType TEXT NOT NULL,
+  categories TEXT,
+  counts TEXT,
+  createdAt INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_admin_audit_created
+  ON admin_audit_events (createdAt DESC);

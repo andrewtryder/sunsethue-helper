@@ -684,6 +684,174 @@ export async function pruneOperationalData(env, now = Date.now(), retainMs = 90 
       `UPDATE provider_credential_status
        SET lastValidationCode = NULL
        WHERE updatedAt IS NOT NULL AND updatedAt < ?`
-    ).bind(cutoff)
+    ).bind(cutoff),
+    env.DB.prepare(`DELETE FROM health_check_runs WHERE startedAt < ?`).bind(cutoff)
   ]);
+}
+
+export async function insertHealthCheckRun(env, row) {
+  await env.DB.prepare(
+    `INSERT INTO health_check_runs
+      (id, checkType, provider, status, code, startedAt, completedAt, durationMs, details)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).bind(
+    row.id,
+    row.checkType,
+    row.provider ?? null,
+    row.status,
+    row.code ?? null,
+    row.startedAt,
+    row.completedAt ?? null,
+    row.durationMs ?? null,
+    row.details ?? null
+  ).run();
+}
+
+export async function getLatestHealthCheckRun(env) {
+  return env.DB.prepare(
+    `SELECT * FROM health_check_runs ORDER BY startedAt DESC LIMIT 1`
+  ).first();
+}
+
+export async function insertAdminAuditEvent(env, row) {
+  await env.DB.prepare(
+    `INSERT INTO admin_audit_events (id, eventType, categories, counts, createdAt)
+     VALUES (?, ?, ?, ?, ?)`
+  ).bind(row.id, row.eventType, row.categories ?? null, row.counts ?? null, row.createdAt).run();
+}
+
+export async function countHistoryScope(env, scope) {
+  if (scope === "runs") {
+    const row = await env.DB.prepare(`SELECT COUNT(*) AS c FROM runs`).first();
+    return Number(row?.c || 0);
+  }
+  if (scope === "deliveries_completed") {
+    const row = await env.DB.prepare(
+      `SELECT COUNT(*) AS c FROM notification_outbox WHERE status IN ('sent', 'skipped')`
+    ).first();
+    return Number(row?.c || 0);
+  }
+  if (scope === "deliveries_failed") {
+    const row = await env.DB.prepare(
+      `SELECT COUNT(*) AS c FROM notification_outbox WHERE status = 'failed'`
+    ).first();
+    return Number(row?.c || 0);
+  }
+  if (scope === "self_tests") {
+    const row = await env.DB.prepare(`SELECT COUNT(*) AS c FROM health_check_runs`).first();
+    return Number(row?.c || 0);
+  }
+  if (scope === "credential_audit") {
+    const row = await env.DB.prepare(
+      `SELECT COUNT(*) AS c FROM admin_audit_events WHERE eventType != 'history_cleared'`
+    ).first();
+    return Number(row?.c || 0);
+  }
+  return 0;
+}
+
+export async function exportHistoryScope(env, scope) {
+  if (scope === "runs") {
+    const { results } = await env.DB.prepare(
+      `SELECT id, timestamp, triggerType, status, locationsCount, error FROM runs ORDER BY timestamp DESC LIMIT 500`
+    ).all();
+    return results || [];
+  }
+  if (scope === "deliveries_completed") {
+    const { results } = await env.DB.prepare(
+      `SELECT id, runId, channel, status, lastErrorCode, createdAt, sentAt
+       FROM notification_outbox WHERE status IN ('sent', 'skipped')
+       ORDER BY createdAt DESC LIMIT 500`
+    ).all();
+    return results || [];
+  }
+  if (scope === "deliveries_failed") {
+    const { results } = await env.DB.prepare(
+      `SELECT id, runId, channel, status, lastErrorCode, createdAt
+       FROM notification_outbox WHERE status = 'failed'
+       ORDER BY createdAt DESC LIMIT 500`
+    ).all();
+    return results || [];
+  }
+  if (scope === "self_tests") {
+    const { results } = await env.DB.prepare(
+      `SELECT id, checkType, provider, status, code, startedAt, completedAt, durationMs
+       FROM health_check_runs ORDER BY startedAt DESC LIMIT 200`
+    ).all();
+    return results || [];
+  }
+  if (scope === "credential_audit") {
+    const { results } = await env.DB.prepare(
+      `SELECT id, eventType, categories, counts, createdAt
+       FROM admin_audit_events WHERE eventType != 'history_cleared'
+       ORDER BY createdAt DESC LIMIT 200`
+    ).all();
+    return results || [];
+  }
+  return [];
+}
+
+/**
+ * Delete terminal history for the given scopes. Never touches pending/processing outbox.
+ */
+export async function clearHistoryScopes(env, scopes) {
+  const statements = [];
+  for (const scope of scopes) {
+    if (scope === "deliveries_completed") {
+      statements.push(env.DB.prepare(
+        `DELETE FROM notification_outbox WHERE status IN ('sent', 'skipped')`
+      ));
+    } else if (scope === "deliveries_failed") {
+      statements.push(env.DB.prepare(
+        `DELETE FROM notification_outbox WHERE status = 'failed'`
+      ));
+    } else if (scope === "self_tests") {
+      statements.push(env.DB.prepare(`DELETE FROM health_check_runs`));
+    } else if (scope === "credential_audit") {
+      statements.push(env.DB.prepare(
+        `DELETE FROM admin_audit_events WHERE eventType != 'history_cleared'`
+      ));
+    }
+  }
+  // Delete runs after terminal outbox rows so pending/processing FK parents remain.
+  if (scopes.includes("runs")) {
+    statements.push(env.DB.prepare(
+      `DELETE FROM runs
+       WHERE id NOT IN (
+         SELECT DISTINCT runId FROM notification_outbox
+         WHERE status IN ('pending', 'processing')
+       )`
+    ));
+  }
+  if (statements.length > 0) await env.DB.batch(statements);
+}
+
+/**
+ * Non-sensitive first-run checklist aggregate.
+ */
+export async function getSetupStatus(env) {
+  const tables = await env.DB.prepare(
+    `SELECT name FROM sqlite_master WHERE type = 'table'`
+  ).all();
+  const present = new Set((tables.results || []).map((row) => row.name));
+  const settings = await getNotificationSettingsRow(env);
+  const emailStatus = await getProviderCredentialStatus(env, "email");
+  const pushoverStatus = await getProviderCredentialStatus(env, "pushover");
+  const webhookStatus = await getProviderCredentialStatus(env, "webhook");
+  const pushCount = await env.DB.prepare(
+    `SELECT COUNT(*) AS c FROM web_push_subscriptions WHERE enabled = 1`
+  ).first().catch(() => ({ c: 0 }));
+
+  return {
+    accessReady: true,
+    databaseTables: REQUIRED_D1_TABLES.every((name) => present.has(name)) ? "ready" : "missing",
+    forecastApiKey: "unknown",
+    email: Number(emailStatus?.configured) === 1 ? "ready" : "not_configured",
+    pushover: Number(pushoverStatus?.configured) === 1 ? "ready" : "not_configured",
+    webhook: Number(webhookStatus?.configured) === 1 || Number(settings?.webhookEnabled) === 1
+      ? (Number(webhookStatus?.configured) === 1 ? "ready" : "not_configured")
+      : "not_configured",
+    browserPushDevices: Number(pushCount?.c || 0) > 0 ? "ready" : "not_configured",
+    browserPushDeviceCount: Number(pushCount?.c || 0)
+  };
 }

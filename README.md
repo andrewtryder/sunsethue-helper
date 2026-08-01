@@ -13,13 +13,22 @@ Sunsethue Helper checks sunrise and sunset photo-quality forecasts for the place
 - Notify you by email and/or Pushover when quality looks worth shooting
 - Keep an activity log of past runs so you can see what was sent
 
+**[View static demo](https://andrewtryder.github.io/sunsethue-helper/)** · **[View screenshots](docs/assets/forecast-dashboard.png)** · **[Deploy your own instance](#for-developers)**
+
 ---
 
 ## For developers
 
 Private sunrise/sunset quality notifier for a single authorized user.
 
-Planned notification-platform work (health dashboard, self-test, clear history, setup wizard, static demo): [docs/design/notification-platform-roadmap.md](docs/design/notification-platform-roadmap.md).
+Notification platform Releases 3–4 (health, self-test, clear history, doctor/setup/upgrade, static demo) ship in this tree. Design notes: [docs/design/notification-platform-roadmap.md](docs/design/notification-platform-roadmap.md).
+
+Operator CLIs:
+
+- `npm run doctor` — read-only deployment checklist
+- `npm run setup` — interactive first-time orchestrator (never collects Gmail/Pushover in the terminal)
+- `npm run upgrade` — pending reviewed D1 upgrades + redeploy + verify
+- `npm run demo:build` — static GitHub Pages demo artifact
 
 ### Architecture
 

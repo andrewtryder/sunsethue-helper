@@ -45,6 +45,8 @@ New installs use [`schema.sql`](../schema.sql). Existing production D1 databases
 ```bash
 npm run db:upgrade:r1 -- --remote    # application_settings, location rules, occurrences
 npm run db:upgrade:r2 -- --remote    # outbox rebuild, web_push_subscriptions, webhook columns
+npm run db:upgrade:r3 -- --remote    # health_check_runs, admin_audit_events
+# Or: npm run upgrade  (detects pending reviewed upgrades, redeploys, verifies)
 ```
 
 See [notification-platform-roadmap.md](design/notification-platform-roadmap.md) for Releases 3–4.

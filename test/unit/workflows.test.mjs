@@ -25,7 +25,7 @@ test("every workflow passes the repository security policy", () => {
 test("the expected workflow set is present", () => {
   assert.deepEqual(
     workflows.map((entry) => entry.name).sort(),
-    ["production.yml", "rollback.yml", "security.yml", "validate.yml"]
+    ["production.yml", "publish-demo.yml", "rollback.yml", "security.yml", "validate.yml"]
   );
 });
 
@@ -96,7 +96,7 @@ test("every production job that touches Cloudflare uses the production environme
 
 test("every Cloudflare-touching workflow uses the single CLOUDFLARE_API_TOKEN", () => {
   for (const entry of workflows) {
-    if (entry.name === "validate.yml" || entry.name === "security.yml") {
+    if (entry.name === "validate.yml" || entry.name === "security.yml" || entry.name === "publish-demo.yml") {
       assert.doesNotMatch(entry.text, /secrets\.CLOUDFLARE_/);
       continue;
     }

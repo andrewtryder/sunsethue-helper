@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import * as db from "../../worker/db.js";
+import { REQUIRED_D1_TABLES } from "../../shared/schema-manifest.js";
 import { createLocalD1, readSchemaSql } from "../support/local-d1.mjs";
 
 /**
@@ -19,30 +20,12 @@ async function withDatabase(fn) {
 test("schema.sql creates the tables and indexes the Worker queries", async () => {
   await withDatabase(async (env, local) => {
     const schema = await readSchemaSql();
-    assert.ok(schema.includes("CREATE TABLE IF NOT EXISTS locations"));
-    assert.ok(schema.includes("CREATE TABLE IF NOT EXISTS runs"));
-    assert.ok(schema.includes("CREATE TABLE IF NOT EXISTS notification_settings"));
-    assert.ok(schema.includes("CREATE TABLE IF NOT EXISTS notification_outbox"));
-    assert.ok(schema.includes("CREATE TABLE IF NOT EXISTS report_execution_lock"));
-    assert.ok(schema.includes("CREATE TABLE IF NOT EXISTS autocomplete_limiter"));
-    assert.ok(schema.includes("CREATE TABLE IF NOT EXISTS provider_credential_status"));
-    assert.ok(schema.includes("CREATE TABLE IF NOT EXISTS provider_credential_limiter"));
 
     const tables = local.database
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
       .all()
       .map((row) => row.name);
-    assert.deepEqual(tables, [
-      "autocomplete_limiter",
-      "locations",
-      "notification_outbox",
-      "notification_settings",
-      "notification_test_limiter",
-      "provider_credential_limiter",
-      "provider_credential_status",
-      "report_execution_lock",
-      "runs"
-    ]);
+    assert.deepEqual(tables, [...REQUIRED_D1_TABLES].sort());
 
     const indexes = local.database
       .prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name LIKE 'idx_%' ORDER BY name")
@@ -57,6 +40,14 @@ test("schema.sql creates the tables and indexes the Worker queries", async () =>
         .total,
       tables.length
     );
+  });
+});
+
+test("operational status reports a missing required table", async () => {
+  await withDatabase(async (env, local) => {
+    local.database.exec("DROP TABLE provider_credential_limiter");
+    const status = await db.getOperationalStatus(env);
+    assert.equal(status.requiredTablesPresent, false);
   });
 });
 

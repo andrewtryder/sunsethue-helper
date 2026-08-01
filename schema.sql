@@ -34,7 +34,7 @@ CREATE INDEX IF NOT EXISTS idx_locations_createdAt ON locations (createdAt ASC);
 CREATE INDEX IF NOT EXISTS idx_runs_timestamp ON runs (timestamp DESC);
 
 -- Notification configuration and delivery intent. Provider credentials remain
--- Worker secrets and are intentionally never stored in D1.
+-- in Secrets Store and are intentionally never stored in D1.
 CREATE TABLE IF NOT EXISTS notification_settings (
   id INTEGER PRIMARY KEY CHECK (id = 1),
   emailEnabled INTEGER NOT NULL DEFAULT 1 CHECK (emailEnabled IN (0, 1)),

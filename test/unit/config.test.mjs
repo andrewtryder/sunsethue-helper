@@ -6,6 +6,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { generateWranglerConfig } from "../../scripts/generate-wrangler-config.mjs";
+import { PROJECT } from "../../scripts/lib/cloudflare.mjs";
+import { REQUIRED_D1_TABLES } from "../../shared/schema-manifest.js";
 
 const ROOT = new URL("../../", import.meta.url);
 const ROOT_PATH = fileURLToPath(ROOT);
@@ -13,6 +15,13 @@ const ROOT_PATH = fileURLToPath(ROOT);
 async function read(relativePath) {
   return readFile(fileURLToPath(new URL(relativePath, ROOT)), "utf8");
 }
+
+test("deployment preflight uses the shared D1 table manifest", () => {
+  assert.equal(PROJECT.requiredD1Tables, REQUIRED_D1_TABLES);
+  assert.equal(REQUIRED_D1_TABLES.length, 9);
+  assert.ok(REQUIRED_D1_TABLES.includes("autocomplete_limiter"));
+  assert.ok(REQUIRED_D1_TABLES.includes("provider_credential_limiter"));
+});
 
 test("the Worker template keeps the Worker private with a cron and D1 binding", async () => {
   const config = await read("wrangler.worker.example.toml");
@@ -209,9 +218,11 @@ test("schema.sql is the single source of schema truth", async () => {
   assert.equal(rootEntries.includes("migrations"), false, "migrations/ must not remain");
 });
 
-test("the local development example is fail-closed and uses placeholders only", async () => {
+test("local development defaults to fail-closed bypass and uses placeholders only", async () => {
   const example = await read(".dev.vars.example");
+  const devScript = await read("scripts/dev.sh");
   assert.match(example, /^DEV_AUTH_BYPASS=false$/m);
+  assert.match(devScript, /export DEV_AUTH_BYPASS="\$\{DEV_AUTH_BYPASS:-false\}"/);
   assert.match(example, /AUTHORIZED_EMAIL=owner@example\.com/);
   assert.doesNotMatch(example, /eyJ[A-Za-z0-9_-]{10,}\./, "no JWT may be committed");
   assert.doesNotMatch(example, /[0-9a-f]{32,}/, "no real audience tag or token may be committed");
@@ -322,7 +333,13 @@ test("tracked sources do not embed personal emails or a committed D1 UUID", asyn
     ) {
       continue;
     }
-    const contents = await readFile(join(ROOT_PATH, path), "utf8");
+    let contents;
+    try {
+      contents = await readFile(join(ROOT_PATH, path), "utf8");
+    } catch (error) {
+      if (error?.code === "ENOENT") continue;
+      throw error;
+    }
     assert.doesNotMatch(contents, committedDatabaseId, path);
     // smtp.gmail.com is a service host, not a personal mailbox.
     const withoutServiceHosts = contents.replace(/smtp\.gmail\.com/g, "smtp.example.com");

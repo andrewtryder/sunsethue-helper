@@ -1,3 +1,5 @@
+import { REQUIRED_D1_TABLES } from "../shared/schema-manifest.js";
+
 const MANUAL_RETRY_COOLDOWN_MS = 60_000;
 const MAX_MANUAL_RETRIES = 10;
 
@@ -411,17 +413,6 @@ export async function disableNotificationChannel(env, channel, now) {
   }
 }
 
-const REQUIRED_TABLES = [
-  "locations",
-  "runs",
-  "notification_settings",
-  "notification_outbox",
-  "notification_test_limiter",
-  "report_execution_lock",
-  "autocomplete_limiter",
-  "provider_credential_status"
-];
-
 /** Non-sensitive operational snapshot for the authenticated status endpoint. */
 export async function getOperationalStatus(env, now = Date.now()) {
   const scheduled = await env.DB.prepare(
@@ -451,7 +442,7 @@ export async function getOperationalStatus(env, now = Date.now()) {
       oldest == null ? 0 : Math.max(0, Math.floor((now - oldest) / 1000)),
     pendingDeliveries: Number(pending?.c || 0),
     failedDeliveries: Number(failed?.c || 0),
-    requiredTablesPresent: REQUIRED_TABLES.every((name) => present.has(name))
+    requiredTablesPresent: REQUIRED_D1_TABLES.every((name) => present.has(name))
   };
 }
 

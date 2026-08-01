@@ -23,7 +23,7 @@ WORKER_NAME="$(
   '
 )"
 
-export DEV_AUTH_BYPASS="${DEV_AUTH_BYPASS:-true}"
+export DEV_AUTH_BYPASS="${DEV_AUTH_BYPASS:-false}"
 export AUTHORIZED_EMAIL="${AUTHORIZED_EMAIL:-owner@example.com}"
 export TEAM_DOMAIN="${TEAM_DOMAIN:-https://example.cloudflareaccess.com}"
 export POLICY_AUD="${POLICY_AUD:-local-dev-audience}"

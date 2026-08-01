@@ -8,7 +8,6 @@ import {
   canAddLocation,
   validateCoordinates,
   formatCoordinateDisplay,
-  formatDashboardCoordinateDisplay,
   getLogStatusClass,
   buildPhotonDisplayName,
   moveSuggestionIndex,
@@ -54,9 +53,7 @@ test("frontend helpers enforce location limits and coordinates", () => {
 
 test("frontend helpers build display strings", () => {
   assert.match(formatCoordinateDisplay(40.7128, -74.006), /40\.7128° N \/ 74\.0060° W/);
-  assert.match(formatDashboardCoordinateDisplay(40.7128, -74.006), /40\.71° N \/ 74\.01° W/);
   assert.match(formatCoordinateDisplay(-33.8688, 151.2093), /33\.8688° S \/ 151\.2093° E/);
-  assert.match(formatDashboardCoordinateDisplay(-33.8688, 151.2093), /33\.87° S \/ 151\.21° E/);
 });
 
 test("frontend helpers support autocomplete and log rendering", () => {

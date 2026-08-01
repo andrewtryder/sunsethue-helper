@@ -74,10 +74,10 @@ Remove and re-save Gmail or Pushover via Settings → provider cards. Confirm `/
 
 | Step | Result |
 |------|--------|
-| Worker rollback `73fd8bf1` → Access still 302 | 3s |
-| Worker restore `41db0040` → Access still 302 | 2s |
+| Worker rollback `<previous-worker-version>` → Access still 302 | 3s |
+| Worker restore `<current-worker-version>` → Access still 302 | 2s |
 | Total Worker RTO (rollback+restore) | **5s** (target ≤15m) |
-| Production D1 bookmark captured | `000000b4-00000000-000050ba-ce6919accfa68d2001a233ccec3c0d5b` |
+| Production D1 bookmark captured | `<redacted-bookmark>` |
 | Disposable D1 create | **Blocked** — account D1 database quota; substituted `npm run db:schema:local` idempotent reapply |
 | Pages rollback | Use Rollback workflow with ids from Production verify summary (not exercised in this drill to avoid overlapping deploys) |
 | Token rotate | Documented path; not rotated in this drill (would invalidate CI mid-flight) |

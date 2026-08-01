@@ -5,7 +5,6 @@ import {
   buildForecastEventSnapshot,
   escapeHtml,
   formatColumnDateET,
-  formatTimeET,
   formatTimeOnlyET,
   getQualityBadge,
   getQualityDotColor,
@@ -90,13 +89,6 @@ test("escapeHtml handles every replaced character and empty input", () => {
   assert.equal(escapeHtml(0), "");
 });
 
-test("times render in Eastern Time across DST", () => {
-  assert.match(formatTimeET(SUMMER_SUNSET), /Tue, Jul 14, 8:26\sPM/);
-  assert.match(formatTimeET(WINTER_SUNSET), /Thu, Jan 15, 4:20\sPM/);
-  assert.equal(formatTimeET(null), "N/A");
-  assert.equal(formatTimeET(""), "N/A");
-});
-
 test("time-only and column date formats stay Eastern", () => {
   assert.match(formatTimeOnlyET(SUMMER_SUNSET), /8:26\sPM/);
   assert.equal(formatTimeOnlyET(null), "N/A");
@@ -104,16 +96,6 @@ test("time-only and column date formats stay Eastern", () => {
   assert.equal(formatColumnDateET(SUMMER_SUNSET), "(Tue, Jul 14)");
   assert.equal(formatColumnDateET(WINTER_SUNSET), "(Thu, Jan 15)");
   assert.equal(formatColumnDateET(null), "");
-});
-
-test("an unparseable timestamp reports an invalid date instead of throwing", () => {
-  const originalError = console.error;
-  console.error = () => {};
-  try {
-    assert.equal(formatTimeET("definitely not a date"), "Invalid Date");
-  } finally {
-    console.error = originalError;
-  }
 });
 
 test("forecast snapshots keep the raw value alongside the normalized one", () => {

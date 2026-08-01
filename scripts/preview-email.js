@@ -15,9 +15,9 @@ const shouldOpen = !args.includes("--no-open");
 
 const dummyResults = [
   {
-    name: "Sandown, NH",
-    latitude: 42.9286,
-    longitude: -71.187,
+    name: "Example Coast",
+    latitude: 40,
+    longitude: -70,
     sunrise: {
       time: "2026-06-08T09:12:00.000Z",
       quality: 0.52,
@@ -31,9 +31,9 @@ const dummyResults = [
     error: null
   },
   {
-    name: "Boston, MA",
-    latitude: 42.3601,
-    longitude: -71.0589,
+    name: "Example City",
+    latitude: 41,
+    longitude: -71,
     sunrise: {
       time: "2026-06-08T09:05:00.000Z",
       quality: 0.22,

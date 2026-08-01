@@ -32,11 +32,6 @@ const timeFormatterShort = new Intl.DateTimeFormat("en-US", {
   timeStyle: "short"
 });
 
-const DEBUG = typeof window !== "undefined" && (
-  window.location.search.includes("debug=true") || 
-  localStorage.getItem("debug") === "true"
-);
-
 // Same-origin API through Pages Functions -> private Worker service binding.
 // Local Pages (`npm run dev`) also uses relative /api/* via the service binding.
 const API_BASE = "";
@@ -571,7 +566,6 @@ async function fetchRuns() {
 // Render Locations list
 function renderLocations() {
   try {
-    if (DEBUG) console.log("renderLocations called. locationsList:", locationsList);
     locationsCountBadge.textContent = `${locationsList.length} / 10`;
     locationsListContainer.innerHTML = "";
 
@@ -710,7 +704,6 @@ function buildForecastEventColumnHtml({ timeText, badgeHtml, mobileLabel, errorH
 
 function renderForecastDashboard() {
   try {
-    if (DEBUG) console.log("renderForecastDashboard called. locationsList:", locationsList);
     if (!forecastCardsContainer) return;
 
     Array.from(forecastCardsContainer.children).forEach(child => {

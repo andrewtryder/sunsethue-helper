@@ -1,13 +1,3 @@
-const timeFormatterET = new Intl.DateTimeFormat("en-US", {
-  timeZone: "America/New_York",
-  weekday: "short",
-  month: "short",
-  day: "numeric",
-  hour: "numeric",
-  minute: "2-digit",
-  hour12: true
-});
-
 const timeOnlyFormatterET = new Intl.DateTimeFormat("en-US", {
   timeZone: "America/New_York",
   hour: "numeric",
@@ -20,17 +10,6 @@ const columnDateFormatterET = new Intl.DateTimeFormat("en-US", {
   month: "short",
   day: "numeric"
 });
-
-export function formatTimeET(utcString) {
-  if (!utcString) return "N/A";
-  try {
-    const date = Date.parse(utcString);
-    return timeFormatterET.format(date);
-  } catch (error) {
-    console.error("Error formatting date:", error);
-    return "Invalid Date";
-  }
-}
 
 export function normalizeQualityToUnit(quality) {
   if (quality === null || quality === undefined) {

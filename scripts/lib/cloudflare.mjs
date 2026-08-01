@@ -7,6 +7,7 @@
  */
 import { appendFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
+import { REQUIRED_D1_TABLES } from "../../shared/schema-manifest.js";
 import { resolveProject } from "./project-config.mjs";
 
 const API_BASE = "https://api.cloudflare.com/client/v4";
@@ -30,16 +31,7 @@ export const PROJECT = {
     "CONTACT_EMAIL"
   ],
   requiredAdminSecretNames: ["CLOUDFLARE_API_TOKEN"],
-  requiredD1Tables: [
-    "locations",
-    "runs",
-    "notification_settings",
-    "notification_outbox",
-    "notification_test_limiter",
-    "report_execution_lock",
-    "provider_credential_status",
-    "provider_credential_limiter"
-  ]
+  requiredD1Tables: REQUIRED_D1_TABLES
 };
 
 export function requireEnv(name) {

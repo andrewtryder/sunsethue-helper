@@ -46,10 +46,6 @@ npx license-checker --production --summary
 | `public/lib/helpers.js` | Shared frontend helpers | Original; MIT with the repository |
 | `public/_routes.json` | Pages Functions routing | Original; MIT with the repository |
 | `public/` favicon | Inline SVG data-URI emoji icon in `index.html` | Original; MIT with the repository |
-| `docs/assets/forecast-dashboard.html` | Design/reference HTML mock | Original design artifact for docs; MIT with the repository |
-| `docs/assets/forecast-dashboard.png` | Screenshot of the mock | Original screenshot; MIT with the repository |
-| `docs/assets/stitch-streamlined-dashboard.html` | Alternate design reference | Original design artifact for docs; MIT with the repository |
-
-No third-party image, icon pack, or font binary is vendored under `public/` or
-`docs/assets/`. If you add such assets later, record them in this table with an
+No third-party image, icon pack, or font binary is vendored under `public/`.
+If you add such assets later, record them in this table with an
 explicit license before publishing.

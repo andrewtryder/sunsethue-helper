@@ -95,14 +95,6 @@ export function formatCoordinateDisplay(latitude, longitude) {
   return `${lat}° ${latDir} / ${lng}° ${lngDir}`;
 }
 
-export function formatDashboardCoordinateDisplay(latitude, longitude) {
-  const latDir = (latitude || 0) >= 0 ? "N" : "S";
-  const lngDir = (longitude || 0) >= 0 ? "E" : "W";
-  const lat = Math.abs(latitude || 0).toFixed(2);
-  const lng = Math.abs(longitude || 0).toFixed(2);
-  return `${lat}° ${latDir} / ${lng}° ${lngDir}`;
-}
-
 export function getLogStatusClass(status) {
   if (status === "warning") return "warning";
   if (status === "failure") return "failure";

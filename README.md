@@ -41,7 +41,7 @@ Do not enable account-wide “Require Access protection.” Do not add wildcard,
 
 This repository ships without the owner's production identity or infrastructure IDs.
 
-1. Copy `.env.example` to `.env` and fill in your Cloudflare account, project names, D1 id, Access values, and mail secrets.
+1. Copy `.env.example` to `.env` and fill in your Cloudflare account, project names, D1 id, and Access values. Provider transport credentials are managed separately in Secrets Store.
 2. Copy `.dev.vars.example` to `.dev.vars` for local Worker/Pages vars. Keep `DEV_AUTH_BYPASS=false` unless you explicitly need loopback-only bypass.
 3. Generate Wrangler configs (gitignored):
 
@@ -84,7 +84,8 @@ Never commit real tokens, JWTs, cookies, Audience tags, or D1 database IDs.
 | --- | --- |
 | `wrangler.example.toml` | Template for the Pages project (`pages_build_output_dir`, `API_SERVICE` binding) |
 | `wrangler.worker.example.toml` | Template for the private API Worker (`workers_dev = false`, cron, D1) |
-| `wrangler.toml` / `wrangler.worker.toml` | Generated locally / in CI; gitignored |
+| `wrangler.credential-admin.example.toml` | Template for the private credential-administration Worker |
+| `wrangler.toml` / `wrangler.worker.toml` / `wrangler.credential-admin.toml` | Generated locally / in CI; gitignored |
 | `.env.example` / `.dev.vars.example` | Placeholder configuration |
 | `schema.sql` | D1 schema for local setup and tests (`npm run db:schema:local`) |
 | `public/_routes.json` | Invoke Functions only for `/api/*` |

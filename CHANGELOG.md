@@ -4,6 +4,13 @@ All notable changes to this project are documented in this file.
 
 This changelog follows [Conventional Commits](https://www.conventionalcommits.org/) and is maintained by [release-please](https://github.com/googleapis/release-please). Release sections group changes by commit type (`feat`, `fix`, etc.). Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.20.0](https://github.com/andrewtryder/sunsethue-helper/compare/v1.19.0...v1.20.0) (2026-08-01)
+
+
+### Features
+
+* **frontend:** polish forecast, locations, activity, and settings layouts ([#64](https://github.com/andrewtryder/sunsethue-helper/issues/64)) ([46cef7d](https://github.com/andrewtryder/sunsethue-helper/commit/46cef7dd3d5661342d81995512910426f0e50f4c))
+
 ## [1.19.0](https://github.com/andrewtryder/sunsethue-helper/compare/v1.18.1...v1.19.0) (2026-08-01)
 
 

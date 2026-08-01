@@ -4,6 +4,14 @@ All notable changes to this project are documented in this file.
 
 This changelog follows [Conventional Commits](https://www.conventionalcommits.org/) and is maintained by [release-please](https://github.com/googleapis/release-please). Release sections group changes by commit type (`feat`, `fix`, etc.). Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.18.1](https://github.com/andrewtryder/sunsethue-helper/compare/v1.18.0...v1.18.1) (2026-08-01)
+
+
+### Bug Fixes
+
+* **frontend:** tighten Horizon gear, quality row, and forecast columns ([a253ffd](https://github.com/andrewtryder/sunsethue-helper/commit/a253ffd2aaa8c8b71c319a1d1fef7a26833657d0))
+* **frontend:** tighten Horizon gear, quality row, and forecast columns ([595c4e7](https://github.com/andrewtryder/sunsethue-helper/commit/595c4e7e38b7d488315e102aa251ad94f96cce4f))
+
 ## [1.18.0](https://github.com/andrewtryder/sunsethue-helper/compare/v1.17.0...v1.18.0) (2026-07-31)
 
 

@@ -232,7 +232,8 @@ async function initApp() {
     const notificationOutcomes = await Promise.allSettled([
       fetchNotificationSettings(),
       fetchNotificationDeliveries(),
-      fetchProviderCredentials()
+      fetchProviderCredentials(),
+      fetchOperationalStatus()
     ]);
     for (const outcome of notificationOutcomes) {
       if (outcome.status === "rejected") {
@@ -263,6 +264,34 @@ async function fetchNotificationSettings() {
   notificationSound.value = settings.pushoverSound || "";
   notificationEmailStatus.textContent = settings.emailConfigured ? "Email transport configured" : "Email transport not configured";
   notificationPushoverStatus.textContent = settings.pushoverConfigured ? "Pushover configured" : "Pushover not configured";
+}
+
+async function fetchOperationalStatus() {
+  const summary = document.getElementById("ops-status-summary");
+  const list = document.getElementById("ops-status-list");
+  if (!summary || !list) return;
+  const response = await fetch(`${API_BASE}/api/operational-status`);
+  if (!response.ok) throw new Error("Failed to load operational status.");
+  const status = await response.json();
+  summary.textContent = status.requiredTablesPresent
+    ? `Email: ${status.emailTransport} · Pushover: ${status.pushoverTransport}`
+    : "Schema preflight incomplete — required tables missing.";
+  const rows = [
+    ["Last scheduled run", status.lastScheduledRunAt || "Never"],
+    ["Last successful run", status.lastSuccessfulRunAt || "Never"],
+    ["Pending deliveries", String(status.pendingDeliveries)],
+    ["Failed deliveries", String(status.failedDeliveries)],
+    ["Oldest pending age (s)", String(status.oldestPendingDeliveryAgeSeconds)],
+    ["Required tables", status.requiredTablesPresent ? "Present" : "Missing"]
+  ];
+  list.replaceChildren();
+  for (const [label, value] of rows) {
+    const dt = document.createElement("dt");
+    dt.textContent = label;
+    const dd = document.createElement("dd");
+    dd.textContent = value;
+    list.append(dt, dd);
+  }
 }
 
 function formatCredentialUpdatedAt(value) {

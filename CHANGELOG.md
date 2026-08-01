@@ -9,6 +9,7 @@ This changelog follows [Conventional Commits](https://www.conventionalcommits.or
 
 ### Features
 
+* **ops:** add status endpoint, CSP headers, and Playwright ([#62](https://github.com/andrewtryder/sunsethue-helper/issues/62)) ([f2039ca](https://github.com/andrewtryder/sunsethue-helper/commit/f2039ca))
 * **credentials:** require Secrets Store for provider delivery ([#60](https://github.com/andrewtryder/sunsethue-helper/issues/60)) ([5ee67ae](https://github.com/andrewtryder/sunsethue-helper/commit/5ee67ae4aaf0a75e610d1872c1ccd752788007c2))
 
 ## [1.18.1](https://github.com/andrewtryder/sunsethue-helper/compare/v1.18.0...v1.18.1) (2026-08-01)
@@ -17,7 +18,6 @@ This changelog follows [Conventional Commits](https://www.conventionalcommits.or
 ### Bug Fixes
 
 * **frontend:** tighten Horizon gear, quality row, and forecast columns ([a253ffd](https://github.com/andrewtryder/sunsethue-helper/commit/a253ffd2aaa8c8b71c319a1d1fef7a26833657d0))
-* **frontend:** tighten Horizon gear, quality row, and forecast columns ([595c4e7](https://github.com/andrewtryder/sunsethue-helper/commit/595c4e7e38b7d488315e102aa251ad94f96cce4f))
 
 ## [1.18.0](https://github.com/andrewtryder/sunsethue-helper/compare/v1.17.0...v1.18.0) (2026-07-31)
 
@@ -27,18 +27,14 @@ This changelog follows [Conventional Commits](https://www.conventionalcommits.or
 * add configurable notification outbox ([4802669](https://github.com/andrewtryder/sunsethue-helper/commit/4802669bbfb23d4df61f84cb041f7c23f42800c7))
 * configurable notification outbox ([bcadeca](https://github.com/andrewtryder/sunsethue-helper/commit/bcadeca4931ad069d5deadbf8f7d8fd35fdcb0db))
 * **credentials:** add secrets store provider credential administration ([a6b8bfd](https://github.com/andrewtryder/sunsethue-helper/commit/a6b8bfdd0ba432720d806dceec3e53b76e1528bc))
-* **credentials:** add Secrets Store provider credential administration ([53067fa](https://github.com/andrewtryder/sunsethue-helper/commit/53067faad55db6b11af9cd228716ab98d7134d29))
 
 
 ### Bug Fixes
 
 * **ci:** pass secrets store env to pages and verify jobs ([b71403d](https://github.com/andrewtryder/sunsethue-helper/commit/b71403dae4995c82178f2fd4748f0cf3663fdc83))
-* **ci:** pass secrets store env to pages and verify jobs ([8e6a198](https://github.com/andrewtryder/sunsethue-helper/commit/8e6a1982997308e9e8bdb15e2586559272b7d9de))
 * **ci:** upload Worker secrets with worker config ([9ab746d](https://github.com/andrewtryder/sunsethue-helper/commit/9ab746d4f05fa1b6c3c916a1edde60fa2d64d606))
 * **credentials:** accept spaced gmail app passwords and surface codes ([16db040](https://github.com/andrewtryder/sunsethue-helper/commit/16db040a0611ca110746c5a381dd6ca1835a6571))
-* **credentials:** accept spaced gmail app passwords and surface codes ([5128405](https://github.com/andrewtryder/sunsethue-helper/commit/512840588990da60c28281a15c7eb85af69c53e3))
 * **credentials:** allow same-origin status GET without Origin ([a20f226](https://github.com/andrewtryder/sunsethue-helper/commit/a20f226f7bc4612350a751ce604a5b9611b648db))
-* **credentials:** allow same-origin status GET without Origin ([f01b04e](https://github.com/andrewtryder/sunsethue-helper/commit/f01b04efb72c814e139df811237ef5a8cda2f410))
 * **notifications:** harden outbox and validate APIs ([498a3e8](https://github.com/andrewtryder/sunsethue-helper/commit/498a3e81de4a3e0b4d9a79bef063b2174eb8e53c))
 * **test:** lowercase transport-schema email fixture for sanitizer ([5731f6b](https://github.com/andrewtryder/sunsethue-helper/commit/5731f6b83dd0dc055fedc01010833afb0046b9df))
 
@@ -93,23 +89,16 @@ This changelog follows [Conventional Commits](https://www.conventionalcommits.or
 
 * apply Stitch Twilight Glass design system to frontend ([2d44a41](https://github.com/andrewtryder/sunsethue-helper/commit/2d44a41f40b984c0d1fff16d7396fbc6b1f5834c))
 * **cf:** migrate from firebase to cloudflare ([13fd9f3](https://github.com/andrewtryder/sunsethue-helper/commit/13fd9f3fc631613b71f89e39e33e99edffbe4f01))
-* **cf:** migrate from firebase to cloudflare ([e37b9d2](https://github.com/andrewtryder/sunsethue-helper/commit/e37b9d2f1166a0308f5defc1db69e2a8fa615295))
 * **ci:** add tests, CI pipeline, and quality normalization ([559285e](https://github.com/andrewtryder/sunsethue-helper/commit/559285e089ab9adab15fe79b3923ee26eb66c090))
-* **ci:** add tests, CI pipeline, and quality normalization ([2ab50b9](https://github.com/andrewtryder/sunsethue-helper/commit/2ab50b9f551d64d5830a6e046eb0cb0e20a22a80))
 * **email:** remove times and style quality badge background ([1fd78ec](https://github.com/andrewtryder/sunsethue-helper/commit/1fd78ecc6ab8d685d9b23413cb155f7c5862e7d7))
-* **email:** remove times and style quality badge background ([863fd9b](https://github.com/andrewtryder/sunsethue-helper/commit/863fd9bf3ba04a3ec941200eb1d70afc0723f52a))
 * **repo:** resolve code review findings and support usage endpoint ([3f7463c](https://github.com/andrewtryder/sunsethue-helper/commit/3f7463c0796931f402d875bc793b8587f0aff766))
 * **report:** add 12:00 pm scheduled report email ([239ec53](https://github.com/andrewtryder/sunsethue-helper/commit/239ec53dc5c874506450cf4f2d1a00a5b5ef113a))
 * **report:** add webapp dashboard link to automated report emails ([e43f8e8](https://github.com/andrewtryder/sunsethue-helper/commit/e43f8e8b859f74b50d7365baf30ba88a20949efa))
-* **report:** add webapp dashboard link to automated report emails ([17f7ebb](https://github.com/andrewtryder/sunsethue-helper/commit/17f7ebbe9c5cf020f7011a819ffdaa13300a401a))
 * **ui:** add email success modal and mobile-friendly reports ([b8917f4](https://github.com/andrewtryder/sunsethue-helper/commit/b8917f4b8327f5e8fa5c870e961103bbb07f21c5))
 * **ui:** fix email modal, table email layout, and preview command ([a9505c3](https://github.com/andrewtryder/sunsethue-helper/commit/a9505c334dde8ebc4f0e131876850e39a84286a3))
-* **ui:** fix email modal, table email layout, and preview command ([9f1fa93](https://github.com/andrewtryder/sunsethue-helper/commit/9f1fa9304f8eb3df8e99a68f33db3bfb2154ae7a))
 * **ui:** improve screen reader accessibility for icon buttons ([#22](https://github.com/andrewtryder/sunsethue-helper/issues/22)) ([036ac36](https://github.com/andrewtryder/sunsethue-helper/commit/036ac3652d4f3be590b523fdc418bda5377309c4))
 * **ui:** obsidian flux redesign for frontend and email ([d3ee12d](https://github.com/andrewtryder/sunsethue-helper/commit/d3ee12d9469afae7329240445f995e35f86eb396))
-* **ui:** obsidian flux redesign for frontend and email ([0b82bb0](https://github.com/andrewtryder/sunsethue-helper/commit/0b82bb00e2c3c97a272a5d6d8c96c43bf10a447d))
 * **ui:** polish email modal and show api credits on logs ([bb8ab93](https://github.com/andrewtryder/sunsethue-helper/commit/bb8ab936ef12b98c49b5bb6e96a4db39c827726a))
-* **ui:** polish email modal and show api credits on logs ([918caaf](https://github.com/andrewtryder/sunsethue-helper/commit/918caaf870d69c027bef8292de773d88b8b67d91))
 
 
 ### Bug Fixes
@@ -164,7 +153,6 @@ This changelog follows [Conventional Commits](https://www.conventionalcommits.or
 ### Features
 
 * **cf:** migrate from firebase to cloudflare ([13fd9f3](https://github.com/andrewtryder/sunsethue-helper/commit/13fd9f3fc631613b71f89e39e33e99edffbe4f01))
-* **cf:** migrate from firebase to cloudflare ([e37b9d2](https://github.com/andrewtryder/sunsethue-helper/commit/e37b9d2f1166a0308f5defc1db69e2a8fa615295))
 
 
 ### Bug Fixes
@@ -178,7 +166,6 @@ This changelog follows [Conventional Commits](https://www.conventionalcommits.or
 ### Features
 
 * **report:** add webapp dashboard link to automated report emails ([e43f8e8](https://github.com/andrewtryder/sunsethue-helper/commit/e43f8e8b859f74b50d7365baf30ba88a20949efa))
-* **report:** add webapp dashboard link to automated report emails ([17f7ebb](https://github.com/andrewtryder/sunsethue-helper/commit/17f7ebbe9c5cf020f7011a819ffdaa13300a401a))
 
 ## [1.10.3](https://github.com/andrewtryder/sunsethue-helper/compare/sunsethue-helper-v1.10.2...sunsethue-helper-v1.10.3) (2026-06-13)
 
@@ -227,7 +214,6 @@ This changelog follows [Conventional Commits](https://www.conventionalcommits.or
 ### Features
 
 * **ui:** polish email modal and show api credits on logs ([bb8ab93](https://github.com/andrewtryder/sunsethue-helper/commit/bb8ab936ef12b98c49b5bb6e96a4db39c827726a))
-* **ui:** polish email modal and show api credits on logs ([918caaf](https://github.com/andrewtryder/sunsethue-helper/commit/918caaf870d69c027bef8292de773d88b8b67d91))
 
 ## [1.8.0](https://github.com/andrewtryder/sunsethue-helper/compare/sunsethue-helper-v1.7.0...sunsethue-helper-v1.8.0) (2026-06-08)
 
@@ -235,7 +221,6 @@ This changelog follows [Conventional Commits](https://www.conventionalcommits.or
 ### Features
 
 * **ui:** fix email modal, table email layout, and preview command ([a9505c3](https://github.com/andrewtryder/sunsethue-helper/commit/a9505c334dde8ebc4f0e131876850e39a84286a3))
-* **ui:** fix email modal, table email layout, and preview command ([9f1fa93](https://github.com/andrewtryder/sunsethue-helper/commit/9f1fa9304f8eb3df8e99a68f33db3bfb2154ae7a))
 
 ## [1.7.0](https://github.com/andrewtryder/sunsethue-helper/compare/sunsethue-helper-v1.6.0...sunsethue-helper-v1.7.0) (2026-06-08)
 
@@ -244,10 +229,8 @@ This changelog follows [Conventional Commits](https://www.conventionalcommits.or
 
 * apply Stitch Twilight Glass design system to frontend ([2d44a41](https://github.com/andrewtryder/sunsethue-helper/commit/2d44a41f40b984c0d1fff16d7396fbc6b1f5834c))
 * **ci:** add tests, CI pipeline, and quality normalization ([559285e](https://github.com/andrewtryder/sunsethue-helper/commit/559285e089ab9adab15fe79b3923ee26eb66c090))
-* **ci:** add tests, CI pipeline, and quality normalization ([2ab50b9](https://github.com/andrewtryder/sunsethue-helper/commit/2ab50b9f551d64d5830a6e046eb0cb0e20a22a80))
 * **ui:** add email success modal and mobile-friendly reports ([b8917f4](https://github.com/andrewtryder/sunsethue-helper/commit/b8917f4b8327f5e8fa5c870e961103bbb07f21c5))
 * **ui:** obsidian flux redesign for frontend and email ([d3ee12d](https://github.com/andrewtryder/sunsethue-helper/commit/d3ee12d9469afae7329240445f995e35f86eb396))
-* **ui:** obsidian flux redesign for frontend and email ([0b82bb0](https://github.com/andrewtryder/sunsethue-helper/commit/0b82bb00e2c3c97a272a5d6d8c96c43bf10a447d))
 
 
 ### Bug Fixes

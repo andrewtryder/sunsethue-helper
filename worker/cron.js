@@ -1,5 +1,6 @@
 import { runAndSendReport } from "./report.js";
 import { dispatchPendingNotifications } from "./notifications/dispatcher.js";
+import { pruneOperationalData } from "./db.js";
 
 // ⚡ Bolt Performance Optimization:
 // Caching Intl.DateTimeFormat instances at the module level prevents the V8 engine
@@ -31,6 +32,12 @@ export async function handleScheduledReport(event, env, deps = {}) {
     await dispatch(env, { ...deps, now: now.getTime() });
   } catch {
     // A later hourly cron recovers expired leases and pending work.
+  }
+
+  try {
+    await pruneOperationalData(env, now.getTime());
+  } catch {
+    // Retention failures must not block scheduled reports.
   }
 
   // Format to Eastern Time hour and minute

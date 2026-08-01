@@ -1,6 +1,6 @@
 {
   "name": "sunsethue-helper",
-  "version": "1.20.0",
+  "version": "1.21.0",
   "private": true,
   "type": "module",
   "description": "Daily sunrise/sunset quality notifier on Cloudflare Pages, Workers, D1, Secrets Store, Access, email, and Pushover.",

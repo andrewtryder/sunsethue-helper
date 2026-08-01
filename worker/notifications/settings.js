@@ -13,14 +13,22 @@ function text(value) {
   return typeof value === "string" ? value.trim() : value;
 }
 
-/** Synchronous legacy check used by defaults / tests with plain env objects. */
-export function hasEmailTransport(env) {
-  return Boolean(env.GMAIL_USER && env.GMAIL_APP_PASSWORD && (env.EMAIL_FROM || env.GMAIL_USER));
+/**
+ * Deprecated synchronous readiness checks. The main Worker requires provider
+ * credentials to live in Secrets Store, so a plain `env` object can never
+ * confirm production readiness without an async Secrets Store lookup.
+ *
+ * These helpers now always return `false`. Use `hasEmailTransportAsync` and
+ * `hasPushoverTransportAsync` (below) for authoritative provider readiness.
+ * They remain exported only so downstream callers get a predictable, safe
+ * default instead of a stale legacy heuristic.
+ */
+export function hasEmailTransport() {
+  return false;
 }
 
-/** Synchronous legacy check used by defaults / tests with plain env objects. */
-export function hasPushoverTransport(env) {
-  return Boolean(env.PUSHOVER_APP_TOKEN && env.PUSHOVER_USER_KEY);
+export function hasPushoverTransport() {
+  return false;
 }
 
 export { hasEmailTransportAsync, hasPushoverTransportAsync };
@@ -29,10 +37,15 @@ export function validateEmailAddress(value) {
   return typeof value === "string" && !/[\r\n]/.test(value) && EMAIL_RE.test(value.trim());
 }
 
-export function getDefaultSettings(env) {
+/**
+ * Ship-safe defaults: notification channels start disabled and the recipient
+ * mailbox is empty. The owner enables a channel through the Notifications UI
+ * after configuring the provider credentials in Secrets Store.
+ */
+export function getDefaultSettings() {
   return {
-    emailEnabled: hasEmailTransport(env) && validateEmailAddress(env.EMAIL_TO) ? 1 : 0,
-    emailTo: validateEmailAddress(env.EMAIL_TO) ? env.EMAIL_TO.trim() : null,
+    emailEnabled: 0,
+    emailTo: null,
     pushoverEnabled: 0,
     pushoverDevice: null,
     pushoverPriority: 0,
@@ -42,7 +55,7 @@ export function getDefaultSettings(env) {
 
 export async function getSettings(env) {
   const row = await db.getNotificationSettingsRow(env);
-  return row || getDefaultSettings(env);
+  return row || getDefaultSettings();
 }
 
 export async function publicSettings(settings, env) {

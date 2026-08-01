@@ -1,5 +1,11 @@
 /**
- * Resolve Gmail SMTP credentials from Secrets Store (preferred) or legacy Worker secrets.
+ * Resolve Gmail SMTP credentials from Cloudflare Secrets Store.
+ *
+ * Production delivery requires the store-backed `EMAIL_TRANSPORT_SECRET`
+ * binding to hold a document with `configured === true`. There is no
+ * legacy Worker-secret fallback — an unconfigured or missing store secret
+ * fails closed with `EMAIL_NOT_CONFIGURED`.
+ *
  * Never logs returned credential objects.
  */
 
@@ -16,7 +22,7 @@ async function readStoreBinding(binding) {
 }
 
 /**
- * @returns {Promise<{ source: string, gmailUser: string, gmailAppPassword: string, emailFrom: string }>}
+ * @returns {Promise<{ source: "secrets_store", gmailUser: string, gmailAppPassword: string, emailFrom: string }>}
  */
 export async function resolveEmailTransport(env) {
   const raw = await readStoreBinding(env.EMAIL_TRANSPORT_SECRET);
@@ -36,15 +42,6 @@ export async function resolveEmailTransport(env) {
         throw new NotificationError("EMAIL_NOT_CONFIGURED");
       }
     }
-  }
-
-  if (env.GMAIL_USER && env.GMAIL_APP_PASSWORD) {
-    return {
-      source: "legacy_worker_secret",
-      gmailUser: String(env.GMAIL_USER).trim(),
-      gmailAppPassword: String(env.GMAIL_APP_PASSWORD),
-      emailFrom: env.EMAIL_FROM || `Sunsethue Helper <${env.GMAIL_USER}>`
-    };
   }
 
   throw new NotificationError("EMAIL_NOT_CONFIGURED");

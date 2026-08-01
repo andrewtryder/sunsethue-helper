@@ -32,13 +32,10 @@ Instance-specific values (project names, hostnames, D1 id) are **not** committed
 | `TEAM_DOMAIN` | Worker secret | `https://<team>.cloudflareaccess.com` |
 | `POLICY_AUD` | Worker secret | Access application Audience tag |
 | `SUNSETHUE_API_KEY` | Worker secret | Sunsethue API key |
-| `GMAIL_USER` / `GMAIL_APP_PASSWORD` | Main Worker secret (Stage 1 fallback) | Legacy SMTP auth until Secrets Store cutover |
-| `EMAIL_TO` / `EMAIL_FROM` | Worker secret | Report recipients / default From |
-| `PUSHOVER_APP_TOKEN` / `PUSHOVER_USER_KEY` | Main Worker secret (Stage 1 optional fallback) | Legacy Pushover credentials |
+
+Provider transport credentials (Gmail SMTP + Pushover) are **not** GitHub environment secrets. They live only in Cloudflare Secrets Store and are administered through the Notifications UI backed by the credential-admin Worker. Report recipient email and Pushover device/priority/sound live in D1 notification settings, not in Worker secrets. See [secrets-store-credentials.md](secrets-store-credentials.md).
 
 The Cloudflare API token must be a **scoped API token**, never a Global API Key. It must include **Account → Secrets Store → Edit** in addition to the deploy permissions below.
-
-Provider Gmail/Pushover credentials are preferred from Secrets Store (see [secrets-store-credentials.md](secrets-store-credentials.md)). D1 stores only masked metadata.
 
 If `D1_DATABASE_ID` (or any other required value) is missing, `npm run config:generate:strict` fails with the **name** of the missing variable and does not print the identifier.
 
@@ -86,7 +83,7 @@ See the README Access automation section for lockout recovery and Audience tag h
 4. Confirm a dry-run of `production.yml` and a local `npm run access:verify`.
 5. Revoke the previous token in Cloudflare.
 
-Rotate provider Gmail/Pushover credentials through the Notifications UI (Secrets Store) when Stage 1 is live. Stage 1 legacy Worker secrets can still be rotated via GitHub env + redeploy until Stage 2 removes them.
+Rotate provider Gmail/Pushover credentials through the Notifications UI, which writes to Cloudflare Secrets Store via the credential-admin Worker. Never place provider transport credentials in GitHub environment secrets, `.env`, or Worker `wrangler.toml` vars.
 
 Rotate `D1_DATABASE_ID` only when you intentionally point the Worker at a different database; treat a leaked id as an inventory disclosure, not a credential, but prefer keeping it out of public logs.
 

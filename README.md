@@ -118,7 +118,7 @@ Details:
 - [docs/rollback.md](docs/rollback.md) — exact-identifier rollback
 - [docs/branch-protection.md](docs/branch-protection.md) — recommended `main` settings
 - [docs/cloudflare-credentials.md](docs/cloudflare-credentials.md) — environment variables, secrets, and one-time Access setup
-- [docs/secrets-store-credentials.md](docs/secrets-store-credentials.md) — Secrets Store provider credentials, admin Worker, Stage 1/2
+- [docs/secrets-store-credentials.md](docs/secrets-store-credentials.md) — Secrets Store provider credentials and credential-admin Worker
 
 ## Worker secrets
 
@@ -131,10 +131,9 @@ Set these as **Worker secrets** on the main API Worker (never commit real values
 | `TEAM_DOMAIN` | `https://<team>.cloudflareaccess.com` |
 | `POLICY_AUD` | Access application Audience tag |
 | `SUNSETHUE_API_KEY` | Sunsethue API key |
-| `GMAIL_USER` / `GMAIL_APP_PASSWORD` | Stage 1 legacy SMTP fallback (prefer Secrets Store via UI) |
-| `EMAIL_TO` / `EMAIL_FROM` | Report recipients / default From |
-| `PUSHOVER_APP_TOKEN` / `PUSHOVER_USER_KEY` | Stage 1 optional Pushover fallback |
-| `WEBAPP_URL` | Optional dashboard link in report emails (set from `PRODUCTION_URL` in CI) |
+| `WEBAPP_URL` | Dashboard link used in report emails (set from `PRODUCTION_URL` in CI) |
+
+Provider transport credentials (Gmail SMTP + Pushover) are **not** Worker secrets. They live in Cloudflare Secrets Store and are administered through the Notifications UI backed by the credential-admin Worker. Report recipient email and Pushover device/priority/sound live in D1 notification settings.
 
 The private **credential-admin** Worker receives only `CLOUDFLARE_API_TOKEN` (Secrets Store Edit). See [docs/secrets-store-credentials.md](docs/secrets-store-credentials.md).
 
@@ -142,12 +141,14 @@ The private **credential-admin** Worker receives only `CLOUDFLARE_API_TOKEN` (Se
 
 Delivery can be email-only, Pushover-only, both, or disabled. The protected
 Notifications tab stores channel preferences in D1. Provider transport credentials
-are managed through Secrets Store (Gmail / Pushover cards in the UI); Stage 1 still
-falls back to the Worker secrets above when the store is unconfigured. Each report
-snapshot creates one D1 outbox job per enabled channel, then attempts delivery
-immediately. Jobs use at-least-once semantics: the dispatcher leases a job for one
-minute and retries transient failures after 1 minute, 5 minutes, 30 minutes, and
-2 hours (five attempts total). A later hourly cron also processes due jobs.
+live in Cloudflare Secrets Store and are managed through the Notifications UI
+(Gmail / Pushover cards). Delivery requires the corresponding Secrets Store
+document to be marked `configured: true`; there is no legacy Worker-secret
+fallback. Each report snapshot creates one D1 outbox job per enabled channel,
+then attempts delivery immediately. Jobs use at-least-once semantics: the
+dispatcher leases a job for one minute and retries transient failures after 1
+minute, 5 minutes, 30 minutes, and 2 hours (five attempts total). A later hourly
+cron also processes due jobs.
 
 Use the tab's test buttons and delivery history to test or retry a failed channel.
 Tests use the same outbox/dispatcher path as reports. Pushover titles are limited to
@@ -157,9 +158,9 @@ is supported.
 `schema.sql` is intentionally the bootstrap source of truth, not a migration
 framework. Reapply it when provisioning or adding these idempotent tables. Before
 production schema work, take a D1 backup and confirm Time Travel retention. Rotate
-provider credentials via the Notifications UI (or Stage 1 Worker secrets), then
-redeploy if needed; never put credentials in D1, browser storage, commits, or public
-issue reports.
+provider credentials via the Notifications UI (which writes to Secrets Store),
+then redeploy if needed; never put credentials in D1, browser storage, commits,
+or public issue reports.
 ## Access automation
 
 Access is initialization-only. Run these locally with instance configuration in `.env`; they are not part of the production pipeline.

@@ -3,10 +3,14 @@
  * Upload Worker secrets.
  *
  * Targets:
- *   --target=main (default): Access + app secrets for wrangler.worker.toml
- *   --target=admin: CLOUDFLARE_API_TOKEN only for wrangler.credential-admin.toml
- *
- * Stage 1 still uploads Gmail/Pushover to the main Worker as fallback.
+ *   --target=main (default): Access + application config secrets for
+ *                            wrangler.worker.toml. Provider transport
+ *                            credentials (Gmail / Pushover) live in
+ *                            Cloudflare Secrets Store and are managed by
+ *                            the credential-administration Worker, so they
+ *                            are intentionally NOT uploaded here.
+ *   --target=admin: CLOUDFLARE_API_TOKEN only for
+ *                   wrangler.credential-admin.toml.
  */
 import { spawnSync } from "node:child_process";
 import { resolve, dirname } from "node:path";
@@ -19,24 +23,19 @@ const MAIN_REQUIRED = [
   "TEAM_DOMAIN",
   "POLICY_AUD",
   "SUNSETHUE_API_KEY",
-  "GMAIL_USER",
-  "GMAIL_APP_PASSWORD",
-  "EMAIL_TO",
-  "EMAIL_FROM",
   "CONTACT_EMAIL",
   "WEBAPP_URL"
 ];
 
-const MAIN_OPTIONAL = ["PUSHOVER_APP_TOKEN", "PUSHOVER_USER_KEY"];
 const ADMIN_REQUIRED = ["CLOUDFLARE_API_TOKEN"];
 
-function collect(names, { optional = false } = {}) {
+function collect(names) {
   const payload = {};
   const missing = [];
   for (const name of names) {
     const value = process.env[name];
     if (value === undefined || value === "") {
-      if (!optional) missing.push(name);
+      missing.push(name);
       continue;
     }
     payload[name] = value;
@@ -89,7 +88,6 @@ function main() {
   }
 
   const required = collect(MAIN_REQUIRED);
-  const optional = collect(MAIN_OPTIONAL, { optional: true });
   if (required.missing.length > 0) {
     console.error(
       `Missing required Worker secret${required.missing.length === 1 ? "" : "s"}: ${required.missing.join(", ")}`
@@ -98,8 +96,7 @@ function main() {
     return;
   }
 
-  const payload = { ...required.payload, ...optional.payload };
-  const status = upload("wrangler.worker.toml", payload);
+  const status = upload("wrangler.worker.toml", required.payload);
   if (status !== 0) {
     process.exitCode = status;
     return;
@@ -108,9 +105,8 @@ function main() {
     JSON.stringify({
       ok: true,
       target: "main",
-      uploaded: Object.keys(payload).sort(),
-      skippedOptional: MAIN_OPTIONAL.filter((name) => !(name in payload)),
-      note: "Stage 1: Gmail/Pushover remain as legacy Worker secret fallback"
+      uploaded: Object.keys(required.payload).sort(),
+      note: "Provider transport credentials live in Cloudflare Secrets Store; the main Worker no longer receives Gmail or Pushover secrets."
     })
   );
 }

@@ -9,7 +9,7 @@ function binding(value) {
   return { get: async () => value };
 }
 
-test("email resolver prefers Secrets Store over legacy Worker secrets", async () => {
+test("email resolver returns Secrets Store credentials when configured", async () => {
   const env = {
     EMAIL_TRANSPORT_SECRET: binding(
       JSON.stringify({
@@ -20,6 +20,7 @@ test("email resolver prefers Secrets Store over legacy Worker secrets", async ()
         emailFrom: "Sunsethue Helper <store@example.com>"
       })
     ),
+    // Legacy Worker envs must be ignored — the resolver is Secrets Store only.
     GMAIL_USER: "legacy@example.com",
     GMAIL_APP_PASSWORD: "legacy-password-xx",
     EMAIL_FROM: "legacy@example.com"
@@ -29,20 +30,55 @@ test("email resolver prefers Secrets Store over legacy Worker secrets", async ()
   assert.equal(resolved.gmailUser, "store@example.com");
 });
 
-test("email resolver falls back to legacy Worker secrets", async () => {
+test("email resolver requires Secrets Store — legacy Worker envs never suffice", async () => {
   const env = {
     EMAIL_TRANSPORT_SECRET: binding(JSON.stringify({ version: 1, configured: false })),
     GMAIL_USER: "legacy@example.com",
     GMAIL_APP_PASSWORD: "abcdefghijklmnop",
     EMAIL_FROM: "legacy@example.com"
   };
-  const resolved = await resolveEmailTransport(env);
-  assert.equal(resolved.source, "legacy_worker_secret");
+  await assert.rejects(
+    () => resolveEmailTransport(env),
+    (error) => error instanceof NotificationError && error.code === "EMAIL_NOT_CONFIGURED"
+  );
 });
 
-test("pushover resolver throws when neither Secrets Store nor legacy is configured", async () => {
+test("email resolver fails closed when no Secrets Store binding is bound at all", async () => {
   await assert.rejects(
-    () => resolvePushoverTransport({ PUSHOVER_TRANSPORT_SECRET: binding(JSON.stringify({ version: 1, configured: false })) }),
+    () => resolveEmailTransport({
+      GMAIL_USER: "legacy@example.com",
+      GMAIL_APP_PASSWORD: "abcdefghijklmnop",
+      EMAIL_FROM: "legacy@example.com"
+    }),
+    (error) => error instanceof NotificationError && error.code === "EMAIL_NOT_CONFIGURED"
+  );
+});
+
+test("pushover resolver returns Secrets Store credentials when configured", async () => {
+  const env = {
+    PUSHOVER_TRANSPORT_SECRET: binding(
+      JSON.stringify({
+        version: 1,
+        configured: true,
+        appToken: "abcdefghijklmnopqrstuvwxyz12",
+        userKey: "zyxwvutsrqponmlkjihgfedcba98"
+      })
+    ),
+    PUSHOVER_APP_TOKEN: "legacy-app-token",
+    PUSHOVER_USER_KEY: "legacy-user-key"
+  };
+  const resolved = await resolvePushoverTransport(env);
+  assert.equal(resolved.source, "secrets_store");
+  assert.equal(resolved.appToken, "abcdefghijklmnopqrstuvwxyz12");
+});
+
+test("pushover resolver requires Secrets Store — legacy Worker envs never suffice", async () => {
+  await assert.rejects(
+    () => resolvePushoverTransport({
+      PUSHOVER_TRANSPORT_SECRET: binding(JSON.stringify({ version: 1, configured: false })),
+      PUSHOVER_APP_TOKEN: "legacy-app-token",
+      PUSHOVER_USER_KEY: "legacy-user-key"
+    }),
     (error) => error instanceof NotificationError && error.code === "PUSHOVER_NOT_CONFIGURED"
   );
 });

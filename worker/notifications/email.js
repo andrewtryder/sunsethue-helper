@@ -70,9 +70,11 @@ export async function sendEmail(job, env, deps = {}) {
   const transport = await resolveEmailTransport(env);
   const payload = parseNotificationPayload(job.payload);
   const from = parseMailbox(transport.emailFrom || `Sunsethue Helper <${transport.gmailUser}>`);
-  // Prefer the delivery-time snapshot columns over live settings so a settings
-  // change made after the job was enqueued cannot redirect the recipient.
-  const recipient = job.deliveryEmailTo || job.settings?.emailTo || env.EMAIL_TO;
+  // Prefer the delivery-time snapshot column over live settings so a settings
+  // change made after the job was enqueued cannot redirect the recipient. The
+  // recipient always comes from D1 notification settings — never from a
+  // Worker env var.
+  const recipient = job.deliveryEmailTo || job.settings?.emailTo;
   if (typeof recipient !== "string" || recipient.trim() === "") {
     throw new NotificationError("INVALID_EMAIL_ADDRESS");
   }

@@ -138,8 +138,9 @@ jobs:
         run: npm run secrets-store:preflight
 
       # Upload secrets against wrangler.worker.toml (not the Pages wrangler.toml).
-      # Optional Pushover credentials are skipped when unset so deploy stays green.
-      # Stage 1: Gmail/Pushover remain as legacy fallback until Secrets Store cutover.
+      # Provider transport credentials (Gmail / Pushover) live in Cloudflare
+      # Secrets Store and are managed by the credential-admin Worker, so they
+      # are intentionally not present here.
       - name: Upload main Worker secrets
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -148,12 +149,6 @@ jobs:
           TEAM_DOMAIN: ${{ secrets.TEAM_DOMAIN }}
           POLICY_AUD: ${{ secrets.POLICY_AUD }}
           SUNSETHUE_API_KEY: ${{ secrets.SUNSETHUE_API_KEY }}
-          GMAIL_USER: ${{ secrets.GMAIL_USER }}
-          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
-          EMAIL_TO: ${{ secrets.EMAIL_TO }}
-          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
-          PUSHOVER_APP_TOKEN: ${{ secrets.PUSHOVER_APP_TOKEN }}
-          PUSHOVER_USER_KEY: ${{ secrets.PUSHOVER_USER_KEY }}
           CONTACT_EMAIL: ${{ secrets.CONTACT_EMAIL }}
           WEBAPP_URL: ${{ vars.PRODUCTION_URL }}
         run: node scripts/upload-worker-secrets.mjs --target=main

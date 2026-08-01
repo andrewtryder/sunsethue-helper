@@ -9,19 +9,27 @@ import { buildPushoverContent, parseNotificationPayload } from "../../worker/not
 import { getSettings, publicSettings, saveSettings } from "../../worker/notifications/settings.js";
 import { handleHttpRequest } from "../../worker/api.js";
 import { createLocalD1 } from "../support/local-d1.mjs";
-import { createFetchFake, createMailerFake, jsonOk } from "../support/fakes.mjs";
+import {
+  createFetchFake,
+  createMailerFake,
+  fakeSecretsStoreBinding,
+  jsonOk,
+  transportBindings,
+  unconfiguredTransportBinding
+} from "../support/fakes.mjs";
 import { makeRequest } from "../helpers.mjs";
 
 const NOW = Date.parse("2026-07-15T12:00:00Z");
 const TOKEN_A = "00000000-0000-0000-0000-000000000001";
 const TOKEN_B = "00000000-0000-0000-0000-000000000002";
 
+const FAKE_EMAIL_PASSWORD = "fake-app-password";
+
 async function withEnv(fn) {
   const local = await createLocalD1();
   const env = {
-    DB: local.DB, GMAIL_USER: "reports@example.com", GMAIL_APP_PASSWORD: "fake-password",
-    EMAIL_TO: "owner@example.com", EMAIL_FROM: "Sunsethue <reports@example.com>",
-    PUSHOVER_APP_TOKEN: "fake-pushover-app", PUSHOVER_USER_KEY: "fake-pushover-user",
+    DB: local.DB,
+    ...transportBindings(),
     WEBAPP_URL: "https://dashboard.example.test"
   };
   try { await fn(env); } finally { local.close(); }
@@ -35,15 +43,20 @@ function model(runId = crypto.randomUUID()) {
   };
 }
 
-test("settings default to valid legacy email only and never expose secrets", async () => {
+test("default notification settings ship disabled and publicSettings never leaks stored secrets", async () => {
   await withEnv(async (env) => {
     const settings = await getSettings(env);
-    assert.equal(settings.emailEnabled, 1);
+    // Ship-safe defaults: the owner must opt in through the Notifications UI.
+    assert.equal(settings.emailEnabled, 0);
+    assert.equal(settings.emailTo, null);
     assert.equal(settings.pushoverEnabled, 0);
     const visible = await publicSettings(settings, env);
+    // With Secrets Store bindings configured, publicSettings still reports
+    // both channels as ready to enable.
     assert.equal(visible.emailConfigured, true);
     assert.equal(visible.pushoverConfigured, true);
-    assert.doesNotMatch(JSON.stringify(visible), /fake-password|fake-pushover/);
+    // Never surface the actual Gmail/Pushover secrets.
+    assert.doesNotMatch(JSON.stringify(visible), /fake-app-password|abcdefghijklmnopqrstuvwxyz12|zyxwvutsrqponmlkjihgfedcba98/);
   });
 });
 
@@ -59,7 +72,9 @@ test("settings support both channels and reject injection, emergency priority, a
 
 test("saveSettings fails closed when the caller enables an unconfigured provider", async () => {
   await withEnv(async (env) => {
-    const withoutPushover = { ...env, PUSHOVER_APP_TOKEN: "", PUSHOVER_USER_KEY: "" };
+    // Replace Pushover with the unconfigured sentinel so the resolver reports
+    // the store as not-ready and saveSettings rejects.
+    const withoutPushover = { ...env, PUSHOVER_TRANSPORT_SECRET: unconfiguredTransportBinding() };
     await assert.rejects(
       () => saveSettings(withoutPushover, {
         emailEnabled: false, emailTo: null,
@@ -67,7 +82,7 @@ test("saveSettings fails closed when the caller enables an unconfigured provider
       }, NOW),
       /PROVIDER_NOT_CONFIGURED/
     );
-    const withoutEmail = { ...env, GMAIL_USER: "", GMAIL_APP_PASSWORD: "" };
+    const withoutEmail = { ...env, EMAIL_TRANSPORT_SECRET: unconfiguredTransportBinding() };
     await assert.rejects(
       () => saveSettings(withoutEmail, {
         emailEnabled: true, emailTo: "owner@example.com",
@@ -116,6 +131,7 @@ test("enqueueNotifications snapshots delivery preferences at enqueue time", asyn
 
 test("dispatcher claims once, sends email through the injected mailer, and records only safe status", async () => {
   await withEnv(async (env) => {
+    await saveSettings(env, { emailEnabled: true, emailTo: "owner@example.com", pushoverEnabled: false, pushoverDevice: null, pushoverPriority: 0, pushoverSound: null }, NOW);
     const jobs = await enqueueNotifications(model("run-email"), env);
     const mailer = createMailerFake();
     const outcomes = await dispatchPendingNotifications(env, { now: NOW, loadMailer: mailer.loadMailer });
@@ -124,13 +140,14 @@ test("dispatcher claims once, sends email through the injected mailer, and recor
     const stored = await db.getOutboxJob(env, jobs[0].id);
     assert.equal(stored.status, "sent");
     assert.equal(stored.leaseToken, null, "lease token cleared on completion");
-    assert.equal(stored.payload.includes("fake-password"), false);
+    assert.equal(stored.payload.includes(FAKE_EMAIL_PASSWORD), false, "stored payload never carries the Gmail app password");
     assert.equal(await db.claimOutboxJob(env, jobs[0].id, NOW, NOW + 60_000, TOKEN_A), false);
   });
 });
 
 test("lease fencing prevents an expired-lease writer from overwriting a live job", async () => {
   await withEnv(async (env) => {
+    await saveSettings(env, { emailEnabled: true, emailTo: "owner@example.com", pushoverEnabled: false, pushoverDevice: null, pushoverPriority: 0, pushoverSound: null }, NOW);
     const [job] = await enqueueNotifications(model("run-fenced"), env);
     assert.equal(await db.claimOutboxJob(env, job.id, NOW, NOW + 60_000, TOKEN_A), true);
 
@@ -148,8 +165,14 @@ test("lease fencing prevents an expired-lease writer from overwriting a live job
 
 test("notification logs omit synthetic provider secrets, recipient data, and location names", async () => {
   await withEnv(async (env) => {
-    env.GMAIL_APP_PASSWORD = "synthetic-secret-password";
-    env.EMAIL_TO = "private-recipient@example.com";
+    env.EMAIL_TRANSPORT_SECRET = fakeSecretsStoreBinding({
+      version: 1,
+      configured: true,
+      gmailUser: "reports@example.com",
+      gmailAppPassword: "synthetic-secret-password",
+      emailFrom: '"Sunsethue Helper" <reports@example.com>'
+    });
+    await saveSettings(env, { emailEnabled: true, emailTo: "private-recipient@example.com", pushoverEnabled: false, pushoverDevice: null, pushoverPriority: 0, pushoverSound: null }, NOW);
     const privateModel = model("private-log-run");
     privateModel.results[0].name = "Secret Observatory";
     await enqueueNotifications(privateModel, env);
@@ -255,7 +278,8 @@ test("notification settings and delivery history routes validate bodies and reda
     const call = (path, options, deps = {}) => handleHttpRequest(makeRequest(path, options), env, { authorized: true }, { now: NOW, ...deps });
     const initial = await call("/api/notification-settings");
     assert.equal(initial.status, 200);
-    assert.equal((await initial.json()).emailEnabled, true);
+    // Ship-safe defaults: channels start disabled until the owner opts in.
+    assert.equal((await initial.json()).emailEnabled, false);
     const invalidType = await call("/api/notification-settings", { method: "PUT", headers: { "content-type": "text/plain" }, body: "{}" });
     assert.equal(invalidType.status, 415);
     const invalid = await call("/api/notification-settings", { method: "PUT", body: { emailEnabled: true, emailTo: "owner@example.com", pushoverEnabled: false, pushoverDevice: null, pushoverPriority: 2, pushoverSound: null } });
@@ -270,7 +294,7 @@ test("notification settings and delivery history routes validate bodies and reda
 
 test("PUT /api/notification-settings maps PROVIDER_NOT_CONFIGURED to 409", async () => {
   await withEnv(async (env) => {
-    const misconfigured = { ...env, PUSHOVER_APP_TOKEN: "", PUSHOVER_USER_KEY: "" };
+    const misconfigured = { ...env, PUSHOVER_TRANSPORT_SECRET: unconfiguredTransportBinding() };
     const call = (path, options, deps = {}) => handleHttpRequest(makeRequest(path, options), misconfigured, { authorized: true }, { now: NOW, ...deps });
     const response = await call("/api/notification-settings", {
       method: "PUT",
@@ -283,9 +307,10 @@ test("PUT /api/notification-settings maps PROVIDER_NOT_CONFIGURED to 409", async
 
 test("test endpoint checks provider readiness before consuming the rate-limit slot", async () => {
   await withEnv(async (env) => {
-    const noPushover = { ...env, PUSHOVER_APP_TOKEN: "", PUSHOVER_USER_KEY: "" };
-    // Test the response: the getSettings will return 0 for pushoverEnabled by default,
-    // so we need email-configured but pushover-unconfigured. env has valid email.
+    // Pushover is unconfigured in the store; email is configured. The email
+    // channel must also be enabled with a recipient in the D1 settings row.
+    const noPushover = { ...env, PUSHOVER_TRANSPORT_SECRET: unconfiguredTransportBinding() };
+    await saveSettings(noPushover, { emailEnabled: true, emailTo: "owner@example.com", pushoverEnabled: false, pushoverDevice: null, pushoverPriority: 0, pushoverSound: null }, NOW);
     const call = (path, options, deps = {}) => handleHttpRequest(makeRequest(path, options), noPushover, { authorized: true }, { now: NOW, ...deps });
     const misconfigured = await call("/api/notifications/test", { method: "POST", body: { channel: "pushover" } });
     assert.equal(misconfigured.status, 409);
@@ -298,6 +323,7 @@ test("test endpoint checks provider readiness before consuming the rate-limit sl
 
 test("test and manual-retry routes use the dispatcher, enforce rate limiting, and do not expose payloads", async () => {
   await withEnv(async (env) => {
+    await saveSettings(env, { emailEnabled: true, emailTo: "owner@example.com", pushoverEnabled: false, pushoverDevice: null, pushoverPriority: 0, pushoverSound: null }, NOW);
     const mailer = createMailerFake();
     const call = (path, options, deps = {}) => handleHttpRequest(makeRequest(path, options), env, { authorized: true }, { now: NOW, loadMailer: mailer.loadMailer, ...deps });
     const bad = await call("/api/notifications/test", { method: "POST", body: { channel: "unknown" } });
@@ -332,9 +358,8 @@ test("dispatcher drops outcomes when a parallel claimer wins the lease", async (
   const local = await createLocalD1();
   try {
     const env = {
-      DB: local.DB, GMAIL_USER: "reports@example.com", GMAIL_APP_PASSWORD: "fake-password",
-      EMAIL_TO: "owner@example.com", EMAIL_FROM: "Sunsethue <reports@example.com>",
-      PUSHOVER_APP_TOKEN: "fake-pushover-app", PUSHOVER_USER_KEY: "fake-pushover-user",
+      DB: local.DB,
+      ...transportBindings(),
       WEBAPP_URL: "https://dashboard.example.test"
     };
     await saveSettings(env, { emailEnabled: false, emailTo: null, pushoverEnabled: true, pushoverDevice: null, pushoverPriority: 0, pushoverSound: null }, NOW);
@@ -361,9 +386,8 @@ test("dispatcher drops fail outcomes when a parallel claimer wins the lease", as
   const local = await createLocalD1();
   try {
     const env = {
-      DB: local.DB, GMAIL_USER: "reports@example.com", GMAIL_APP_PASSWORD: "fake-password",
-      EMAIL_TO: "owner@example.com", EMAIL_FROM: "Sunsethue <reports@example.com>",
-      PUSHOVER_APP_TOKEN: "fake-pushover-app", PUSHOVER_USER_KEY: "fake-pushover-user",
+      DB: local.DB,
+      ...transportBindings(),
       WEBAPP_URL: "https://dashboard.example.test"
     };
     await saveSettings(env, { emailEnabled: false, emailTo: null, pushoverEnabled: true, pushoverDevice: null, pushoverPriority: 0, pushoverSound: null }, NOW);
@@ -420,6 +444,7 @@ test("API triggerReport maps a held report lock to 429", async () => {
 
 test("manual retry enforces cooldown and cap", async () => {
   await withEnv(async (env) => {
+    await saveSettings(env, { emailEnabled: true, emailTo: "owner@example.com", pushoverEnabled: false, pushoverDevice: null, pushoverPriority: 0, pushoverSound: null }, NOW);
     const [job] = await enqueueNotifications(model("retry-limits"), env);
     await db.claimOutboxJob(env, job.id, NOW, NOW + 10, TOKEN_A);
     await db.failOutboxJob(env, job.id, TOKEN_A, { attempts: 5, nextAttemptAt: NOW, code: "SMTP_DELIVERY_FAILED", terminal: true });

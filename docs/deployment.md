@@ -77,14 +77,10 @@ All of these live in the `production` environment. Values are never logged.
 | `TEAM_DOMAIN` | Worker secret during deploy |
 | `POLICY_AUD` | Worker secret during deploy |
 | `SUNSETHUE_API_KEY` | Worker secret during deploy |
-| `GMAIL_USER` | Main Worker secret (Stage 1 legacy fallback) |
-| `GMAIL_APP_PASSWORD` | Main Worker secret (Stage 1 legacy fallback) |
-| `EMAIL_TO` | Worker secret during deploy |
-| `EMAIL_FROM` | Worker secret during deploy |
-| `PUSHOVER_APP_TOKEN` | Optional main Worker secret (Stage 1 fallback) |
-| `PUSHOVER_USER_KEY` | Optional main Worker secret (Stage 1 fallback) |
 
-Before the first Secrets Store deploy: run `npm run secrets-store:bootstrap`, set `SECRETS_STORE_ID` / `CREDENTIAL_ADMIN_WORKER_NAME`, and apply `npm run db:schema:remote`. Details: [secrets-store-credentials.md](secrets-store-credentials.md).
+Provider transport credentials (Gmail SMTP + Pushover) are **not** GitHub environment secrets and are **not** uploaded to the main Worker. They live in Cloudflare Secrets Store and are administered through the Notifications UI backed by the credential-admin Worker. See [secrets-store-credentials.md](secrets-store-credentials.md).
+
+Before the first Secrets Store deploy: run `npm run secrets-store:bootstrap`, set `SECRETS_STORE_ID` / `CREDENTIAL_ADMIN_WORKER_NAME`, and apply `npm run db:schema:remote`.
 
 Access policy changes are not part of this workflow. See [cloudflare-credentials.md](cloudflare-credentials.md) for one-time Access setup with the same token.
 
@@ -123,5 +119,5 @@ After a green production run:
 1. Open the production URL in a private window and confirm Access challenges.
 2. Sign in as the authorized email.
 3. Confirm locations, logs, credits, address search, and the manual report over same-origin `/api/*`.
-4. On Notifications: save Gmail credentials → send test email; save Pushover → send test push. Confirm status shows masked identifiers only.
+4. On Notifications: save Gmail credentials to Secrets Store → send test email; save Pushover to Secrets Store → send test push. Confirm status shows masked identifiers only.
 5. Confirm browser storage, network responses, and D1 metadata contain no plaintext provider secrets.

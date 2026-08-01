@@ -3,28 +3,46 @@ import assert from "node:assert/strict";
 import { runAndSendReport, buildHtmlEmail } from "../../worker/report.js";
 import { handleScheduledReport } from "../../worker/cron.js";
 import * as db from "../../worker/db.js";
+import { saveSettings } from "../../worker/notifications/settings.js";
 import { createLocalD1 } from "../support/local-d1.mjs";
-import { createFetchFake, createMailerFake, jsonOk, sunsethueForecast } from "../support/fakes.mjs";
+import {
+  createFetchFake,
+  createMailerFake,
+  jsonOk,
+  sunsethueForecast,
+  transportBindings,
+  unconfiguredTransportBinding
+} from "../support/fakes.mjs";
 
 const NOW = Date.parse("2026-07-15T12:00:00Z");
 
-function reportEnv(overrides = {}) {
+function reportEnv({ envOverrides = {}, transportOverrides = {} } = {}) {
   return {
     SUNSETHUE_API_KEY: "fake-sunsethue-key",
-    GMAIL_USER: "reports@example.com",
-    GMAIL_APP_PASSWORD: "fake-app-password",
-    EMAIL_TO: "owner@example.com",
-    EMAIL_FROM: '"Sunsethue Helper" <reports@example.com>',
     WEBAPP_URL: "https://app.example.com",
-    ...overrides
+    ...transportBindings(transportOverrides),
+    ...envOverrides
   };
 }
 
-async function withEnv(fn, { locations = [], envOverrides = {} } = {}) {
+async function withEnv(fn, { locations = [], envOverrides = {}, transportOverrides = {}, emailSettings = { emailEnabled: true, emailTo: "owner@example.com" } } = {}) {
   const local = await createLocalD1();
-  const env = { ...reportEnv(envOverrides), DB: local.DB };
+  const env = { ...reportEnv({ envOverrides, transportOverrides }), DB: local.DB };
   for (const location of locations) {
     await db.addLocation(env, location);
+  }
+  if (emailSettings) {
+    // Configure D1 notification settings so the email channel opts in for the
+    // report. Callers wanting to exercise the "unconfigured / disabled" branch
+    // pass `emailSettings: false` (and, if needed, `transportOverrides: { email: null }`).
+    await saveSettings(env, {
+      emailEnabled: Boolean(emailSettings.emailEnabled),
+      emailTo: emailSettings.emailTo ?? null,
+      pushoverEnabled: false,
+      pushoverDevice: null,
+      pushoverPriority: 0,
+      pushoverSound: null
+    }, NOW);
   }
   try {
     return await fn(env, local);
@@ -176,7 +194,7 @@ test("at most ten locations are queried per run", async () => {
   );
 });
 
-test("missing SMTP configuration disables the legacy default without blocking forecasts", async () => {
+test("with delivery disabled in settings the report still generates a run without sending email", async () => {
   await withEnv(
     async (env) => {
       const fetchFake = createFetchFake({});
@@ -184,12 +202,16 @@ test("missing SMTP configuration disables the legacy default without blocking fo
 
       await runAndSendReport("AM", env, { fetch: fetchFake, loadMailer: mailer.loadMailer, now: NOW });
       assert.equal(fetchFake.calls.length, 1);
+      assert.equal(mailer.sent.length, 0, "no outbox job is enqueued when the email channel is disabled");
       const runs = await db.getRuns(env);
       assert.equal(runs[0].status, "warning");
     },
     {
       locations: [location("a", "Beach", 1)],
-      envOverrides: { GMAIL_APP_PASSWORD: "" }
+      // Leave D1 notification settings at their ship-safe defaults (email
+      // disabled). The report still runs and records forecast state — it
+      // simply enqueues no delivery jobs.
+      emailSettings: false
     }
   );
 });

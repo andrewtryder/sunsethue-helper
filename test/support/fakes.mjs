@@ -9,6 +9,61 @@ const HOST_HANDLERS = new Set([
   "photon.komoot.io"
 ]);
 
+/**
+ * Emulate a Cloudflare Secrets Store binding. The real binding exposes a
+ * single `get()` method that resolves to the stored string document.
+ */
+export function fakeSecretsStoreBinding(document) {
+  const payload = document === null || document === undefined ? null : (typeof document === "string" ? document : JSON.stringify(document));
+  return {
+    async get() {
+      return payload;
+    }
+  };
+}
+
+const DEFAULT_EMAIL_TRANSPORT = Object.freeze({
+  version: 1,
+  configured: true,
+  gmailUser: "reports@example.com",
+  gmailAppPassword: "fake-app-password",
+  emailFrom: '"Sunsethue Helper" <reports@example.com>'
+});
+
+const DEFAULT_PUSHOVER_TRANSPORT = Object.freeze({
+  version: 1,
+  configured: true,
+  appToken: "abcdefghijklmnopqrstuvwxyz12",
+  userKey: "zyxwvutsrqponmlkjihgfedcba98"
+});
+
+/**
+ * Compose fake `EMAIL_TRANSPORT_SECRET` and `PUSHOVER_TRANSPORT_SECRET`
+ * bindings for integration tests. Pass `null` for either channel to make
+ * the resolver see the binding as unbound and fail closed. Pass a partial
+ * override to keep the rest of the default configured document.
+ */
+export function transportBindings({ email, pushover } = {}) {
+  const bindings = {};
+  if (email !== null) {
+    const document = email === undefined ? DEFAULT_EMAIL_TRANSPORT : { ...DEFAULT_EMAIL_TRANSPORT, ...email };
+    bindings.EMAIL_TRANSPORT_SECRET = fakeSecretsStoreBinding(document);
+  }
+  if (pushover !== null) {
+    const document = pushover === undefined ? DEFAULT_PUSHOVER_TRANSPORT : { ...DEFAULT_PUSHOVER_TRANSPORT, ...pushover };
+    bindings.PUSHOVER_TRANSPORT_SECRET = fakeSecretsStoreBinding(document);
+  }
+  return bindings;
+}
+
+/**
+ * Convenience helper: return an unconfigured sentinel binding for one channel.
+ * The resolver treats this as "not configured" and fails closed.
+ */
+export function unconfiguredTransportBinding() {
+  return fakeSecretsStoreBinding({ version: 1, configured: false });
+}
+
 export function jsonOk(body, init = {}) {
   return new Response(JSON.stringify(body), {
     status: init.status ?? 200,

@@ -58,7 +58,6 @@ const useCurrentLocationBtn = document.getElementById("use-current-location-btn"
 const searchSuggestions = document.getElementById("search-suggestions");
 
 const logsListContainer = document.getElementById("logs-list-container");
-const forecastLocationChips = document.getElementById("forecast-location-chips");
 
 const locationsListContainer = document.getElementById("locations-list-container");
 const emptyStateView = document.getElementById("empty-state-view");
@@ -110,7 +109,8 @@ let locationsList = [];
 let activityFilter = "runs";
 let cachedRuns = [];
 let cachedDeliveries = [];
-let activeChipLocationId = null;
+let editingLocationId = null;
+let expandedActivityIds = new Set();
 
 // Banner Utility
 const bannerTimeouts = new Map();
@@ -184,6 +184,11 @@ document.addEventListener("keydown", (event) => {
   }
   if (event.key === "Escape" && locationDrawer?.classList.contains("open")) {
     closeLocationDrawer();
+    return;
+  }
+  if (event.key === "Escape" && editingLocationId) {
+    editingLocationId = null;
+    renderLocations();
   }
 });
 
@@ -262,8 +267,12 @@ async function fetchNotificationSettings() {
   notificationDevice.value = settings.pushoverDevice || "";
   notificationPriority.value = String(settings.pushoverPriority);
   notificationSound.value = settings.pushoverSound || "";
-  notificationEmailStatus.textContent = settings.emailConfigured ? "Email transport configured" : "Email transport not configured";
-  notificationPushoverStatus.textContent = settings.pushoverConfigured ? "Pushover configured" : "Pushover not configured";
+  notificationEmailStatus.textContent = settings.emailConfigured ? "Configured" : "Not configured";
+  notificationEmailStatus.classList.toggle("success", settings.emailConfigured);
+  notificationEmailStatus.classList.toggle("muted", !settings.emailConfigured);
+  notificationPushoverStatus.textContent = settings.pushoverConfigured ? "Configured" : "Not configured";
+  notificationPushoverStatus.classList.toggle("success", settings.pushoverConfigured);
+  notificationPushoverStatus.classList.toggle("muted", !settings.pushoverConfigured);
 }
 
 async function fetchOperationalStatus() {
@@ -294,28 +303,41 @@ async function fetchOperationalStatus() {
   }
 }
 
-function formatCredentialUpdatedAt(value) {
-  if (!value) return "";
-  try {
-    return ` · updated ${new Date(value).toLocaleString()}`;
-  } catch {
-    return "";
+function setStatusBadge(el, configured, detailTitle = "") {
+  if (!el) return;
+  el.textContent = configured ? "Configured" : "Not configured";
+  el.classList.toggle("success", configured);
+  el.classList.toggle("muted", !configured);
+  if (detailTitle) {
+    el.title = detailTitle;
+  } else {
+    el.removeAttribute("title");
   }
 }
 
 function applyProviderCredentialStatus(status, { merge = false } = {}) {
   if (gmailCredentialsStatus && (!merge || status?.email !== undefined)) {
     if (status?.email?.configured) {
-      gmailCredentialsStatus.textContent = `Configured: ${status.email.gmailUserMasked || "masked"}${status.email.emailFromMasked ? ` · from ${status.email.emailFromMasked}` : ""}${formatCredentialUpdatedAt(status.email.updatedAt)}`;
+      const detail = [
+        status.email.gmailUserMasked || "masked",
+        status.email.emailFromMasked ? `from ${status.email.emailFromMasked}` : null,
+        status.email.updatedAt ? `updated ${new Date(status.email.updatedAt).toLocaleString()}` : null
+      ].filter(Boolean).join(" · ");
+      setStatusBadge(gmailCredentialsStatus, true, detail);
     } else if (!merge || status?.email) {
-      gmailCredentialsStatus.textContent = "Not configured";
+      setStatusBadge(gmailCredentialsStatus, false);
     }
   }
   if (pushoverCredentialsStatus && (!merge || status?.pushover !== undefined)) {
     if (status?.pushover?.configured) {
-      pushoverCredentialsStatus.textContent = `Configured · app token ${status.pushover.appTokenPresent ? "present" : "missing"} · user key ${status.pushover.userKeyPresent ? "present" : "missing"}${formatCredentialUpdatedAt(status.pushover.updatedAt)}`;
+      const detail = [
+        `app token ${status.pushover.appTokenPresent ? "present" : "missing"}`,
+        `user key ${status.pushover.userKeyPresent ? "present" : "missing"}`,
+        status.pushover.updatedAt ? `updated ${new Date(status.pushover.updatedAt).toLocaleString()}` : null
+      ].filter(Boolean).join(" · ");
+      setStatusBadge(pushoverCredentialsStatus, true, detail);
     } else if (!merge || status?.pushover) {
-      pushoverCredentialsStatus.textContent = "Not configured";
+      setStatusBadge(pushoverCredentialsStatus, false);
     }
   }
   // Never prepopulate secret fields.
@@ -546,88 +568,115 @@ async function fetchRuns() {
   }
 }
 
-// Render Locations Card List
+// Render Locations list
 function renderLocations() {
   try {
     if (DEBUG) console.log("renderLocations called. locationsList:", locationsList);
     locationsCountBadge.textContent = `${locationsList.length} / 10`;
     locationsListContainer.innerHTML = "";
-    
+
     if (locationsList.length === 0) {
+      editingLocationId = null;
       locationsListContainer.appendChild(emptyStateView);
       emptyStateView.classList.remove("hidden");
       renderForecastDashboard();
       return;
     }
-    
+
     emptyStateView.classList.add("hidden");
-    
-    // ⚡ Bolt Performance Optimization:
-    // Using a DocumentFragment avoids triggering a costly DOM reflow and repaint
-    // on every single loop iteration. Batching DOM insertions significantly reduces
-    // main thread blocking time.
+
     const fragment = document.createDocumentFragment();
 
-    locationsList.forEach((location) => {
-      const card = document.createElement("div");
-      card.className = "location-card";
-      
-      const sunriseBadge = getForecastBadgeHtml(location.latestSunriseQuality, location.latestSunriseText);
-      const sunsetBadge = getForecastBadgeHtml(location.latestSunsetQuality, location.latestSunsetText);
-      
-      const sunriseTimeText = location.latestSunriseTime 
-        ? timeFormatter.format(Date.parse(location.latestSunriseTime))
-        : "—";
-      const sunsetTimeText = location.latestSunsetTime 
-        ? timeFormatter.format(Date.parse(location.latestSunsetTime))
-        : "—";
+    const header = document.createElement("div");
+    header.className = "location-table-header";
+    header.innerHTML = `
+      <div class="location-col-name">Name</div>
+      <div class="location-col-coords">Coordinates</div>
+      <div class="location-col-actions">Actions</div>
+    `;
+    fragment.appendChild(header);
 
-      let errorSection = "";
-      if (location.forecastError) {
-        errorSection = `<div class="forecast-error-text" style="margin-top:6px;">⚠️ ${escapeHtml(location.forecastError)}</div>`;
+    locationsList.forEach((location) => {
+      const row = document.createElement("div");
+      const isEditing = editingLocationId === location.id;
+      row.className = "location-row" + (isEditing ? " is-editing" : "");
+      row.setAttribute("data-id", location.id);
+
+      if (isEditing) {
+        row.innerHTML = `
+          <div class="location-col-name">
+            <input type="text" class="form-input location-inline-name" value="${escapeHtml(location.name)}" aria-label="Location name" required>
+          </div>
+          <div class="location-col-coords location-inline-coords">
+            <input type="number" step="any" class="form-input location-inline-lat" value="${location.latitude}" aria-label="Latitude" min="-90" max="90" required>
+            <input type="number" step="any" class="form-input location-inline-lng" value="${location.longitude}" aria-label="Longitude" min="-180" max="180" required>
+          </div>
+          <div class="location-col-actions location-actions">
+            <button type="button" class="btn-icon save-inline-btn" data-id="${location.id}" title="Save" aria-label="Save location ${escapeHtml(location.name)}">
+              <span class="material-symbols-outlined" aria-hidden="true" style="font-size:18px;">check</span>
+            </button>
+            <button type="button" class="btn-icon cancel-inline-btn" data-id="${location.id}" title="Cancel" aria-label="Cancel editing ${escapeHtml(location.name)}">
+              <span class="material-symbols-outlined" aria-hidden="true" style="font-size:18px;">close</span>
+            </button>
+          </div>
+        `;
+      } else {
+        row.innerHTML = `
+          <div class="location-col-name">${escapeHtml(location.name)}</div>
+          <div class="location-col-coords">${formatCoordinateDisplay(location.latitude, location.longitude)}</div>
+          <div class="location-col-actions location-actions">
+            <button type="button" class="btn-icon edit-btn" data-id="${location.id}" title="Edit" aria-label="Edit location ${escapeHtml(location.name)}">
+              <span class="material-symbols-outlined" aria-hidden="true" style="font-size:18px;">edit</span>
+            </button>
+            <button type="button" class="btn-icon btn-icon-danger delete-btn" data-id="${location.id}" title="Delete" aria-label="Delete location ${escapeHtml(location.name)}">
+              <span class="material-symbols-outlined" aria-hidden="true" style="font-size:18px;">delete</span>
+            </button>
+          </div>
+        `;
       }
 
-      card.innerHTML = `
-        <div class="location-info" style="flex:1;">
-          <h3>${escapeHtml(location.name)}</h3>
-          <div class="location-coords">${formatCoordinateDisplay(location.latitude, location.longitude)}</div>
-          <div class="location-badges">
-            <span class="location-badge-chip"><span class="material-symbols-outlined" aria-hidden="true" style="font-size:14px;font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 20;">wb_twilight</span> ${sunriseTimeText} ${sunriseBadge}</span>
-            <span class="location-badge-chip"><span class="material-symbols-outlined" aria-hidden="true" style="font-size:14px;font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 20;">wb_sunny</span> ${sunsetTimeText} ${sunsetBadge}</span>
-          </div>
-          ${errorSection}
-        </div>
-        <div class="location-actions">
-          <button class="btn-icon edit-btn" data-id="${location.id}" title="Edit" aria-label="Edit location ${escapeHtml(location.name)}">
-            <span class="material-symbols-outlined" aria-hidden="true" style="font-size:18px;">edit</span>
-          </button>
-          <button class="btn-icon btn-icon-danger delete-btn" data-id="${location.id}" title="Delete" aria-label="Delete location ${escapeHtml(location.name)}">
-            <span class="material-symbols-outlined" aria-hidden="true" style="font-size:18px;">delete</span>
-          </button>
-        </div>
-      `;
-      
-      fragment.appendChild(card);
+      fragment.appendChild(row);
     });
-    
+
     locationsListContainer.appendChild(fragment);
 
-    // Attach event listeners to buttons
-    document.querySelectorAll(".edit-btn").forEach(btn => {
+    document.querySelectorAll(".edit-btn").forEach((btn) => {
       btn.addEventListener("click", (e) => {
-        const locId = e.currentTarget.getAttribute("data-id");
-        startEditLocation(locId);
-      });
-    });
-    
-    document.querySelectorAll(".delete-btn").forEach(btn => {
-      btn.addEventListener("click", (e) => {
-        const locId = e.currentTarget.getAttribute("data-id");
-        deleteLocation(locId);
+        startEditLocation(e.currentTarget.getAttribute("data-id"));
       });
     });
 
-    // Render Forecast Dashboard Cards
+    document.querySelectorAll(".delete-btn").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        deleteLocation(e.currentTarget.getAttribute("data-id"));
+      });
+    });
+
+    document.querySelectorAll(".save-inline-btn").forEach((btn) => {
+      btn.addEventListener("click", async (e) => {
+        const locId = e.currentTarget.getAttribute("data-id");
+        const row = e.currentTarget.closest(".location-row");
+        if (!row) return;
+        const name = row.querySelector(".location-inline-name")?.value.trim();
+        const latitude = parseFloat(row.querySelector(".location-inline-lat")?.value);
+        const longitude = parseFloat(row.querySelector(".location-inline-lng")?.value);
+        await saveInlineLocationEdit(locId, { name, latitude, longitude }, e.currentTarget);
+      });
+    });
+
+    document.querySelectorAll(".cancel-inline-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        editingLocationId = null;
+        renderLocations();
+      });
+    });
+
+    if (editingLocationId) {
+      const nameInput = locationsListContainer.querySelector(".location-inline-name");
+      nameInput?.focus();
+      nameInput?.select();
+    }
+
     renderForecastDashboard();
   } catch (error) {
     console.error("Error in renderLocations:", error);
@@ -668,43 +717,13 @@ function renderForecastDashboard() {
       if (child !== forecastEmptyState) child.remove();
     });
 
-    if (forecastLocationChips) {
-      forecastLocationChips.innerHTML = "";
-    }
-
     if (locationsList.length === 0) {
       if (forecastEmptyState) forecastEmptyState.classList.remove("hidden");
       if (dashboardLastUpdated) dashboardLastUpdated.textContent = "Last Run: N/A";
-      activeChipLocationId = null;
       return;
     }
 
     if (forecastEmptyState) forecastEmptyState.classList.add("hidden");
-
-    if (forecastLocationChips) {
-      const chipFragment = document.createDocumentFragment();
-      locationsList.forEach((location) => {
-        const chip = document.createElement("button");
-        chip.type = "button";
-        chip.className = "location-chip" + (activeChipLocationId === location.id ? " active" : "");
-        chip.textContent = location.name;
-        chip.setAttribute("data-location-id", location.id);
-        chip.addEventListener("click", () => {
-          activeChipLocationId = location.id;
-          document.querySelectorAll(".location-chip").forEach((el) => {
-            el.classList.toggle("active", el.getAttribute("data-location-id") === location.id);
-          });
-          const row = document.getElementById(`forecast-row-${location.id}`);
-          if (row) {
-            document.querySelectorAll(".forecast-table-row").forEach((r) => r.classList.remove("chip-highlight"));
-            row.classList.add("chip-highlight");
-            row.scrollIntoView({ behavior: "smooth", block: "nearest" });
-          }
-        });
-        chipFragment.appendChild(chip);
-      });
-      forecastLocationChips.appendChild(chipFragment);
-    }
 
     let maxTimestamp = 0;
     let headerSunriseTime = null;
@@ -731,14 +750,12 @@ function renderForecastDashboard() {
     header.className = "forecast-table-header";
     header.innerHTML = `
       <div class="forecast-table-header-location">Location</div>
-      <div class="forecast-table-header-events">
-        ${isSunsetFirst
-          ? `<div class="forecast-table-header-col">Next Sunset ${formatForecastColumnDate(headerSunsetTime)}</div>
-             <div class="forecast-table-header-col">Next Sunrise ${formatForecastColumnDate(headerSunriseTime)}</div>`
-          : `<div class="forecast-table-header-col">Next Sunrise ${formatForecastColumnDate(headerSunriseTime)}</div>
-             <div class="forecast-table-header-col">Next Sunset ${formatForecastColumnDate(headerSunsetTime)}</div>`
-        }
-      </div>
+      ${isSunsetFirst
+        ? `<div class="forecast-table-header-col">Next Sunset ${formatForecastColumnDate(headerSunsetTime)}</div>
+           <div class="forecast-table-header-col">Next Sunrise ${formatForecastColumnDate(headerSunriseTime)}</div>`
+        : `<div class="forecast-table-header-col">Next Sunrise ${formatForecastColumnDate(headerSunriseTime)}</div>
+           <div class="forecast-table-header-col">Next Sunset ${formatForecastColumnDate(headerSunsetTime)}</div>`
+      }
     `;
     table.appendChild(header);
 
@@ -779,15 +796,12 @@ function renderForecastDashboard() {
       }
 
       const row = document.createElement("div");
-      row.className = "forecast-table-row" + (activeChipLocationId === location.id ? " chip-highlight" : "");
+      row.className = "forecast-table-row";
       row.id = `forecast-row-${location.id}`;
       row.innerHTML = `
         <div class="forecast-table-location">${escapeHtml(location.name)}</div>
-        <div class="forecast-table-events">
-          ${isSunsetFirst ? sunsetColHtml : sunriseColHtml}
-          <div class="forecast-event-separator">|</div>
-          ${isSunsetFirst ? sunriseColHtml : sunsetColHtml}
-        </div>
+        ${isSunsetFirst ? sunsetColHtml : sunriseColHtml}
+        ${isSunsetFirst ? sunriseColHtml : sunsetColHtml}
       `;
       table.appendChild(row);
     });
@@ -811,9 +825,52 @@ function renderForecastDashboard() {
 }
 
 // CRUD Actions
+async function updateLocation(id, { name, latitude, longitude }) {
+  const response = await fetch(`${API_BASE}/api/locations/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, latitude, longitude })
+  });
+  if (!response.ok) {
+    throw new Error(await response.text());
+  }
+  return response;
+}
+
+async function saveInlineLocationEdit(id, { name, latitude, longitude }, saveBtn) {
+  if (!name) {
+    showBanner(dbErrorBanner, "Location Name is required.");
+    return;
+  }
+  if (!validateCoordinates(latitude, longitude)) {
+    showBanner(dbErrorBanner, "Latitude and Longitude must be valid numbers.");
+    return;
+  }
+
+  const originalHtml = saveBtn?.innerHTML;
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<span class="spinner" style="width: 18px; height: 18px; border-width: 2px;"></span>';
+  }
+
+  try {
+    await updateLocation(id, { name, latitude, longitude });
+    showBanner(dbSuccessBanner, `Location "${name}" updated successfully.`);
+    editingLocationId = null;
+    await fetchLocations();
+  } catch (error) {
+    console.error(error);
+    showBanner(dbErrorBanner, "Database Error: " + error.message);
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.innerHTML = originalHtml;
+    }
+  }
+}
+
 locationForm.addEventListener("submit", async (e) => {
   e.preventDefault();
-  
+
   const id = locationIdInput.value;
   const name = locationNameInput.value.trim();
   const latitude = parseFloat(locationLatInput.value);
@@ -823,31 +880,22 @@ locationForm.addEventListener("submit", async (e) => {
     showBanner(dbErrorBanner, "Location Name is required.");
     return;
   }
-  
+
   if (!validateCoordinates(latitude, longitude)) {
     showBanner(dbErrorBanner, "Latitude and Longitude must be valid numbers.");
     return;
   }
-  
+
   saveLocationBtn.disabled = true;
   const originalSaveText = saveLocationBtn.innerHTML;
   saveLocationBtn.innerHTML = '<span class="spinner" style="width: 18px; height: 18px; border-width: 2px;"></span><span>Saving...</span>';
 
   try {
     if (id) {
-      // Edit mode via API
-      const response = await fetch(`${API_BASE}/api/locations/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, latitude, longitude })
-      });
-      if (!response.ok) {
-        throw new Error(await response.text());
-      }
+      await updateLocation(id, { name, latitude, longitude });
       showBanner(dbSuccessBanner, `Location "${name}" updated successfully.`);
       closeLocationDrawer();
     } else {
-      // Create mode via API
       if (!canAddLocation(locationsList.length)) {
         showBanner(dbErrorBanner, "Limit reached: You can monitor a maximum of 10 locations.");
         return;
@@ -874,18 +922,8 @@ locationForm.addEventListener("submit", async (e) => {
 });
 
 function startEditLocation(id) {
-  const loc = locationsList.find(l => l.id === id);
-  if (!loc) return;
-  
-  locationIdInput.value = loc.id;
-  locationNameInput.value = loc.name;
-  locationLatInput.value = loc.latitude;
-  locationLngInput.value = loc.longitude;
-  
-  formTitle.textContent = "Edit Location";
-  saveLocationBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;">save</span><span>Update Location</span>';
-  openLocationDrawer();
-  locationNameInput.focus();
+  editingLocationId = id;
+  renderLocations();
 }
 
 function resetForm() {
@@ -893,7 +931,7 @@ function resetForm() {
   locationNameInput.value = "";
   locationLatInput.value = "";
   locationLngInput.value = "";
-  
+
   formTitle.textContent = "Add Location";
   saveLocationBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;">save</span><span>Save Location</span>';
 }
@@ -1244,17 +1282,58 @@ async function fetchApiCreditsStatus() {
   }
 }
 
-function buildActivityListItem({ timeText, badgeClass, badgeText, summaryHtml, detailsHtml = "" }) {
+function buildActivityListItem({
+  itemKey,
+  summaryText,
+  badgeClass,
+  badgeText,
+  detailsHtml = "",
+  expandable = false
+}) {
+  const isExpanded = expandable && expandedActivityIds.has(itemKey);
   const logItem = document.createElement("div");
-  logItem.className = "log-item";
+  logItem.className = "log-item" + (isExpanded ? " expanded" : "") + (expandable ? " is-expandable" : "");
+  logItem.setAttribute("data-activity-key", itemKey);
+  if (expandable) {
+    logItem.setAttribute("role", "button");
+    logItem.setAttribute("tabindex", "0");
+    logItem.setAttribute("aria-expanded", isExpanded ? "true" : "false");
+  }
+
   logItem.innerHTML = `
-    <div class="log-item-header">
-      <span class="log-time">${timeText}</span>
+    <div class="log-item-summary">
+      <div class="log-item-summary-main">
+        ${expandable ? `<span class="material-symbols-outlined log-item-chevron" aria-hidden="true">expand_more</span>` : ""}
+        <span class="log-time">${summaryText}</span>
+      </div>
       <span class="log-badge ${badgeClass}">${badgeText}</span>
     </div>
-    <div class="log-summary-row">${summaryHtml}</div>
-    ${detailsHtml}
+    ${expandable ? `<div class="log-item-details"${isExpanded ? "" : " hidden"}>${detailsHtml}</div>` : ""}
   `;
+
+  if (expandable) {
+    const toggle = () => {
+      if (expandedActivityIds.has(itemKey)) {
+        expandedActivityIds.delete(itemKey);
+        logItem.classList.remove("expanded");
+        logItem.setAttribute("aria-expanded", "false");
+        logItem.querySelector(".log-item-details")?.setAttribute("hidden", "");
+      } else {
+        expandedActivityIds.add(itemKey);
+        logItem.classList.add("expanded");
+        logItem.setAttribute("aria-expanded", "true");
+        logItem.querySelector(".log-item-details")?.removeAttribute("hidden");
+      }
+    };
+    logItem.addEventListener("click", toggle);
+    logItem.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        toggle();
+      }
+    });
+  }
+
   return logItem;
 }
 
@@ -1268,7 +1347,7 @@ function renderActivityList() {
       return;
     }
     const fragment = document.createDocumentFragment();
-    cachedDeliveries.forEach((delivery) => {
+    cachedDeliveries.forEach((delivery, index) => {
       const status = String(delivery.status || "unknown").toLowerCase();
       const badgeClass = status.includes("fail") || status.includes("error")
         ? "failure"
@@ -1278,13 +1357,16 @@ function renderActivityList() {
       const timeText = delivery.updatedAt || delivery.createdAt
         ? dateTimeFormatterMedium.format(Date.parse(delivery.updatedAt || delivery.createdAt))
         : "—";
+      const itemKey = `delivery:${delivery.id || index}`;
+      const hasDetails = Boolean(delivery.lastErrorCode);
       fragment.appendChild(buildActivityListItem({
-        timeText,
+        itemKey,
+        summaryText: `${timeText} · ${escapeHtml(delivery.channel || "—")} · ${delivery.attempts ?? 0} attempts`,
         badgeClass,
         badgeText: escapeHtml(String(delivery.status || "UNKNOWN").toUpperCase()),
-        summaryHtml: `Channel: <strong>${escapeHtml(delivery.channel)}</strong> | Attempts: <strong>${delivery.attempts ?? 0}</strong>`,
-        detailsHtml: delivery.lastErrorCode
-          ? `<div class="log-details" style="color: var(--error);">Error: ${escapeHtml(delivery.lastErrorCode)}</div>`
+        expandable: hasDetails,
+        detailsHtml: hasDetails
+          ? `<div class="log-detail-chips"><span class="log-detail-chip log-detail-chip-error">Error: ${escapeHtml(delivery.lastErrorCode)}</span></div>`
           : ""
       }));
     });
@@ -1298,27 +1380,33 @@ function renderActivityList() {
   }
 
   const fragment = document.createDocumentFragment();
-  cachedRuns.forEach((log) => {
+  cachedRuns.forEach((log, index) => {
     const dateText = dateTimeFormatterMedium.format(log.timestamp);
     const statusClass = getLogStatusClass(log.status);
     const statusText = log.status.toUpperCase();
+    const itemKey = `run:${log.id || index}`;
 
     let detailsHtml = "";
+    let expandable = false;
     if (log.error) {
-      detailsHtml = `<div class="log-details" style="color: var(--error);">Error: ${escapeHtml(log.error)}</div>`;
+      expandable = true;
+      detailsHtml = `<div class="log-detail-chips"><span class="log-detail-chip log-detail-chip-error">Error: ${escapeHtml(log.error)}</span></div>`;
     } else if (log.results && log.results.length > 0) {
-      const resultsText = log.results.map(r => {
-        const dot = r.status === "error" ? "🔴" : "🟢";
-        return `${dot} ${escapeHtml(r.name)} (${r.status === "error" ? "Failed" : "Success"})`;
-      }).join("<br>");
-      detailsHtml = `<div class="log-details">${resultsText}</div>`;
+      expandable = true;
+      const chips = log.results.map((r) => {
+        const failed = r.status === "error";
+        const label = `${escapeHtml(r.name)} · ${failed ? "Failed" : "Success"}`;
+        return `<span class="log-detail-chip${failed ? " log-detail-chip-error" : ""}">${label}</span>`;
+      }).join("");
+      detailsHtml = `<div class="log-detail-chips">${chips}</div>`;
     }
 
     fragment.appendChild(buildActivityListItem({
-      timeText: dateText,
+      itemKey,
+      summaryText: `${dateText} · ${escapeHtml(log.triggerType)} · ${log.locationsCount} locations`,
       badgeClass: statusClass,
       badgeText: statusText,
-      summaryHtml: `Trigger: <strong>${escapeHtml(log.triggerType)}</strong> | Locations: <strong>${log.locationsCount}</strong>`,
+      expandable,
       detailsHtml
     }));
   });

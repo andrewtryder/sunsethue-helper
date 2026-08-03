@@ -10,6 +10,17 @@ import {
   shouldSearchAutocomplete,
   mapGeolocationError
 } from "./lib/helpers.js";
+import { initApi, CREDENTIAL_ADMIN_HEADER } from "./api/client.js";
+import { showBanner, hideBanner } from "./ui/banners.js";
+import { initEmailSuccessModal } from "./ui/dialog.js";
+import { initNotifications } from "./features/notifications.js";
+import { initSchedule } from "./features/schedule.js";
+import { initThresholds } from "./features/thresholds.js";
+import { initWebPush } from "./features/webpush.js";
+import { initWebhook } from "./features/webhook.js";
+import { initHealth } from "./features/health.js";
+import { initHistory } from "./features/history.js";
+import { initSetupStatus } from "./features/setup-status.js";
 
 const timeFormatter = new Intl.DateTimeFormat("en-US", {
   timeZone: "America/New_York",
@@ -32,77 +43,8 @@ const timeFormatterShort = new Intl.DateTimeFormat("en-US", {
   timeStyle: "short"
 });
 
-// Same-origin API through Pages Functions -> private Worker service binding.
-// Local Pages (`npm run dev`) also uses relative /api/* via the service binding.
-const DEMO_MODE = new URLSearchParams(window.location.search).has("demo")
-  || window.__SUNSETHUE_DEMO__ === true
-  || document.documentElement.dataset.demo === "1";
-const DEMO_READ_ONLY = DEMO_MODE;
-const API_BASE = "";
-
-function createApiClient() {
-  return {
-    async get(path) {
-      const response = await fetch(`${API_BASE}${path}`);
-      if (!response.ok) throw new Error(`Request failed: ${path}`);
-      return response.json();
-    },
-    async send(path, init) {
-      if (DEMO_READ_ONLY && init?.method && init.method !== "GET") {
-        throw new Error("DEMO_READ_ONLY");
-      }
-      const response = await fetch(`${API_BASE}${path}`, init);
-      return response;
-    }
-  };
-}
-
-function createDemoClient(fixtures) {
-  return {
-    async get(path) {
-      if (path.startsWith("/api/notification-health")) return fixtures.notificationHealth;
-      if (path.startsWith("/api/setup-status")) return fixtures.setupStatus;
-      if (path.startsWith("/api/operational-status")) return fixtures.operationalStatus;
-      if (path.startsWith("/api/application-settings")) return fixtures.applicationSettings;
-      if (path.startsWith("/api/notification-settings")) return fixtures.notificationSettings;
-      if (path.startsWith("/api/locations")) return fixtures.locations;
-      if (path.startsWith("/api/runs")) return fixtures.runs;
-      if (path.startsWith("/api/location-notification-rules")) return fixtures.rules;
-      if (path.startsWith("/api/getApiCredits")) return fixtures.credits;
-      if (path.startsWith("/api/provider-credentials")) return fixtures.providerCredentials;
-      if (path.startsWith("/api/web-push")) return fixtures.webPush || { subscriptions: [] };
-      return {};
-    },
-    async send() {
-      throw new Error("DEMO_READ_ONLY");
-    }
-  };
-}
-
-const api = DEMO_MODE
-  ? createDemoClient(window.__SUNSETHUE_DEMO_FIXTURES__ || {})
-  : createApiClient();
-
-if (DEMO_MODE) {
-  const banner = document.getElementById("demo-banner");
-  if (banner) banner.hidden = false;
-  const fixtures = window.__SUNSETHUE_DEMO_FIXTURES__ || {};
-  const originalFetch = window.fetch.bind(window);
-  window.fetch = async (input, init = {}) => {
-    const url = typeof input === "string" ? input : input.url;
-    const path = url.replace(/^https?:\/\/[^/]+/, "").split("?")[0];
-    const method = (init.method || "GET").toUpperCase();
-    if (method !== "GET") {
-      return new Response(JSON.stringify({ code: "DEMO_READ_ONLY" }), { status: 403, headers: { "Content-Type": "application/json" } });
-    }
-    try {
-      const data = await api.get(path.startsWith("/api") ? path : `/api${path}`);
-      return new Response(JSON.stringify(data), { status: 200, headers: { "Content-Type": "application/json" } });
-    } catch {
-      return originalFetch(input, init);
-    }
-  };
-}
+// API
+const { api, DEMO_MODE, DEMO_READ_ONLY } = initApi();
 
 // DOM Elements
 const appContainer = document.getElementById("app-container");
@@ -140,32 +82,7 @@ const triggerTestBtn = document.getElementById("trigger-test-btn");
 const triggerStatus = document.getElementById("trigger-status");
 const triggerStatusText = document.getElementById("trigger-status-text");
 
-const emailSuccessModal = document.getElementById("email-success-modal");
-const emailSuccessModalMessage = document.getElementById("email-success-modal-message");
-const emailSuccessModalClose = document.getElementById("email-success-modal-close");
-const emailSuccessModalDone = document.getElementById("email-success-modal-done");
-
 const apiCreditsStatus = document.getElementById("api-credits-status");
-const notificationSettingsForm = document.getElementById("notification-settings-form");
-const notificationEmailEnabled = document.getElementById("notification-email-enabled");
-const notificationEmailTo = document.getElementById("notification-email-to");
-const notificationPushoverEnabled = document.getElementById("notification-pushover-enabled");
-const notificationDevice = document.getElementById("notification-device");
-const notificationPriority = document.getElementById("notification-priority");
-const notificationSound = document.getElementById("notification-sound");
-const notificationEmailStatus = document.getElementById("notification-email-status");
-const notificationPushoverStatus = document.getElementById("notification-pushover-status");
-const gmailCredentialsForm = document.getElementById("gmail-credentials-form");
-const gmailCredentialsStatus = document.getElementById("gmail-credentials-status");
-const gmailUserInput = document.getElementById("gmail-user");
-const gmailAppPasswordInput = document.getElementById("gmail-app-password");
-const gmailEmailFromInput = document.getElementById("gmail-email-from");
-const pushoverCredentialsForm = document.getElementById("pushover-credentials-form");
-const pushoverCredentialsStatus = document.getElementById("pushover-credentials-status");
-const pushoverAppTokenInput = document.getElementById("pushover-app-token");
-const pushoverUserKeyInput = document.getElementById("pushover-user-key");
-
-const CREDENTIAL_ADMIN_HEADER = { "X-Sunsethue-Admin": "credentials" };
 
 // State
 let locationsList = [];
@@ -175,85 +92,14 @@ let cachedDeliveries = [];
 let editingLocationId = null;
 let expandedActivityIds = new Set();
 
-// Banner Utility
-const bannerTimeouts = new Map();
+// Banner helpers bound to the shared banner elements
+const showSuccess = (msg, duration) => showBanner(dbSuccessBanner, msg, duration);
+const showError = (msg, duration) => showBanner(dbErrorBanner, msg, duration);
 
-function showBanner(bannerElement, message, duration = 5000) {
-  if (!bannerElement) return;
-  if (bannerTimeouts.has(bannerElement)) {
-    clearTimeout(bannerTimeouts.get(bannerElement));
-  }
-  bannerElement.textContent = message;
-  bannerElement.classList.add("show");
-  bannerElement.style.display = "block";
-  
-  if (duration > 0) {
-    const timeoutId = setTimeout(() => {
-      bannerElement.classList.remove("show");
-      bannerElement.style.display = "none";
-      bannerTimeouts.delete(bannerElement);
-    }, duration);
-    bannerTimeouts.set(bannerElement, timeoutId);
-  }
-}
+// Modal
+const emailModal = initEmailSuccessModal();
 
-function hideBanner(bannerElement) {
-  if (!bannerElement) return;
-  if (bannerTimeouts.has(bannerElement)) {
-    clearTimeout(bannerTimeouts.get(bannerElement));
-    bannerTimeouts.delete(bannerElement);
-  }
-  bannerElement.style.display = "none";
-  bannerElement.textContent = "";
-}
-
-function showEmailSuccessModal() {
-  if (!emailSuccessModal) return;
-  if (emailSuccessModalMessage) {
-    emailSuccessModalMessage.textContent = `Success! Test report email sent.`;
-  }
-  emailSuccessModal.classList.remove("hidden");
-  emailSuccessModal.classList.add("is-open");
-  emailSuccessModal.setAttribute("aria-hidden", "false");
-  document.body.classList.add("modal-open");
-  emailSuccessModalDone?.focus();
-}
-
-function hideEmailSuccessModal() {
-  if (!emailSuccessModal) return;
-  emailSuccessModal.classList.add("hidden");
-  emailSuccessModal.classList.remove("is-open");
-  emailSuccessModal.setAttribute("aria-hidden", "true");
-  document.body.classList.remove("modal-open");
-}
-
-if (emailSuccessModalClose) {
-  emailSuccessModalClose.addEventListener("click", hideEmailSuccessModal);
-}
-if (emailSuccessModalDone) {
-  emailSuccessModalDone.addEventListener("click", hideEmailSuccessModal);
-}
-if (emailSuccessModal) {
-  emailSuccessModal.addEventListener("click", (event) => {
-    if (event.target === emailSuccessModal) {
-      hideEmailSuccessModal();
-    }
-  });
-}
-document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && emailSuccessModal?.classList.contains("is-open")) {
-    hideEmailSuccessModal();
-    return;
-  }
-  if (event.key === "Escape" && locationDrawer?.classList.contains("open")) {
-    closeLocationDrawer();
-    return;
-  }
-  if (event.key === "Escape" && editingLocationId) {
-    editingLocationId = null;
-    renderLocations();
-  }
-});
+// ── Location Drawer ──────────────────────────────────────────────────
 
 function openLocationDrawer() {
   if (!locationDrawer) return;
@@ -286,16 +132,61 @@ openLocationDrawerBtn?.addEventListener("click", () => {
 closeLocationDrawerBtn?.addEventListener("click", closeLocationDrawer);
 locationDrawerOverlay?.addEventListener("click", closeLocationDrawer);
 
-// Load Initial Data
+// ── Notification deliveries (shared state lives here) ────────────────
+
+async function fetchNotificationDeliveries() {
+  const response = await api.send("/api/notification-deliveries");
+  if (!response.ok) throw new Error("Failed to load delivery history.");
+  cachedDeliveries = await response.json();
+  if (activityFilter === "deliveries") {
+    renderActivityList();
+  }
+}
+
+// ── Feature wiring ───────────────────────────────────────────────────
+
+const { fetchNotificationSettings, fetchProviderCredentials } = initNotifications({
+  api, showSuccess, showError, CREDENTIAL_ADMIN_HEADER,
+  fetchDeliveries: () => fetchNotificationDeliveries()
+});
+
+const { fetchApplicationSettings } = initSchedule({ api, showSuccess, showError });
+
+const { fetchLocationRules } = initThresholds({
+  api, showSuccess, showError,
+  getLocationsList: () => locationsList
+});
+
+const { fetchWebPushDevices } = initWebPush({
+  api, showSuccess, showError, DEMO_READ_ONLY
+});
+
+initWebhook({
+  api, showSuccess, showError, CREDENTIAL_ADMIN_HEADER,
+  fetchNotificationSettings
+});
+
+const { fetchOperationalStatus } = initHealth({ api });
+
+const { refreshHistoryCounts } = initHistory({
+  api, DEMO_READ_ONLY, showSuccess, showError,
+  afterClear: () => Promise.all([
+    fetchRuns(),
+    fetchNotificationDeliveries(),
+    fetchOperationalStatus()
+  ])
+});
+
+const { fetchSetupChecklist } = initSetupStatus({ api });
+
+// ── Init ─────────────────────────────────────────────────────────────
+
 async function initApp() {
   const loader = document.getElementById("loading-overlay");
   try {
     appContainer.classList.remove("hidden");
     document.body.classList.add("app-visible");
 
-    // Locations and runs power the primary UI, so their failures must surface
-    // loudly. Notification settings and delivery history are secondary — a
-    // notification-provider outage should not black out the main dashboard.
     await Promise.all([fetchLocations(), fetchRuns()]);
     const notificationOutcomes = await Promise.allSettled([
       fetchNotificationSettings(),
@@ -325,399 +216,11 @@ async function initApp() {
   }
 }
 
-async function fetchNotificationSettings() {
-  const response = await fetch(`${API_BASE}/api/notification-settings`);
-  if (!response.ok) throw new Error("Failed to load notification settings.");
-  const settings = await response.json();
-  notificationEmailEnabled.checked = settings.emailEnabled;
-  notificationEmailTo.value = settings.emailTo || "";
-  notificationPushoverEnabled.checked = settings.pushoverEnabled;
-  notificationDevice.value = settings.pushoverDevice || "";
-  notificationPriority.value = String(settings.pushoverPriority);
-  notificationSound.value = settings.pushoverSound || "";
-  const webhookEnabledEl = document.getElementById("notification-webhook-enabled");
-  if (webhookEnabledEl) webhookEnabledEl.checked = Boolean(settings.webhookEnabled);
-  const webhookStatus = document.getElementById("webhook-credentials-status");
-  if (webhookStatus) {
-    webhookStatus.textContent = settings.webhookConfigured
-      ? (settings.webhookMaskedHostname ? `Configured · ${settings.webhookMaskedHostname}` : "Configured")
-      : "Not configured";
-    webhookStatus.classList.toggle("success", settings.webhookConfigured);
-    webhookStatus.classList.toggle("muted", !settings.webhookConfigured);
-  }
-  notificationEmailStatus.textContent = settings.emailConfigured ? "Configured" : "Not configured";
-  notificationEmailStatus.classList.toggle("success", settings.emailConfigured);
-  notificationEmailStatus.classList.toggle("muted", !settings.emailConfigured);
-  notificationPushoverStatus.textContent = settings.pushoverConfigured ? "Configured" : "Not configured";
-  notificationPushoverStatus.classList.toggle("success", settings.pushoverConfigured);
-  notificationPushoverStatus.classList.toggle("muted", !settings.pushoverConfigured);
-}
+// ── Locations ────────────────────────────────────────────────────────
 
-async function fetchOperationalStatus() {
-  const summary = document.getElementById("notification-health-summary")
-    || document.getElementById("ops-status-summary");
-  const channelsHost = document.getElementById("notification-health-channels");
-  const scheduleHost = document.getElementById("notification-health-schedule");
-  const skipsHost = document.getElementById("notification-health-skips");
-  const selfTestHost = document.getElementById("notification-health-selftest");
-  const legacyList = document.getElementById("ops-status-list");
-  if (!summary) return;
-  try {
-    const health = await api.get("/api/notification-health");
-    const stateLabel = {
-      healthy: "Healthy",
-      degraded: "Degraded",
-      action_required: "Action required",
-      disabled: "Disabled"
-    }[health.state] || health.state;
-    summary.textContent = `${stateLabel} · last report ${health.lastReportAt || "never"}`;
-    if (channelsHost) {
-      channelsHost.innerHTML = (health.channels || []).map((ch) => `
-        <article class="health-channel-card">
-          <h4>${escapeHtml(ch.channel)}</h4>
-          <p>${ch.enabled ? "Enabled" : "Off"} · ${ch.configured ? "Configured" : "Not configured"}</p>
-          <p>Qualifying locations: ${ch.qualifyingLocationCount}</p>
-          <p>Pending ${ch.pending} · Failed ${ch.failed}</p>
-          <p>Last success: ${ch.lastSuccessAt || "—"}</p>
-          <p>Last failure: ${ch.lastFailureCode || "—"}</p>
-          ${ch.devicesEnabled != null ? `<p>Devices: ${ch.devicesEnabled} enabled · ${ch.devicesStale || 0} stale · ${ch.devicesRevoked || 0} revoked</p>` : ""}
-          ${ch.maskedHostname ? `<p>Host: ${escapeHtml(ch.maskedHostname)} · signing ${ch.signingEnabled ? "on" : "off"}</p>` : ""}
-        </article>`).join("");
-    }
-    if (scheduleHost && health.schedule) {
-      const q = health.schedule.quota || {};
-      scheduleHost.innerHTML = `<strong>Schedule</strong> (${escapeHtml(health.schedule.timeZone || "")}): ${(health.schedule.times || []).join(", ")}
-        <br>Quota estimate: ${q.estimatedRequestsPerDay ?? "—"}/day · next: ${health.nextScheduled?.slot || "—"}`;
-    }
-    if (skipsHost) {
-      const skips = health.skips || [];
-      skipsHost.innerHTML = skips.length
-        ? `<strong>Recent threshold skips</strong><ul>${skips.map((s) => `<li>${escapeHtml(s.channel)} · ${escapeHtml(s.code)} · ${escapeHtml(s.createdAt)}</li>`).join("")}</ul>`
-        : "<p class=\"pane-subtext\">No recent threshold skips.</p>";
-    }
-    if (selfTestHost) {
-      selfTestHost.textContent = health.selfTest
-        ? `Latest self-test: ${health.selfTest.checkType} · ${health.selfTest.status} · ${health.selfTest.code || ""}`
-        : "No self-test runs yet.";
-      window.__lastSelfTestSummary = selfTestHost.textContent;
-    }
-    if (legacyList) {
-      legacyList.replaceChildren();
-    }
-    const legacySummary = document.getElementById("ops-status-summary");
-    if (legacySummary && legacySummary !== summary) {
-      legacySummary.textContent = summary.textContent;
-    }
-  } catch {
-    summary.textContent = "Unable to load notification health.";
-  }
-}
-
-async function fetchSetupChecklist() {
-  const list = document.getElementById("setup-checklist");
-  if (!list) return;
-  try {
-    const status = await api.get("/api/setup-status");
-    const items = [
-      ["Access", "ready"],
-      ["Database tables", status.databaseTables],
-      ["Forecast API key", status.forecastApiKey],
-      ["Email", status.email],
-      ["Pushover", status.pushover],
-      ["Webhook", status.webhook],
-      ["Browser push", status.browserPushDevices]
-    ];
-    list.innerHTML = items.map(([label, state]) => {
-      const text = state === "ready" ? "Ready" : state === "missing" ? "Missing" : "Not configured";
-      return `<li><strong>${escapeHtml(label)}</strong>: ${text}</li>`;
-    }).join("");
-  } catch {
-    list.innerHTML = "<li>Unable to load setup status.</li>";
-  }
-}
-
-function selectedHistoryScopes() {
-  const all = document.querySelector("[data-history-scope=\"all\"]");
-  if (all?.checked) return ["all"];
-  return [...document.querySelectorAll("[data-history-scope]:checked")]
-    .map((el) => el.getAttribute("data-history-scope"))
-    .filter((s) => s && s !== "all");
-}
-
-async function refreshHistoryCounts() {
-  const host = document.getElementById("clear-history-counts");
-  const confirmWrap = document.getElementById("clear-history-confirm-wrap");
-  if (!host) return;
-  const scopes = selectedHistoryScopes();
-  if (confirmWrap) confirmWrap.hidden = !scopes.includes("all");
-  if (scopes.length === 0) {
-    host.textContent = "Select at least one scope.";
-    return;
-  }
-  try {
-    const response = await api.send("/api/history/clear", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ scopes, preview: true })
-    });
-    if (!response.ok) throw new Error("preview failed");
-    const data = await response.json();
-    host.textContent = Object.entries(data.counts || {})
-      .map(([k, v]) => `${k}: ${v}`)
-      .join(" · ");
-  } catch (error) {
-    host.textContent = error?.message === "DEMO_READ_ONLY"
-      ? "Demo mode — clear/export disabled."
-      : "Unable to preview counts.";
-  }
-}
-
-function setStatusBadge(el, configured, detailTitle = "") {
-  if (!el) return;
-  el.textContent = configured ? "Configured" : "Not configured";
-  el.classList.toggle("success", configured);
-  el.classList.toggle("muted", !configured);
-  if (detailTitle) {
-    el.title = detailTitle;
-  } else {
-    el.removeAttribute("title");
-  }
-}
-
-function applyProviderCredentialStatus(status, { merge = false } = {}) {
-  if (gmailCredentialsStatus && (!merge || status?.email !== undefined)) {
-    if (status?.email?.configured) {
-      const detail = [
-        status.email.gmailUserMasked || "masked",
-        status.email.emailFromMasked ? `from ${status.email.emailFromMasked}` : null,
-        status.email.updatedAt ? `updated ${new Date(status.email.updatedAt).toLocaleString()}` : null
-      ].filter(Boolean).join(" · ");
-      setStatusBadge(gmailCredentialsStatus, true, detail);
-    } else if (!merge || status?.email) {
-      setStatusBadge(gmailCredentialsStatus, false);
-    }
-  }
-  if (pushoverCredentialsStatus && (!merge || status?.pushover !== undefined)) {
-    if (status?.pushover?.configured) {
-      const detail = [
-        `app token ${status.pushover.appTokenPresent ? "present" : "missing"}`,
-        `user key ${status.pushover.userKeyPresent ? "present" : "missing"}`,
-        status.pushover.updatedAt ? `updated ${new Date(status.pushover.updatedAt).toLocaleString()}` : null
-      ].filter(Boolean).join(" · ");
-      setStatusBadge(pushoverCredentialsStatus, true, detail);
-    } else if (!merge || status?.pushover) {
-      setStatusBadge(pushoverCredentialsStatus, false);
-    }
-  }
-  // Never prepopulate secret fields.
-  if (gmailAppPasswordInput) gmailAppPasswordInput.value = "";
-  if (pushoverAppTokenInput) pushoverAppTokenInput.value = "";
-  if (pushoverUserKeyInput) pushoverUserKeyInput.value = "";
-}
-
-async function fetchProviderCredentials() {
-  const response = await fetch(`${API_BASE}/api/provider-credentials`);
-  if (!response.ok) {
-    const payload = await response.json().catch(() => null);
-    const message = payload?.error?.message || "Failed to load provider credentials.";
-    const code = payload?.error?.code;
-    throw new Error(code ? `${message} (${code})` : message);
-  }
-  applyProviderCredentialStatus(await response.json());
-}
-
-async function refreshProviderCredentialsAfterMutation(partialStatus) {
-  // Apply the mutation response immediately so the UI updates even if GET flakes.
-  if (partialStatus) applyProviderCredentialStatus(partialStatus, { merge: true });
-  try {
-    await fetchProviderCredentials();
-  } catch (error) {
-    // Keep the success banner / applied status; surface reload failure separately.
-    showBanner(dbErrorBanner, error.message);
-  }
-}
-
-async function fetchNotificationDeliveries() {
-  const response = await fetch(`${API_BASE}/api/notification-deliveries`);
-  if (!response.ok) throw new Error("Failed to load delivery history.");
-  cachedDeliveries = await response.json();
-  if (activityFilter === "deliveries") {
-    renderActivityList();
-  }
-}
-
-notificationSettingsForm?.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const body = {
-    emailEnabled: notificationEmailEnabled.checked,
-    emailTo: notificationEmailTo.value || null,
-    pushoverEnabled: notificationPushoverEnabled.checked,
-    pushoverDevice: notificationDevice.value || null,
-    pushoverPriority: Number(notificationPriority.value),
-    pushoverSound: notificationSound.value || null,
-    webhookEnabled: Boolean(document.getElementById("notification-webhook-enabled")?.checked)
-  };
-  try {
-    const response = await fetch(`${API_BASE}/api/notification-settings`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    if (!response.ok) throw new Error("Notification settings were not accepted.");
-    showBanner(dbSuccessBanner, "Notification settings saved.");
-    await fetchNotificationSettings();
-  } catch (error) { showBanner(dbErrorBanner, error.message); }
-});
-
-gmailCredentialsForm?.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const saveBtn = document.getElementById("save-gmail-credentials-btn");
-  saveBtn && (saveBtn.disabled = true);
-  try {
-    const body = {
-      gmailUser: gmailUserInput?.value || "",
-      gmailAppPassword: gmailAppPasswordInput?.value || "",
-      emailFrom: gmailEmailFromInput?.value || ""
-    };
-    const response = await fetch(`${API_BASE}/api/provider-credentials/email`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json", ...CREDENTIAL_ADMIN_HEADER },
-      body: JSON.stringify(body)
-    });
-    if (!response.ok) {
-      const payload = await response.json().catch(() => null);
-      const message = payload?.error?.message || "Unable to save Gmail credentials.";
-      const code = payload?.error?.code;
-      throw new Error(code ? `${message} (${code})` : message);
-    }
-    const payload = await response.json();
-    if (gmailAppPasswordInput) gmailAppPasswordInput.value = "";
-    showBanner(dbSuccessBanner, "Gmail credentials saved.");
-    await refreshProviderCredentialsAfterMutation({ email: payload.email });
-    await fetchNotificationSettings().catch(() => {});
-  } catch (error) {
-    showBanner(dbErrorBanner, error.message);
-  } finally {
-    saveBtn && (saveBtn.disabled = false);
-    saveBtn?.focus();
-  }
-});
-
-document.getElementById("remove-gmail-credentials-btn")?.addEventListener("click", async (event) => {
-  const btn = event.currentTarget;
-  if (!window.confirm("Remove Gmail credentials? Email delivery will be disabled until new credentials are saved.")) {
-    btn.focus();
-    return;
-  }
-  btn.disabled = true;
-  try {
-    const response = await fetch(`${API_BASE}/api/provider-credentials/email`, {
-      method: "DELETE",
-      headers: { ...CREDENTIAL_ADMIN_HEADER }
-    });
-    if (!response.ok) {
-      const payload = await response.json().catch(() => null);
-      const message = payload?.error?.message || "Unable to remove Gmail credentials.";
-      const code = payload?.error?.code;
-      throw new Error(code ? `${message} (${code})` : message);
-    }
-    const payload = await response.json();
-    showBanner(dbSuccessBanner, "Gmail credentials removed.");
-    await refreshProviderCredentialsAfterMutation({ email: payload.email });
-    await fetchNotificationSettings().catch(() => {});
-  } catch (error) {
-    showBanner(dbErrorBanner, error.message);
-  } finally {
-    btn.disabled = false;
-    btn.focus();
-  }
-});
-
-pushoverCredentialsForm?.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const saveBtn = document.getElementById("save-pushover-credentials-btn");
-  saveBtn && (saveBtn.disabled = true);
-  try {
-    const body = {
-      appToken: pushoverAppTokenInput?.value || "",
-      userKey: pushoverUserKeyInput?.value || ""
-    };
-    const response = await fetch(`${API_BASE}/api/provider-credentials/pushover`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json", ...CREDENTIAL_ADMIN_HEADER },
-      body: JSON.stringify(body)
-    });
-    if (!response.ok) {
-      const payload = await response.json().catch(() => null);
-      const message = payload?.error?.message || "Unable to save Pushover credentials.";
-      const code = payload?.error?.code;
-      throw new Error(code ? `${message} (${code})` : message);
-    }
-    const payload = await response.json();
-    if (pushoverAppTokenInput) pushoverAppTokenInput.value = "";
-    if (pushoverUserKeyInput) pushoverUserKeyInput.value = "";
-    showBanner(dbSuccessBanner, "Pushover credentials saved.");
-    await refreshProviderCredentialsAfterMutation({ pushover: payload.pushover });
-    await fetchNotificationSettings().catch(() => {});
-  } catch (error) {
-    showBanner(dbErrorBanner, error.message);
-  } finally {
-    saveBtn && (saveBtn.disabled = false);
-    saveBtn?.focus();
-  }
-});
-
-document.getElementById("remove-pushover-credentials-btn")?.addEventListener("click", async (event) => {
-  const btn = event.currentTarget;
-  if (!window.confirm("Remove Pushover credentials? Pushover delivery will be disabled until new credentials are saved.")) {
-    btn.focus();
-    return;
-  }
-  btn.disabled = true;
-  try {
-    const response = await fetch(`${API_BASE}/api/provider-credentials/pushover`, {
-      method: "DELETE",
-      headers: { ...CREDENTIAL_ADMIN_HEADER }
-    });
-    if (!response.ok) {
-      const payload = await response.json().catch(() => null);
-      const message = payload?.error?.message || "Unable to remove Pushover credentials.";
-      const code = payload?.error?.code;
-      throw new Error(code ? `${message} (${code})` : message);
-    }
-    const payload = await response.json();
-    showBanner(dbSuccessBanner, "Pushover credentials removed.");
-    await refreshProviderCredentialsAfterMutation({ pushover: payload.pushover });
-    await fetchNotificationSettings().catch(() => {});
-  } catch (error) {
-    showBanner(dbErrorBanner, error.message);
-  } finally {
-    btn.disabled = false;
-    btn.focus();
-  }
-});
-
-async function testNotification(channel) {
-  const response = await fetch(`${API_BASE}/api/notifications/test`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ channel }) });
-  if (!response.ok) {
-    const payload = await response.json().catch(() => null);
-    const code = payload?.error?.code;
-    if (code === "PROVIDER_NOT_CONFIGURED" || code === "EMAIL_NOT_CONFIGURED" || code === "PUSHOVER_NOT_CONFIGURED") {
-      throw new Error("Credentials are not configured for this channel.");
-    }
-    if (code === "INVALID_EMAIL_ADDRESS") {
-      throw new Error(payload?.error?.message || "Set an email destination in notification settings before sending a test.");
-    }
-    if (code === "RATE_LIMITED") throw new Error("Rate limited. Try again in a minute.");
-    throw new Error("Test notification could not be queued.");
-  }
-  showBanner(dbSuccessBanner, `${channel === "email" ? "Email" : "Pushover"} test queued.`);
-  await fetchNotificationDeliveries();
-}
-
-document.getElementById("test-email-btn")?.addEventListener("click", () => testNotification("email").catch((error) => showBanner(dbErrorBanner, error.message)));
-document.getElementById("test-pushover-btn")?.addEventListener("click", () => testNotification("pushover").catch((error) => showBanner(dbErrorBanner, error.message)));
-
-// Fetch Locations
 async function fetchLocations() {
   try {
-    const response = await fetch(`${API_BASE}/api/locations`);
+    const response = await api.send("/api/locations");
     if (!response.ok) {
       throw new Error(`Failed to load locations: ${response.statusText}`);
     }
@@ -729,10 +232,9 @@ async function fetchLocations() {
   }
 }
 
-// Fetch Runs
 async function fetchRuns() {
   try {
-    const response = await fetch(`${API_BASE}/api/runs`);
+    const response = await api.send("/api/runs");
     if (!response.ok) {
       throw new Error(`Failed to load logs: ${response.statusText}`);
     }
@@ -745,7 +247,6 @@ async function fetchRuns() {
   }
 }
 
-// Render Locations list
 function renderLocations() {
   try {
     locationsCountBadge.textContent = `${locationsList.length} / 10`;
@@ -860,7 +361,8 @@ function renderLocations() {
   }
 }
 
-// Render Forecast Dashboard
+// ── Forecast Dashboard ───────────────────────────────────────────────
+
 function formatForecastColumnDate(isoTime) {
   if (!isoTime) return "";
   const formatted = dateFormatter.format(Date.parse(isoTime));
@@ -999,9 +501,10 @@ function renderForecastDashboard() {
   }
 }
 
-// CRUD Actions
+// ── Location CRUD ────────────────────────────────────────────────────
+
 async function updateLocation(id, { name, latitude, longitude }) {
-  const response = await fetch(`${API_BASE}/api/locations/${id}`, {
+  const response = await api.send(`/api/locations/${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name, latitude, longitude })
@@ -1075,7 +578,7 @@ locationForm.addEventListener("submit", async (e) => {
         showBanner(dbErrorBanner, "Limit reached: You can monitor a maximum of 10 locations.");
         return;
       }
-      const response = await fetch(`${API_BASE}/api/locations`, {
+      const response = await api.send("/api/locations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, latitude, longitude })
@@ -1116,10 +619,10 @@ cancelEditBtn.addEventListener("click", closeLocationDrawer);
 async function deleteLocation(id) {
   const loc = locationsList.find(l => l.id === id);
   if (!loc) return;
-  
+
   if (confirm(`Are you sure you want to delete "${loc.name}"?`)) {
     try {
-      const response = await fetch(`${API_BASE}/api/locations/${id}`, {
+      const response = await api.send(`/api/locations/${id}`, {
         method: "DELETE"
       });
       if (!response.ok) {
@@ -1137,7 +640,8 @@ async function deleteLocation(id) {
   }
 }
 
-// Test Trigger for Daily Email Functions
+// ── Trigger Report ───────────────────────────────────────────────────
+
 triggerTestBtn.addEventListener("click", async () => {
   if (locationsList.length === 0) {
     showBanner(dbErrorBanner, "Cannot trigger test: You need to add at least 1 location.");
@@ -1149,18 +653,18 @@ triggerTestBtn.addEventListener("click", async () => {
     triggerStatus.classList.remove("hidden");
     triggerStatus.setAttribute("aria-hidden", "false");
     if (triggerStatusText) triggerStatusText.textContent = "Sending…";
-    
-    const reportResponse = await fetch(`${API_BASE}/api/triggerReport`, {
+
+    const reportResponse = await api.send("/api/triggerReport", {
       method: "POST"
     });
-    
+
     const result = await reportResponse.json();
-    
+
     if (!reportResponse.ok) {
       throw new Error(result.error || "Failed to trigger email report.");
     }
-    
-    showEmailSuccessModal();
+
+    emailModal.show();
     await Promise.all([
       fetchApiCreditsStatus(),
       fetchRuns(),
@@ -1176,17 +680,18 @@ triggerTestBtn.addEventListener("click", async () => {
   }
 });
 
-// Geolocation Handler
+// ── Geolocation ──────────────────────────────────────────────────────
+
 useCurrentLocationBtn.addEventListener("click", () => {
   if (!navigator.geolocation) {
     showBanner(dbErrorBanner, "Geolocation is not supported by your browser.");
     return;
   }
-  
+
   useCurrentLocationBtn.disabled = true;
   const originalText = useCurrentLocationBtn.textContent;
   useCurrentLocationBtn.textContent = "📍 Locating...";
-  
+
   navigator.geolocation.getCurrentPosition(
     (position) => {
       locationLatInput.value = position.coords.latitude.toFixed(6);
@@ -1194,7 +699,7 @@ useCurrentLocationBtn.addEventListener("click", () => {
       showBanner(dbSuccessBanner, "Current location loaded.");
       useCurrentLocationBtn.disabled = false;
       useCurrentLocationBtn.textContent = originalText;
-      
+
       if (!locationNameInput.value) {
         locationNameInput.value = "Current Location";
       }
@@ -1210,44 +715,45 @@ useCurrentLocationBtn.addEventListener("click", () => {
   );
 });
 
-// Address Search Handler
+// ── Address Search & Autocomplete ────────────────────────────────────
+
 async function performAddressSearch() {
   const queryText = searchAddressInput.value.trim();
   if (!queryText) {
     showBanner(dbErrorBanner, "Please enter an address or city to search.");
     return;
   }
-  
+
   searchAddressBtn.disabled = true;
   const searchIcon = searchAddressBtn.querySelector(".material-symbols-outlined");
   if (searchIcon) searchIcon.textContent = "hourglass_empty";
-  
+
   try {
-    const response = await fetch(`${API_BASE}/api/searchCoordinates`, {
+    const response = await api.send("/api/searchCoordinates", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ query: queryText })
     });
-    
+
     if (!response.ok) {
       const errorJson = await response.json();
       throw new Error(errorJson.error || "Search service failed.");
     }
     const results = await response.json();
-    
+
     if (results && results.length > 0) {
       const match = results[0];
       const lat = parseFloat(match.lat);
       const lon = parseFloat(match.lon);
-      
+
       locationLatInput.value = lat.toFixed(6);
       locationLngInput.value = lon.toFixed(6);
-      
+
       if (!locationNameInput.value || locationNameInput.value === "Current Location") {
         const shortName = match.display_name.split(",")[0].trim();
         locationNameInput.value = shortName;
       }
-      
+
       showBanner(dbSuccessBanner, `Found: ${match.display_name}`);
       searchAddressInput.value = "";
       searchSuggestions.classList.add("hidden");
@@ -1261,21 +767,20 @@ async function performAddressSearch() {
     showBanner(dbErrorBanner, "Search failed: " + error.message);
   } finally {
     searchAddressBtn.disabled = false;
-    const searchIcon = searchAddressBtn.querySelector(".material-symbols-outlined");
-    if (searchIcon) searchIcon.textContent = "search";
+    const icon = searchAddressBtn.querySelector(".material-symbols-outlined");
+    if (icon) icon.textContent = "search";
   }
 }
 
 searchAddressBtn.addEventListener("click", performAddressSearch);
 
-// Autocomplete Suggestions logic & Key-nav
 let autocompleteTimeout = null;
 let activeSuggestionIndex = -1;
 let currentSuggestions = [];
 
 searchAddressInput.addEventListener("keydown", (e) => {
   const items = searchSuggestions.querySelectorAll(".suggestion-item");
-  
+
   if (items.length === 0) {
     if (e.key === "Enter") {
       e.preventDefault();
@@ -1324,7 +829,7 @@ function updateActiveSuggestion(items) {
 
 searchAddressInput.addEventListener("input", () => {
   clearTimeout(autocompleteTimeout);
-  
+
   const queryText = searchAddressInput.value.trim();
   if (!shouldSearchAutocomplete(queryText)) {
     searchSuggestions.classList.add("hidden");
@@ -1335,10 +840,10 @@ searchAddressInput.addEventListener("input", () => {
     activeSuggestionIndex = -1;
     return;
   }
-  
+
   autocompleteTimeout = setTimeout(async () => {
     try {
-      const response = await fetch(`${API_BASE}/api/autocomplete`, {
+      const response = await api.send("/api/autocomplete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: queryText })
@@ -1368,19 +873,15 @@ function renderSuggestions(features) {
   searchAddressInput.setAttribute('aria-expanded', 'true');
   activeSuggestionIndex = -1;
   currentSuggestions = features;
-  
-  // ⚡ Bolt Performance Optimization:
-  // Using a DocumentFragment avoids triggering a costly DOM reflow and repaint
-  // on every single loop iteration. Batching DOM insertions significantly reduces
-  // main thread blocking time.
+
   const fragment = document.createDocumentFragment();
 
   features.forEach((feature, index) => {
     const props = feature.properties;
-    const coords = feature.geometry.coordinates; // [Lng, Lat]
-    
+    const coords = feature.geometry.coordinates;
+
     const displayName = buildPhotonDisplayName(props);
-    
+
     const item = document.createElement("div");
     item.className = "suggestion-item";
     item.id = `suggestion-${index}`;
@@ -1388,15 +889,15 @@ function renderSuggestions(features) {
     item.setAttribute("aria-selected", "false");
     item.textContent = displayName;
     item.setAttribute("data-index", index);
-    
+
     item.addEventListener("click", () => {
       const lon = coords[0];
       const lat = coords[1];
-      
+
       locationLatInput.value = lat.toFixed(6);
       locationLngInput.value = lon.toFixed(6);
       locationNameInput.value = props.name;
-      
+
       searchAddressInput.value = "";
       searchSuggestions.classList.add("hidden");
       searchAddressInput.setAttribute('aria-expanded', 'false');
@@ -1404,18 +905,17 @@ function renderSuggestions(features) {
       searchSuggestions.innerHTML = "";
       currentSuggestions = [];
       activeSuggestionIndex = -1;
-      
+
       showBanner(dbSuccessBanner, `Selected location: ${displayName}`);
       locationNameInput.focus();
     });
-    
+
     fragment.appendChild(item);
   });
 
   searchSuggestions.appendChild(fragment);
 }
 
-// Close suggestion dropdown if clicking outside
 document.addEventListener("click", (e) => {
   if (!searchAddressInput.contains(e.target) && !searchSuggestions.contains(e.target)) {
     searchSuggestions.classList.add("hidden");
@@ -1424,6 +924,8 @@ document.addEventListener("click", (e) => {
     activeSuggestionIndex = -1;
   }
 });
+
+// ── API Credits ──────────────────────────────────────────────────────
 
 function formatApiCreditsLabel(credits) {
   const limitPart = credits.limit != null ? ` / ${credits.limit}` : "";
@@ -1444,7 +946,7 @@ async function fetchApiCreditsStatus() {
   apiCreditsStatus.textContent = "Loading API credits…";
 
   try {
-    const response = await fetch(`${API_BASE}/api/getApiCredits`);
+    const response = await api.send("/api/getApiCredits");
     const result = await response.json();
     if (!response.ok) {
       throw new Error(result.error || "Failed to load API credits.");
@@ -1456,6 +958,8 @@ async function fetchApiCreditsStatus() {
     apiCreditsStatus.textContent = `Unable to load API credits: ${error.message}`;
   }
 }
+
+// ── Activity List ────────────────────────────────────────────────────
 
 function buildActivityListItem({
   itemKey,
@@ -1618,7 +1122,8 @@ document.querySelectorAll(".activity-filter-btn").forEach((btn) => {
   });
 });
 
-// Tab Switching logic
+// ── Tab Switching ────────────────────────────────────────────────────
+
 const allNavButtons = document.querySelectorAll(".nav-tab, .bottom-nav-item, .settings-gear-btn");
 const tabPanes = document.querySelectorAll(".tab-pane");
 
@@ -1626,7 +1131,6 @@ function switchTab(targetTab) {
   allNavButtons.forEach(b => {
     const tab = b.getAttribute("data-tab");
     const isActive = tab === targetTab;
-    // Bottom nav never includes settings — do not mark bottom items active for settings.
     if (b.classList.contains("bottom-nav-item") && targetTab === "settings") {
       b.classList.remove("active");
       b.setAttribute("aria-selected", "false");
@@ -1662,398 +1166,23 @@ if (logoHomeBtn) {
   logoHomeBtn.addEventListener("click", () => switchTab("main"));
 }
 
-const HOUR_OPTIONS = Array.from({ length: 24 }, (_, hour) => `${String(hour).padStart(2, "0")}:00`);
-const SCHEDULE_PRESETS = {
-  once: ["06:00"],
-  twice: ["06:00", "18:00"],
-  three: ["06:00", "12:00", "18:00"],
-  four: ["00:00", "06:00", "12:00", "18:00"]
-};
+// ── Keyboard shortcuts ───────────────────────────────────────────────
 
-function populateTimezoneDatalist() {
-  const list = document.getElementById("iana-timezone-list");
-  if (!list || typeof Intl.supportedValuesOf !== "function") return;
-  list.innerHTML = Intl.supportedValuesOf("timeZone")
-    .map((tz) => `<option value="${tz}"></option>`)
-    .join("");
-}
-
-function renderScheduleCheckboxes(selected) {
-  const host = document.getElementById("schedule-times-checkboxes");
-  if (!host) return;
-  const set = new Set(selected || []);
-  host.innerHTML = HOUR_OPTIONS.map((slot) => {
-    const labelHour = Number(slot.slice(0, 2));
-    const ampm = labelHour === 0 ? "12:00 AM" : labelHour < 12 ? `${labelHour}:00 AM` : labelHour === 12 ? "12:00 PM" : `${labelHour - 12}:00 PM`;
-    return `<label><input type="checkbox" data-schedule-slot="${slot}" ${set.has(slot) ? "checked" : ""}> ${ampm}</label>`;
-  }).join("");
-}
-
-function selectedScheduleSlots() {
-  return [...document.querySelectorAll("[data-schedule-slot]:checked")].map((el) => el.getAttribute("data-schedule-slot"));
-}
-
-async function fetchApplicationSettings() {
-  const response = await fetch(`${API_BASE}/api/application-settings`);
-  if (!response.ok) throw new Error("Failed to load application settings.");
-  const data = await response.json();
-  const tzInput = document.getElementById("schedule-timezone");
-  if (tzInput) tzInput.value = data.scheduleTimezone || "America/New_York";
-  const label = document.getElementById("schedule-timezone-label");
-  if (label) label.textContent = `Timezone: ${data.scheduleTimezone || "America/New_York"}`;
-  for (const radio of document.querySelectorAll('input[name="display-timezone-mode"]')) {
-    radio.checked = radio.value === (data.displayTimezoneMode || "schedule");
-  }
-  const displayTz = document.getElementById("display-timezone");
-  if (displayTz) {
-    displayTz.value = data.displayTimezone || "";
-    displayTz.hidden = data.displayTimezoneMode !== "selected";
-  }
-  renderScheduleCheckboxes(data.scheduleTimes || ["06:00", "12:00", "18:00"]);
-  const selfEnabled = document.getElementById("weekly-self-test-enabled");
-  if (selfEnabled) selfEnabled.checked = data.weeklySelfTestEnabled !== false;
-  const selfMode = document.getElementById("weekly-self-test-mode");
-  if (selfMode) selfMode.value = data.weeklySelfTestMode || "passive";
-  const selfDay = document.getElementById("weekly-self-test-day");
-  if (selfDay) selfDay.value = String(data.weeklySelfTestDay ?? 0);
-  const selfTime = document.getElementById("weekly-self-test-time");
-  if (selfTime) selfTime.value = data.weeklySelfTestTime || "10:00";
-  const quota = document.getElementById("quota-estimator");
-  if (quota && data.quota) {
-    const q = data.quota;
-    quota.innerHTML = `<strong>Estimated Sunsethue usage</strong><br>
-      ${q.scheduledRunsPerDay} runs/day × ${q.activeLocations} locations = ${q.estimatedRequestsPerDay} requests/day
-      (~${q.estimatedRequestsPer30Days}/30 days).
-      ${q.remainingCredits != null ? ` Remaining credits: ${q.remainingCredits}.` : ""}
-      <br><small>Channels, thresholds, and delivery retries do not add forecast quota. Manual reports are not included.</small>`;
-  }
-}
-
-async function fetchLocationRules() {
-  const response = await fetch(`${API_BASE}/api/location-notification-rules`);
-  if (!response.ok) throw new Error("Failed to load notification rules.");
-  const data = await response.json();
-  renderLocationRules(data.rules || []);
-}
-
-function renderLocationRules(rules) {
-  const host = document.getElementById("location-rules-grid");
-  if (!host) return;
-  const byLocation = new Map();
-  for (const rule of rules) {
-    if (!byLocation.has(rule.locationId)) byLocation.set(rule.locationId, []);
-    byLocation.get(rule.locationId).push(rule);
-  }
-  if (!locationsList.length) {
-    host.innerHTML = "<p class=\"pane-subtext\">Add locations to configure thresholds.</p>";
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && emailModal.isOpen()) {
+    emailModal.hide();
     return;
   }
-  const thresholdOptions = [
-    ["", "Always"],
-    ["20", "20%+"],
-    ["40", "40%+"],
-    ["50", "50%+"],
-    ["60", "60%+"],
-    ["70", "70%+"],
-    ["80", "80%+"],
-    ["off", "Off"]
-  ];
-  host.innerHTML = locationsList.map((loc) => {
-    const locRules = byLocation.get(loc.id) || [];
-    const cells = ["email", "pushover", "webpush", "webhook"].map((channel) => {
-      const rule = locRules.find((r) => r.channel === channel);
-      const enabled = rule?.enabled !== false && rule?.enabled !== 0;
-      const threshold = !enabled ? "off" : (rule?.thresholdPercent == null ? "" : String(rule.thresholdPercent));
-      const options = thresholdOptions.map(([value, label]) =>
-        `<option value="${value}" ${threshold === value ? "selected" : ""}>${label}</option>`
-      ).join("");
-      return `<label>${channel}<select data-rule-location="${loc.id}" data-rule-channel="${channel}">${options}</select></label>`;
-    }).join("");
-    return `<div class="form-card"><strong>${loc.name}</strong><div class="settings-field-grid">${cells}</div></div>`;
-  }).join("");
-  host.querySelectorAll("select[data-rule-location]").forEach((select) => {
-    select.addEventListener("change", async () => {
-      const locationId = select.getAttribute("data-rule-location");
-      const channel = select.getAttribute("data-rule-channel");
-      const value = select.value;
-      const enabled = value !== "off";
-      const thresholdPercent = !enabled || value === "" ? null : Number(value);
-      try {
-        const response = await fetch(`${API_BASE}/api/location-notification-rules`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ locationId, channel, enabled, thresholdPercent, eventScope: "either" })
-        });
-        if (!response.ok) throw new Error("Unable to save rule.");
-        showBanner(dbSuccessBanner, "Notification rule saved.");
-      } catch (error) {
-        showBanner(dbErrorBanner, error.message);
-      }
-    });
-  });
-}
-
-async function fetchWebPushDevices() {
-  const response = await fetch(`${API_BASE}/api/web-push/subscriptions`);
-  if (!response.ok) throw new Error("Failed to load browser devices.");
-  const data = await response.json();
-  const host = document.getElementById("web-push-devices");
-  if (!host) return;
-  const devices = data.devices || [];
-  if (!devices.length) {
-    host.innerHTML = "<p class=\"pane-subtext\">No devices registered yet.</p>";
+  if (event.key === "Escape" && locationDrawer?.classList.contains("open")) {
+    closeLocationDrawer();
     return;
   }
-  host.innerHTML = devices.map((device) =>
-    `<div class="settings-toggle-row"><span>${device.deviceName} — ${device.enabled ? "Enabled" : "Disabled"}</span>
-      <button type="button" class="btn btn-secondary" data-push-disable="${device.id}">Disable</button>
-      <button type="button" class="btn btn-secondary" data-push-remove="${device.id}">Remove</button></div>`
-  ).join("");
-  host.querySelectorAll("[data-push-disable]").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      await fetch(`${API_BASE}/api/web-push/subscriptions/${btn.getAttribute("data-push-disable")}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ enabled: false })
-      });
-      await fetchWebPushDevices();
-    });
-  });
-  host.querySelectorAll("[data-push-remove]").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      await fetch(`${API_BASE}/api/web-push/subscriptions/${btn.getAttribute("data-push-remove")}`, { method: "DELETE" });
-      await fetchWebPushDevices();
-    });
-  });
-}
-
-function urlBase64ToUint8Array(base64String) {
-  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
-  const raw = atob(base64);
-  return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
-}
-
-document.getElementById("application-settings-form")?.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const mode = document.querySelector('input[name="display-timezone-mode"]:checked')?.value || "schedule";
-  const body = {
-    scheduleTimezone: document.getElementById("schedule-timezone")?.value || "America/New_York",
-    displayTimezoneMode: mode,
-    displayTimezone: document.getElementById("display-timezone")?.value || null,
-    scheduleTimes: selectedScheduleSlots(),
-    weeklySelfTestEnabled: document.getElementById("weekly-self-test-enabled")?.checked !== false,
-    weeklySelfTestMode: document.getElementById("weekly-self-test-mode")?.value || "passive",
-    weeklySelfTestDay: Number(document.getElementById("weekly-self-test-day")?.value || 0),
-    weeklySelfTestTime: document.getElementById("weekly-self-test-time")?.value || "10:00"
-  };
-  try {
-    const response = await fetch(`${API_BASE}/api/application-settings`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body)
-    });
-    if (!response.ok) throw new Error("Schedule settings were not accepted.");
-    showBanner(dbSuccessBanner, "Schedule settings saved.");
-    await fetchApplicationSettings();
-  } catch (error) {
-    showBanner(dbErrorBanner, error.message);
+  if (event.key === "Escape" && editingLocationId) {
+    editingLocationId = null;
+    renderLocations();
   }
 });
 
-document.querySelectorAll("[data-schedule-preset]").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    const key = btn.getAttribute("data-schedule-preset");
-    renderScheduleCheckboxes(SCHEDULE_PRESETS[key] || SCHEDULE_PRESETS.three);
-  });
-});
-
-document.querySelectorAll('input[name="display-timezone-mode"]').forEach((radio) => {
-  radio.addEventListener("change", () => {
-    const displayTz = document.getElementById("display-timezone");
-    if (displayTz) displayTz.hidden = radio.value !== "selected" || !radio.checked
-      ? document.querySelector('input[name="display-timezone-mode"]:checked')?.value !== "selected"
-      : false;
-  });
-});
-
-document.getElementById("rules-copy-all-btn")?.addEventListener("click", async () => {
-  if (!locationsList[0]) return;
-  await fetch(`${API_BASE}/api/location-notification-rules`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ action: "copy-to-all", sourceLocationId: locationsList[0].id })
-  });
-  await fetchLocationRules();
-  showBanner(dbSuccessBanner, "Rules copied to all locations.");
-});
-
-document.getElementById("rules-reset-btn")?.addEventListener("click", async () => {
-  await fetch(`${API_BASE}/api/location-notification-rules`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ action: "reset-defaults" })
-  });
-  await fetchLocationRules();
-  showBanner(dbSuccessBanner, "Rules reset to 50% defaults.");
-});
-
-document.getElementById("enable-web-push-btn")?.addEventListener("click", async () => {
-  try {
-    if (DEMO_READ_ONLY) throw new Error("DEMO_READ_ONLY");
-    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
-      throw new Error("Browser push is not supported in this browser.");
-    }
-    const reg = await navigator.serviceWorker.register("/service-worker.js");
-    const permission = await Notification.requestPermission();
-    if (permission !== "granted") throw new Error("Notification permission was not granted.");
-    const vapidRes = await fetch(`${API_BASE}/api/web-push/vapid-public-key`);
-    const vapid = await vapidRes.json();
-    if (!vapid.publicKey) throw new Error("Web Push is not configured on the server.");
-    const sub = await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(vapid.publicKey)
-    });
-    const json = sub.toJSON();
-    const deviceName = window.prompt("Name this device", "This device") || "This device";
-    const response = await fetch(`${API_BASE}/api/web-push/subscriptions`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        endpoint: json.endpoint,
-        keys: json.keys,
-        deviceName
-      })
-    });
-    if (!response.ok) throw new Error("Unable to register this device.");
-    showBanner(dbSuccessBanner, "Browser notifications enabled on this device.");
-    await fetchWebPushDevices();
-  } catch (error) {
-    showBanner(dbErrorBanner, error.message);
-  }
-});
-
-document.getElementById("webhook-credentials-form")?.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  try {
-    const putRes = await fetch(`${API_BASE}/api/webhook-credentials`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json", ...CREDENTIAL_ADMIN_HEADER },
-      body: JSON.stringify({
-        url: document.getElementById("webhook-url")?.value || "",
-        signingSecret: document.getElementById("webhook-signing-secret")?.value || ""
-      })
-    });
-    if (!putRes.ok) throw new Error("Unable to save webhook credentials.");
-    const enabled = Boolean(document.getElementById("notification-webhook-enabled")?.checked);
-    const settingsRes = await fetch(`${API_BASE}/api/notification-settings`);
-    const settings = await settingsRes.json();
-    await fetch(`${API_BASE}/api/notification-settings`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        emailEnabled: settings.emailEnabled,
-        emailTo: settings.emailTo,
-        pushoverEnabled: settings.pushoverEnabled,
-        pushoverDevice: settings.pushoverDevice,
-        pushoverPriority: settings.pushoverPriority,
-        pushoverSound: settings.pushoverSound,
-        webhookEnabled: enabled
-      })
-    });
-    showBanner(dbSuccessBanner, "Webhook saved.");
-    await fetchNotificationSettings();
-  } catch (error) {
-    showBanner(dbErrorBanner, error.message);
-  }
-});
-
-document.getElementById("test-webhook-btn")?.addEventListener("click", async () => {
-  try {
-    const response = await fetch(`${API_BASE}/api/notifications/test`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ channel: "webhook" })
-    });
-    if (!response.ok) throw new Error("Webhook test failed.");
-    showBanner(dbSuccessBanner, "Webhook test queued.");
-  } catch (error) {
-    showBanner(dbErrorBanner, error.message);
-  }
-});
-
-document.getElementById("remove-webhook-btn")?.addEventListener("click", async () => {
-  try {
-    await fetch(`${API_BASE}/api/webhook-credentials`, {
-      method: "DELETE",
-      headers: { ...CREDENTIAL_ADMIN_HEADER }
-    });
-    showBanner(dbSuccessBanner, "Webhook removed.");
-    await fetchNotificationSettings();
-  } catch (error) {
-    showBanner(dbErrorBanner, error.message);
-  }
-});
-
-populateTimezoneDatalist();
-
-// Run
-document.getElementById("clear-history-scopes")?.addEventListener("change", () => {
-  const all = document.querySelector("[data-history-scope=\"all\"]");
-  if (all?.checked) {
-    document.querySelectorAll("[data-history-scope]").forEach((el) => {
-      if (el !== all) el.checked = false;
-    });
-  }
-  refreshHistoryCounts();
-});
-
-document.getElementById("history-export-btn")?.addEventListener("click", async () => {
-  const status = document.getElementById("clear-history-status");
-  try {
-    if (DEMO_READ_ONLY) throw new Error("DEMO_READ_ONLY");
-    const scopes = selectedHistoryScopes();
-    const response = await fetch(`${API_BASE}/api/history/export?scopes=${encodeURIComponent(scopes.join(","))}`);
-    if (!response.ok) throw new Error("Export failed");
-    const data = await response.json();
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "sunsethue-history-export.json";
-    a.click();
-    URL.revokeObjectURL(url);
-    if (status) status.textContent = "Export downloaded.";
-  } catch (error) {
-    if (status) status.textContent = error?.message === "DEMO_READ_ONLY" ? "Demo mode — export disabled." : "Export failed.";
-  }
-});
-
-document.getElementById("history-clear-btn")?.addEventListener("click", async () => {
-  const status = document.getElementById("clear-history-status");
-  try {
-    if (DEMO_READ_ONLY) throw new Error("DEMO_READ_ONLY");
-    const scopes = selectedHistoryScopes();
-    if (scopes.length === 0) throw new Error("Select a scope");
-    const confirmValue = document.getElementById("clear-history-confirm")?.value || "";
-    const response = await fetch(`${API_BASE}/api/history/clear`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ scopes, confirm: confirmValue })
-    });
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      throw new Error(err.code || "Clear failed");
-    }
-    if (status) status.textContent = "History cleared.";
-    await Promise.all([fetchRuns(), fetchNotificationDeliveries(), fetchOperationalStatus(), refreshHistoryCounts()]);
-  } catch (error) {
-    if (status) {
-      status.textContent = error?.message === "DEMO_READ_ONLY"
-        ? "Demo mode — clear disabled."
-        : `Clear failed: ${error.message}`;
-    }
-  }
-});
+// ── Run ──────────────────────────────────────────────────────────────
 
 initApp();

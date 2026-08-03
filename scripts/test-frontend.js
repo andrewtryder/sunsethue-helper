@@ -14,11 +14,35 @@ test("Frontend File Structure & Integrity Checks", () => {
   const cssPath = path.join(publicDir, "style.css");
   const jsPath = path.join(publicDir, "app.js");
   const helpersPath = path.join(publicDir, "lib", "helpers.js");
+  const apiClientPath = path.join(publicDir, "api", "client.js");
+  const bannersPath = path.join(publicDir, "ui", "banners.js");
+  const dialogPath = path.join(publicDir, "ui", "dialog.js");
+  const formsPath = path.join(publicDir, "ui", "forms.js");
+  const schedulePath = path.join(publicDir, "features", "schedule.js");
+  const thresholdsPath = path.join(publicDir, "features", "thresholds.js");
+  const notificationsPath = path.join(publicDir, "features", "notifications.js");
+  const webpushPath = path.join(publicDir, "features", "webpush.js");
+  const webhookPath = path.join(publicDir, "features", "webhook.js");
+  const healthPath = path.join(publicDir, "features", "health.js");
+  const historyPath = path.join(publicDir, "features", "history.js");
+  const setupStatusPath = path.join(publicDir, "features", "setup-status.js");
 
   assert.ok(fs.existsSync(htmlPath), "index.html should exist");
   assert.ok(fs.existsSync(cssPath), "style.css should exist");
   assert.ok(fs.existsSync(jsPath), "app.js should exist");
   assert.ok(fs.existsSync(helpersPath), "lib/helpers.js should exist");
+  assert.ok(fs.existsSync(apiClientPath), "api/client.js should exist");
+  assert.ok(fs.existsSync(bannersPath), "ui/banners.js should exist");
+  assert.ok(fs.existsSync(dialogPath), "ui/dialog.js should exist");
+  assert.ok(fs.existsSync(formsPath), "ui/forms.js should exist");
+  assert.ok(fs.existsSync(schedulePath), "features/schedule.js should exist");
+  assert.ok(fs.existsSync(thresholdsPath), "features/thresholds.js should exist");
+  assert.ok(fs.existsSync(notificationsPath), "features/notifications.js should exist");
+  assert.ok(fs.existsSync(webpushPath), "features/webpush.js should exist");
+  assert.ok(fs.existsSync(webhookPath), "features/webhook.js should exist");
+  assert.ok(fs.existsSync(healthPath), "features/health.js should exist");
+  assert.ok(fs.existsSync(historyPath), "features/history.js should exist");
+  assert.ok(fs.existsSync(setupStatusPath), "features/setup-status.js should exist");
 
   // 2. Verify files are not empty
   assert.ok(fs.statSync(htmlPath).size > 100, "index.html should not be empty");

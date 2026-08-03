@@ -133,14 +133,17 @@ test("Pages Functions only intercept /api/*", async () => {
 });
 
 test("the frontend makes same-origin API calls", async () => {
+  const clientJs = await read("public/api/client.js");
+  assert.match(clientJs, /const API_BASE = ""/);
+  assert.doesNotMatch(clientJs, /workers\.dev/);
   const appJs = await read("public/app.js");
-  assert.match(appJs, /const API_BASE = ""/);
   assert.doesNotMatch(appJs, /workers\.dev/);
 });
 
 test("no tracked source or config references a public workers.dev API origin", async () => {
   const files = [
     "public/app.js",
+    "public/api/client.js",
     "public/_routes.json",
     "wrangler.example.toml",
     "wrangler.worker.example.toml",

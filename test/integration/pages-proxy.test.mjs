@@ -229,7 +229,9 @@ test("static asset routes are not defined as Pages API proxy targets", async () 
   );
   assert.deepEqual(routes.include, ["/api/*"]);
   assert.equal(routes.version, 1);
+  const clientJs = await readFile(new URL("../../public/api/client.js", import.meta.url), "utf8");
+  assert.match(clientJs, /const API_BASE = ""/);
+  assert.doesNotMatch(clientJs, /workers\.dev/);
   const appJs = await readFile(new URL("../../public/app.js", import.meta.url), "utf8");
-  assert.match(appJs, /const API_BASE = ""/);
   assert.doesNotMatch(appJs, /workers\.dev/);
 });

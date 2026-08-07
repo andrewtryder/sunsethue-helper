@@ -118,6 +118,8 @@ test("Frontend File Structure & Integrity Checks", () => {
     "notification-webhook-enabled",
     "application-settings-form",
     "location-rules-grid",
+    "schedule-times-pills",
+    "check-times-locations-section",
     "enable-web-push-btn",
     "webhook-credentials-form",
   ];
@@ -146,6 +148,8 @@ test("Frontend File Structure & Integrity Checks", () => {
     ".status-badge",
     ".channel-card-header",
     ".switch-ui",
+    ".time-pills",
+    ".segmented-control",
     ".quality-indicator",
     ".quality-meter",
   ];

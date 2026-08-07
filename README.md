@@ -1,6 +1,6 @@
 # Sunsethue Helper
 
-Sunsethue Helper checks sunrise and sunset photo-quality forecasts for the places you care about, and can email or push-notify you when conditions look good. It is a private, single-user tool — not a multi-tenant product.
+Sunsethue Helper checks sunrise and sunset photo-quality forecasts for the places you care about, and can notify you via email, browser push, webhook, and Pushover when conditions look good. It is a private, single-user tool — not a multi-tenant product.
 
 ![The Forecast page, showing sunrise and sunset quality for each saved location.](docs/assets/forecast-dashboard.png)
 
@@ -9,9 +9,9 @@ Sunsethue Helper checks sunrise and sunset photo-quality forecasts for the place
 ## What it does
 
 - Save the locations you want to watch
-- Run scheduled forecast checks for upcoming sunrises and sunsets
-- Notify you by email and/or Pushover when quality looks worth shooting
-- Keep an activity log of past runs so you can see what was sent
+- Run scheduled forecast checks for upcoming sunrises and sunsets (with dynamic scheduling and thresholds)
+- Notify you by email, browser push, webhook, and Pushover when quality looks worth shooting
+- Keep an activity log of past runs and run self-tests to ensure health
 
 **[View static demo](https://andrewtryder.github.io/sunsethue-helper/)** · **[View screenshots](docs/assets/forecast-dashboard.png)** · **[Deploy your own instance](#for-developers)**
 
@@ -176,6 +176,12 @@ Use the tab's test buttons and delivery history to test or retry a failed channe
 `schema.sql` is intentionally the bootstrap source of truth, not a migration framework. Reapply it when provisioning or adding these idempotent tables. Before production schema work, take a D1 backup and confirm Time Travel retention. Rotate provider credentials via the Notifications UI (which writes to Secrets Store), then redeploy if needed; never put credentials in D1, browser storage, commits, or public issue reports.
 
 Credential store layout, bootstrap, and incident disable steps: [docs/secrets-store-credentials.md](docs/secrets-store-credentials.md). Operational alerts and retention: [docs/operations.md](docs/operations.md).
+
+#### Webhook security and SSRF
+
+Webhook delivery includes multiple Server-Side Request Forgery (SSRF) mitigations: it enforces HTTPS, blocks common private IPv4 literals, blocks raw IPv6 literals, blocks `localhost`, restricts redirects, and applies a strict 10-second timeout. It also HMAC-signs the exact body.
+
+**Limitation:** The webhook dispatcher does *not* perform DNS-resolution validation prior to the HTTP request. Consequently, if a public-looking hostname (e.g., `internal.example.com`) resolves to a private IP address, the request may still be routed to that internal network destination. In this application, the risk is mitigated because only the authenticated owner can configure the webhook, but operators self-hosting this software should be aware of this limitation before calling the SSRF protection comprehensive.
 
 ### Access automation
 

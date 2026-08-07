@@ -3,7 +3,7 @@
   "version": "1.22.0",
   "private": true,
   "type": "module",
-  "description": "Daily sunrise/sunset quality notifier on Cloudflare Pages, Workers, D1, Secrets Store, Access, email, and Pushover.",
+  "description": "Daily sunrise/sunset quality notifier on Cloudflare Pages, Workers, D1, Secrets Store, Access, email, browser push, webhook, and Pushover. Includes dynamic scheduling, thresholds, and self-tests.",
   "license": "MIT",
   "repository": {
     "type": "git",

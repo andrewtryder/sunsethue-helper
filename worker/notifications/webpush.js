@@ -6,6 +6,7 @@ import {
 } from "../repositories/webpush.js";
 import { NotificationError } from "./errors.js";
 import { buildPushoverContent, parseNotificationPayload } from "./payload.js";
+import { registerSecretForRedaction } from "../http.js";
 
 /**
  * Resolve VAPID public configuration from Worker env (non-secret) and private key
@@ -32,6 +33,9 @@ export async function resolveWebPushConfig(env) {
   } else if (typeof env.WEB_PUSH_VAPID_PRIVATE_KEY === "string") {
     // Local/test secret fallback (never commit real values).
     privateKeyPem = env.WEB_PUSH_VAPID_PRIVATE_KEY;
+  }
+  if (privateKeyPem) {
+    registerSecretForRedaction(privateKeyPem);
   }
   return {
     configured: Boolean(publicKey && subject && privateKeyPem),

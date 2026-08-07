@@ -4,6 +4,26 @@ All notable changes to this project are documented in this file.
 
 This changelog follows [Conventional Commits](https://www.conventionalcommits.org/) and is maintained by [release-please](https://github.com/googleapis/release-please). Release sections group changes by commit type (`feat`, `fix`, etc.). Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.22.0](https://github.com/andrewtryder/sunsethue-helper/compare/v1.21.0...v1.22.0) (2026-08-07)
+
+
+### Features
+
+* **notifications:** add health, self-test, clear history, and adoption CLIs ([#71](https://github.com/andrewtryder/sunsethue-helper/issues/71)) ([43af9f7](https://github.com/andrewtryder/sunsethue-helper/commit/43af9f7b2d49dbde1e79ea70d8c230ae4beb1508))
+* **notifications:** add scheduling, thresholds, web push, and webhook ([#70](https://github.com/andrewtryder/sunsethue-helper/issues/70)) ([4343d39](https://github.com/andrewtryder/sunsethue-helper/commit/4343d39d16019528ce87f0bf8457b359f2cdaaab))
+* prepare for next release (timezone, logging, cleanup) ([#83](https://github.com/andrewtryder/sunsethue-helper/issues/83)) ([2427231](https://github.com/andrewtryder/sunsethue-helper/commit/242723167b6430e10db45019faac9fd835306189))
+* **worker:** redact notification secrets from logs ([#82](https://github.com/andrewtryder/sunsethue-helper/issues/82)) ([8b2b021](https://github.com/andrewtryder/sunsethue-helper/commit/8b2b021ca6f2de89da9ce21ee29760b2d33cf524))
+
+
+### Bug Fixes
+
+* **ci:** pin wrangler to exact version ([#79](https://github.com/andrewtryder/sunsethue-helper/issues/79)) ([0d2fc6b](https://github.com/andrewtryder/sunsethue-helper/commit/0d2fc6b61104d36f6095936c302bd382e7659072))
+* **scripts:** remove leading sql comment in db-upgrade-r2 ([#80](https://github.com/andrewtryder/sunsethue-helper/issues/80)) ([ad9510f](https://github.com/andrewtryder/sunsethue-helper/commit/ad9510fe303c0309fb5f6614da35de73dac5ccc9))
+* **scripts:** remove leading sql comment in db-upgrade-r2 to fix yargs parsing ([ad9510f](https://github.com/andrewtryder/sunsethue-helper/commit/ad9510fe303c0309fb5f6614da35de73dac5ccc9))
+* **secrets:** add missing secrets to bootstrap specs ([#85](https://github.com/andrewtryder/sunsethue-helper/issues/85)) ([59ef91c](https://github.com/andrewtryder/sunsethue-helper/commit/59ef91c43c86919e4632a585d5175b3e70ba4ad0))
+* **test:** update expected pushover error code ([#84](https://github.com/andrewtryder/sunsethue-helper/issues/84)) ([1e63637](https://github.com/andrewtryder/sunsethue-helper/commit/1e63637b18c90ca929ca1fc7323cc3d42a90565e))
+* **worker:** preserve notification error cause for logging ([#81](https://github.com/andrewtryder/sunsethue-helper/issues/81)) ([1bf303a](https://github.com/andrewtryder/sunsethue-helper/commit/1bf303a143525b2022a7e120e78f6f2855f05ab2))
+
 ## [1.21.0](https://github.com/andrewtryder/sunsethue-helper/compare/v1.20.0...v1.21.0) (2026-08-01)
 
 

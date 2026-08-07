@@ -49,7 +49,6 @@ function runSql(project, mode, sql, dryRun) {
 
 function buildUpgradeSql() {
   return `
--- Outbox rebuild: drop fixed channel enumeration; add deliveryTargetId.
 CREATE TABLE IF NOT EXISTS notification_outbox_new (
   id TEXT PRIMARY KEY,
   runId TEXT NOT NULL,

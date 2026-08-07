@@ -361,19 +361,6 @@
               <input id="display-timezone" class="form-input" type="text" list="iana-timezone-list" placeholder="IANA timezone" autocomplete="off" hidden>
             </fieldset>
             <datalist id="iana-timezone-list"></datalist>
-            <div class="form-group">
-              <span class="settings-section-title">Forecast update schedule</span>
-              <p class="pane-subtext" id="schedule-timezone-label">Timezone: America/New_York</p>
-              <div id="schedule-times-checkboxes" class="settings-field-grid"></div>
-              <p class="pane-subtext">Whole-hour slots only. Selecting 1:00 AM or 2:00 AM can be affected by DST.</p>
-              <div class="form-actions form-actions-compact">
-                <button type="button" class="btn btn-secondary" data-schedule-preset="once">Once daily</button>
-                <button type="button" class="btn btn-secondary" data-schedule-preset="twice">Twice daily</button>
-                <button type="button" class="btn btn-secondary" data-schedule-preset="three">Three times</button>
-                <button type="button" class="btn btn-secondary" data-schedule-preset="four">Four times</button>
-              </div>
-            </div>
-            <div id="quota-estimator" class="form-group" aria-live="polite"></div>
             <fieldset class="form-group" id="weekly-self-test-fields">
               <legend>Weekly self-test</legend>
               <label><input id="weekly-self-test-enabled" type="checkbox" checked> Enable weekly self-test</label>
@@ -429,13 +416,43 @@
           <p id="clear-history-status" class="action-status" role="status"></p>
         </section>
 
-        <section class="form-card settings-card" aria-labelledby="location-rules-title">
-          <h3 id="location-rules-title">Per-location notification thresholds</h3>
-          <p class="pane-subtext">A location notifies a channel when sunrise or sunset meets that channel’s threshold. Notification channels do not change forecast quota.</p>
-          <div id="location-rules-grid"></div>
-          <div class="form-actions form-actions-compact">
-            <button type="button" id="rules-copy-all-btn" class="btn btn-secondary">Copy first location’s rules to all</button>
-            <button type="button" id="rules-reset-btn" class="btn btn-secondary">Reset to defaults (50%)</button>
+        <section class="form-card settings-card" aria-labelledby="check-times-locations-title" id="check-times-locations-section">
+          <h3 id="check-times-locations-title">Check times &amp; locations</h3>
+          <p class="pane-subtext">Forecast checks run on the global times below. Each location uses those times and can set its own notification thresholds.</p>
+
+          <div class="form-group" id="check-times-block">
+            <span class="settings-section-title" id="check-times-heading">Check times</span>
+            <p class="pane-subtext" id="schedule-timezone-label">Timezone: America/New_York</p>
+            <div id="schedule-times-pills" class="time-pills" role="list" aria-labelledby="check-times-heading"></div>
+            <!-- Legacy host id for older selectors -->
+            <div id="schedule-times-checkboxes" class="visually-hidden" aria-hidden="true"></div>
+            <div class="time-pills-actions">
+              <label class="visually-hidden" for="add-schedule-time-select">Add check time</label>
+              <select id="add-schedule-time-select" class="form-input time-pill-add-select" aria-label="Add check time">
+                <option value="">Add time…</option>
+              </select>
+              <div class="form-actions form-actions-compact">
+                <button type="button" class="btn btn-secondary" data-schedule-preset="once">Once daily</button>
+                <button type="button" class="btn btn-secondary" data-schedule-preset="twice">Twice daily</button>
+                <button type="button" class="btn btn-secondary" data-schedule-preset="three">Three times</button>
+                <button type="button" class="btn btn-secondary" data-schedule-preset="four">Four times</button>
+              </div>
+            </div>
+            <p class="pane-subtext">Whole-hour slots only (max 8). Selecting 1:00 AM or 2:00 AM can be affected by DST.</p>
+            <div class="form-actions form-actions-compact">
+              <button type="button" class="btn btn-primary" id="save-check-times-btn">Save check times</button>
+            </div>
+            <div id="quota-estimator" class="form-group" aria-live="polite"></div>
+          </div>
+
+          <div class="form-group" id="location-thresholds-block">
+            <span class="settings-section-title" id="location-rules-title">Locations</span>
+            <p class="pane-subtext">A location notifies a channel when sunrise or sunset meets that channel’s threshold. Notification channels do not change forecast quota.</p>
+            <div id="location-rules-grid" class="location-rules-list"></div>
+            <div class="form-actions form-actions-compact">
+              <button type="button" id="rules-copy-all-btn" class="btn btn-secondary">Copy first location’s rules to all</button>
+              <button type="button" id="rules-reset-btn" class="btn btn-secondary">Reset to defaults (50%)</button>
+            </div>
           </div>
         </section>
       </div>

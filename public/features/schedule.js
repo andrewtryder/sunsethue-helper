@@ -1,3 +1,13 @@
+const MAX_SCHEDULE_SLOTS = 8;
+
+function formatHourLabel(slot) {
+  const labelHour = Number(String(slot).slice(0, 2));
+  if (labelHour === 0) return "12:00 AM";
+  if (labelHour < 12) return `${labelHour}:00 AM`;
+  if (labelHour === 12) return "12:00 PM";
+  return `${labelHour - 12}:00 PM`;
+}
+
 export function initSchedule({ api, showSuccess, showError, onSettingsUpdate, capabilities }) {
   const HOUR_OPTIONS = Array.from({ length: 24 }, (_, hour) => `${String(hour).padStart(2, "0")}:00`);
   const SCHEDULE_PRESETS = {
@@ -7,6 +17,8 @@ export function initSchedule({ api, showSuccess, showError, onSettingsUpdate, ca
     four: ["00:00", "06:00", "12:00", "18:00"]
   };
 
+  let selectedTimes = ["06:00", "12:00", "18:00"];
+
   function populateTimezoneDatalist() {
     const list = document.getElementById("iana-timezone-list");
     if (!list || typeof Intl.supportedValuesOf !== "function") return;
@@ -15,20 +27,55 @@ export function initSchedule({ api, showSuccess, showError, onSettingsUpdate, ca
       .join("");
   }
 
-  function renderScheduleCheckboxes(selected) {
-    const host = document.getElementById("schedule-times-checkboxes");
-    if (!host) return;
-    const set = new Set(selected || []);
-    host.innerHTML = HOUR_OPTIONS.map((slot) => {
-      const labelHour = Number(slot.slice(0, 2));
-      const ampm = labelHour === 0 ? "12:00 AM" : labelHour < 12 ? `${labelHour}:00 AM` : labelHour === 12 ? "12:00 PM" : `${labelHour - 12}:00 PM`;
-      return `<label><input type="checkbox" data-schedule-slot="${slot}" ${set.has(slot) ? "checked" : ""}> ${ampm}</label>`;
-    }).join("");
+  function selectedScheduleSlots() {
+    return [...selectedTimes].sort();
   }
 
-  function selectedScheduleSlots() {
-    return [...document.querySelectorAll("[data-schedule-slot]:checked")].map((el) => el.getAttribute("data-schedule-slot"));
+  function renderSchedulePills(selected) {
+    selectedTimes = [...new Set(selected || [])]
+      .filter((slot) => HOUR_OPTIONS.includes(slot))
+      .sort()
+      .slice(0, MAX_SCHEDULE_SLOTS);
+
+    const host = document.getElementById("schedule-times-pills")
+      || document.getElementById("schedule-times-checkboxes");
+    if (!host) return;
+
+    if (host.id === "schedule-times-pills") {
+      host.innerHTML = selectedTimes.map((slot) => `
+        <span class="time-pill" role="listitem" data-schedule-slot="${slot}">
+          <span>${formatHourLabel(slot)}</span>
+          <button type="button" class="time-pill-remove" data-remove-slot="${slot}" aria-label="Remove ${formatHourLabel(slot)}" ${!capabilities?.mutations ? "disabled" : ""}>&times;</button>
+        </span>`).join("") || "<p class=\"pane-subtext\">No check times selected.</p>";
+
+      host.querySelectorAll("[data-remove-slot]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          if (!capabilities?.mutations) return;
+          const slot = btn.getAttribute("data-remove-slot");
+          renderSchedulePills(selectedTimes.filter((t) => t !== slot));
+        });
+      });
+    } else {
+      // Legacy checkbox host fallback
+      const set = new Set(selectedTimes);
+      host.innerHTML = HOUR_OPTIONS.map((slot) => {
+        const ampm = formatHourLabel(slot);
+        return `<label><input type="checkbox" data-schedule-slot="${slot}" ${set.has(slot) ? "checked" : ""}> ${ampm}</label>`;
+      }).join("");
+    }
+
+    const addSelect = document.getElementById("add-schedule-time-select");
+    if (addSelect) {
+      const available = HOUR_OPTIONS.filter((slot) => !selectedTimes.includes(slot));
+      const atMax = selectedTimes.length >= MAX_SCHEDULE_SLOTS;
+      addSelect.disabled = !capabilities?.mutations || atMax || available.length === 0;
+      addSelect.innerHTML = `<option value="">${atMax ? "Maximum 8 times" : "Add time…"}</option>`
+        + available.map((slot) => `<option value="${slot}">${formatHourLabel(slot)}</option>`).join("");
+    }
   }
+
+  // Back-compat alias used by older call sites / tests
+  const renderScheduleCheckboxes = renderSchedulePills;
 
   async function fetchApplicationSettings() {
     const data = await api.get("/api/application-settings");
@@ -44,7 +91,7 @@ export function initSchedule({ api, showSuccess, showError, onSettingsUpdate, ca
       displayTz.value = data.displayTimezone || "";
       displayTz.hidden = data.displayTimezoneMode !== "selected";
     }
-    renderScheduleCheckboxes(data.scheduleTimes || ["06:00", "12:00", "18:00"]);
+    renderSchedulePills(data.scheduleTimes || ["06:00", "12:00", "18:00"]);
     const selfEnabled = document.getElementById("weekly-self-test-enabled");
     if (selfEnabled) selfEnabled.checked = data.weeklySelfTestEnabled !== false;
     const selfMode = document.getElementById("weekly-self-test-mode");
@@ -62,7 +109,7 @@ export function initSchedule({ api, showSuccess, showError, onSettingsUpdate, ca
         ${q.remainingCredits != null ? ` Remaining credits: ${q.remainingCredits}.` : ""}
         <br><small>Channels, thresholds, and delivery retries do not add forecast quota. Manual reports are not included.</small>`;
     }
-    
+
     if (typeof onSettingsUpdate === "function") {
       onSettingsUpdate(data);
     }
@@ -100,23 +147,49 @@ export function initSchedule({ api, showSuccess, showError, onSettingsUpdate, ca
     }
   });
 
+  document.getElementById("add-schedule-time-select")?.addEventListener("change", (event) => {
+    const value = event.target.value;
+    if (!value || !capabilities?.mutations) {
+      event.target.value = "";
+      return;
+    }
+    if (selectedTimes.includes(value) || selectedTimes.length >= MAX_SCHEDULE_SLOTS) {
+      event.target.value = "";
+      return;
+    }
+    renderSchedulePills([...selectedTimes, value]);
+    event.target.value = "";
+  });
+
+  document.getElementById("save-check-times-btn")?.addEventListener("click", () => {
+    document.getElementById("application-settings-form")?.requestSubmit();
+  });
+  if (!capabilities?.mutations) {
+    const saveTimesBtn = document.getElementById("save-check-times-btn");
+    if (saveTimesBtn) {
+      saveTimesBtn.disabled = true;
+      saveTimesBtn.title = "Saving schedule settings is disabled in the static demo.";
+    }
+  }
+
   document.querySelectorAll("[data-schedule-preset]").forEach((btn) => {
     btn.addEventListener("click", () => {
+      if (!capabilities?.mutations) return;
       const key = btn.getAttribute("data-schedule-preset");
-      renderScheduleCheckboxes(SCHEDULE_PRESETS[key] || SCHEDULE_PRESETS.three);
+      renderSchedulePills(SCHEDULE_PRESETS[key] || SCHEDULE_PRESETS.three);
     });
   });
 
   document.querySelectorAll('input[name="display-timezone-mode"]').forEach((radio) => {
     radio.addEventListener("change", () => {
       const displayTz = document.getElementById("display-timezone");
-      if (displayTz) displayTz.hidden = radio.value !== "selected" || !radio.checked
-        ? document.querySelector('input[name="display-timezone-mode"]:checked')?.value !== "selected"
-        : false;
+      if (displayTz) {
+        displayTz.hidden = document.querySelector('input[name="display-timezone-mode"]:checked')?.value !== "selected";
+      }
     });
   });
 
   populateTimezoneDatalist();
 
-  return { fetchApplicationSettings };
+  return { fetchApplicationSettings, renderScheduleCheckboxes, selectedScheduleSlots };
 }

@@ -60,6 +60,14 @@ test("the Pages template binds the Worker as a private service", async () => {
   assert.match(config, /^binding\s*=\s*"API_SERVICE"$/m);
   assert.match(config, /^service\s*=\s*"\{\{WORKER_NAME\}\}"$/m);
   assert.match(config, /\[env\.preview\]/, "preview keeps its own binding so /api fails closed");
+  // Pages wrangler validation rejects [observability]; keep it on Worker templates only.
+  assert.doesNotMatch(config, /\[observability\]/);
+});
+
+test("the Worker template enables Workers Observability", async () => {
+  const config = await read("wrangler.worker.example.toml");
+  assert.match(config, /\[observability\]/);
+  assert.match(config, /^enabled\s*=\s*true$/m);
 });
 
 test("generated Wrangler configs satisfy privacy and binding invariants", async () => {

@@ -53,3 +53,7 @@ secret_name = "SUNSETHUE_WEB_PUSH_VAPID"
 
 # Non-secret Web Push config (set via Wrangler vars / CI):
 # WEB_PUSH_VAPID_PUBLIC_KEY, WEB_PUSH_SUBJECT (mailto: or https URL)
+
+[observability]
+enabled = true
+head_sampling_rate = 1

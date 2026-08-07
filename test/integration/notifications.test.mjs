@@ -200,7 +200,7 @@ test("expired leases recover and transient Pushover failures follow the retry sc
     const stored = await db.getOutboxJob(env, job.id);
     assert.equal(stored.attempts, 1);
     assert.equal(stored.nextAttemptAt, nextAttemptAt(NOW + 2, 1));
-    assert.equal(stored.lastErrorCode, "PUSHOVER_RETRYABLE");
+    assert.equal(stored.lastErrorCode, "PUSHOVER_HTTP_429");
   });
 });
 

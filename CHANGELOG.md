@@ -4,6 +4,14 @@ All notable changes to this project are documented in this file.
 
 This changelog follows [Conventional Commits](https://www.conventionalcommits.org/) and is maintained by [release-please](https://github.com/googleapis/release-please). Release sections group changes by commit type (`feat`, `fix`, etc.). Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.22.1](https://github.com/andrewtryder/sunsethue-helper/compare/v1.22.0...v1.22.1) (2026-08-07)
+
+
+### Bug Fixes
+
+* **frontend:** move api-client to lib to prevent worker interception ([#90](https://github.com/andrewtryder/sunsethue-helper/issues/90)) ([7c769d9](https://github.com/andrewtryder/sunsethue-helper/commit/7c769d92bd30c70f6fa1ff0cdae273b4297e45c0))
+* **notifications:** include quality and timezone in compact push content ([#88](https://github.com/andrewtryder/sunsethue-helper/issues/88)) ([dd11e83](https://github.com/andrewtryder/sunsethue-helper/commit/dd11e833b1a0daac968a2bb8d7be21b8c1b5f157))
+
 ## [1.22.0](https://github.com/andrewtryder/sunsethue-helper/compare/v1.21.0...v1.22.0) (2026-08-07)
 
 

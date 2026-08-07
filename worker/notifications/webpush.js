@@ -141,39 +141,47 @@ export async function sendWebPush(job, env, deps = {}) {
       }
     });
   } catch (error) {
-    throw new NotificationError("WEB_PUSH_NETWORK", { retryable: true, cause: error });
+    if (error?.name === "AbortError") throw new NotificationError("WEBPUSH_TIMEOUT", { retryable: true });
+    throw new NotificationError("WEBPUSH_NETWORK", { retryable: true });
   }
 
   const now = deps.now ?? Date.now();
   if (response.status === 404 || response.status === 410) {
     await updateWebPushSubscriptionMeta(env, subId, {
       enabled: false,
-      lastFailureCode: "WEB_PUSH_GONE",
+      lastFailureCode: "WEBPUSH_SUBSCRIPTION_GONE",
       lastSeenAt: now
     });
-    throw new NotificationError("WEB_PUSH_GONE", { retryable: false });
+    throw new NotificationError("WEBPUSH_SUBSCRIPTION_GONE", { retryable: false, metadata: { providerStatus: response.status } });
   }
   if (response.status === 401 || response.status === 403) {
     await updateWebPushSubscriptionMeta(env, subId, {
       enabled: false,
-      lastFailureCode: "WEB_PUSH_REVOKED",
+      lastFailureCode: "WEBPUSH_REVOKED",
       lastSeenAt: now
     });
-    throw new NotificationError("WEB_PUSH_REVOKED", { retryable: false });
+    throw new NotificationError("WEBPUSH_REVOKED", { retryable: false, metadata: { providerStatus: response.status } });
   }
-  if (response.status === 429 || response.status >= 500) {
+  if (response.status === 429) {
     await updateWebPushSubscriptionMeta(env, subId, {
-      lastFailureCode: "WEB_PUSH_RETRYABLE",
+      lastFailureCode: "WEBPUSH_HTTP_429",
       lastSeenAt: now
     });
-    throw new NotificationError("WEB_PUSH_RETRYABLE", { retryable: true });
+    throw new NotificationError("WEBPUSH_HTTP_429", { retryable: true, metadata: { providerStatus: response.status } });
+  }
+  if (response.status >= 500) {
+    await updateWebPushSubscriptionMeta(env, subId, {
+      lastFailureCode: "WEBPUSH_HTTP_500",
+      lastSeenAt: now
+    });
+    throw new NotificationError("WEBPUSH_HTTP_500", { retryable: true, metadata: { providerStatus: response.status } });
   }
   if (response.status < 200 || response.status >= 300) {
     await updateWebPushSubscriptionMeta(env, subId, {
-      lastFailureCode: "WEB_PUSH_TERMINAL",
+      lastFailureCode: "WEBPUSH_TERMINAL",
       lastSeenAt: now
     });
-    throw new NotificationError("WEB_PUSH_TERMINAL", { retryable: false });
+    throw new NotificationError("WEBPUSH_TERMINAL", { retryable: false, metadata: { providerStatus: response.status } });
   }
 
   await updateWebPushSubscriptionMeta(env, subId, {

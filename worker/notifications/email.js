@@ -99,6 +99,11 @@ export async function sendEmail(job, env, deps = {}) {
     return { providerMessageId: null };
   } catch (error) {
     if (error instanceof NotificationError) throw error;
-    throw new NotificationError("SMTP_DELIVERY_FAILED", { retryable: true, cause: error });
+    const msg = error?.message?.toLowerCase() || "";
+    let code = "SMTP_DELIVERY_FAILED";
+    if (msg.includes("auth")) code = "SMTP_AUTH_REJECTED";
+    else if (msg.includes("conn") || msg.includes("refused")) code = "SMTP_CONNECTION_REFUSED";
+    else if (msg.includes("tls") || msg.includes("cert")) code = "SMTP_TLS_FAILURE";
+    throw new NotificationError(code, { retryable: true });
   }
 }

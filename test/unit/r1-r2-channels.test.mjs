@@ -365,13 +365,13 @@ test("sendWebhook signs and classifies responses", async () => {
       () => sendWebhook(job, env, {
         fetch: async () => ({ status: 500, body: null })
       }),
-      (error) => error.code === "WEBHOOK_RETRYABLE"
+      (error) => error.code === "WEBHOOK_HTTP_500"
     );
     await assert.rejects(
       () => sendWebhook(job, env, {
         fetch: async () => ({ status: 429, body: null })
       }),
-      (error) => error.code === "WEBHOOK_RETRYABLE"
+      (error) => error.code === "WEBHOOK_HTTP_429"
     );
     await assert.rejects(
       () => sendWebhook(job, env, {
@@ -466,7 +466,7 @@ test("web push registration and send classification", async () => {
         now: 30,
         fetch: async () => ({ status: 410 })
       }),
-      (error) => error.code === "WEB_PUSH_GONE"
+      (error) => error.code === "WEBPUSH_SUBSCRIPTION_GONE"
     );
     const gone = await db.getWebPushSubscription(env, device.id);
     assert.equal(Number(gone.enabled), 0);
@@ -478,7 +478,7 @@ test("web push registration and send classification", async () => {
         now: 41,
         fetch: async () => ({ status: 403 })
       }),
-      (error) => error.code === "WEB_PUSH_REVOKED"
+      (error) => error.code === "WEBPUSH_REVOKED"
     );
     await db.updateWebPushSubscriptionMeta(env, device.id, { enabled: true, lastSeenAt: 50 });
     await assert.rejects(
@@ -486,21 +486,21 @@ test("web push registration and send classification", async () => {
         now: 51,
         fetch: async () => ({ status: 503 })
       }),
-      (error) => error.code === "WEB_PUSH_RETRYABLE"
+      (error) => error.code === "WEBPUSH_HTTP_500"
     );
     await assert.rejects(
       () => sendWebPush({ deliveryTargetId: device.id, payload: "{}" }, env, {
         now: 52,
         fetch: async () => ({ status: 400 })
       }),
-      (error) => error.code === "WEB_PUSH_TERMINAL"
+      (error) => error.code === "WEBPUSH_TERMINAL"
     );
     await assert.rejects(
       () => sendWebPush({ deliveryTargetId: device.id, payload: "{}" }, env, {
         now: 53,
         fetch: async () => { throw new Error("network"); }
       }),
-      (error) => error.code === "WEB_PUSH_NETWORK"
+      (error) => error.code === "WEBPUSH_NETWORK"
     );
     await assert.rejects(
       () => sendWebPush({ deliveryTargetId: null, payload: "{}" }, env, { now: 54 }),
@@ -625,11 +625,11 @@ test("pushover send covers device sound and retryable statuses", async () => {
     assert.equal(ok.providerMessageId, "req-1");
     await assert.rejects(
       () => sendPushover(base, env, { fetch: async () => ({ ok: false, status: 429, headers: { get: () => null }, json: async () => ({}) }) }),
-      (error) => error.code === "PUSHOVER_RETRYABLE"
+      (error) => error.code === "PUSHOVER_HTTP_429"
     );
     await assert.rejects(
       () => sendPushover(base, env, { fetch: async () => ({ ok: false, status: 503, headers: { get: () => null }, json: async () => { throw new Error("bad json"); } }) }),
-      (error) => error.code === "PUSHOVER_RETRYABLE"
+      (error) => error.code === "PUSHOVER_HTTP_500"
     );
   } finally {
     local.close();

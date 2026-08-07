@@ -28,13 +28,13 @@ export async function sendPushover(job, env, deps = {}) {
     let responseBody = null;
     try { responseBody = await response.json(); } catch { responseBody = null; }
     if (response.ok && responseBody?.status === 1) return { providerMessageId: String(responseBody.request || response.headers.get("x-request-id") || "").slice(0, 128) || null };
-    if (response.status === 429 || response.status >= 500) throw new NotificationError("PUSHOVER_RETRYABLE", { retryable: true });
-    const rejected = new NotificationError("PUSHOVER_REJECTED");
-    rejected.detail = Array.isArray(responseBody?.errors) ? responseBody.errors.join("; ") : null;
-    throw rejected;
+    if (response.status === 429) throw new NotificationError("PUSHOVER_HTTP_429", { retryable: true, metadata: { providerStatus: 429 } });
+    if (response.status === 401 || response.status === 403) throw new NotificationError("PUSHOVER_HTTP_401", { retryable: false, metadata: { providerStatus: response.status } });
+    if (response.status >= 500) throw new NotificationError("PUSHOVER_HTTP_500", { retryable: true, metadata: { providerStatus: response.status } });
+    throw new NotificationError("PUSHOVER_REJECTED", { retryable: false, metadata: { providerStatus: response.status } });
   } catch (error) {
     if (error instanceof NotificationError) throw error;
-    if (error?.name === "AbortError") throw new NotificationError("PUSHOVER_TIMEOUT", { retryable: true, cause: error });
-    throw new NotificationError("PUSHOVER_UNAVAILABLE", { retryable: true, cause: error });
+    if (error?.name === "AbortError") throw new NotificationError("PUSHOVER_TIMEOUT", { retryable: true });
+    throw new NotificationError("PUSHOVER_UNAVAILABLE", { retryable: true });
   } finally { clearTimeout(timeout); }
 }

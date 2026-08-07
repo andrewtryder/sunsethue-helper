@@ -259,7 +259,7 @@ test("Pushover rejects invalid credentials and normalizes timeout failures", asy
     const [job] = await enqueueNotifications(model("push-errors"), env);
     const stored = await db.getOutboxJob(env, job.id);
     const delivery = { ...stored, settings: await getSettings(env) };
-    await assert.rejects(() => sendPushover(delivery, env, { fetch: async () => new Response("no", { status: 401 }) }), /PUSHOVER_REJECTED/);
+    await assert.rejects(() => sendPushover(delivery, env, { fetch: async () => new Response("no", { status: 401 }) }), /PUSHOVER_HTTP_401/);
     await assert.rejects(() => sendPushover(delivery, env, { fetch: async () => { const error = new Error("aborted"); error.name = "AbortError"; throw error; } }), /PUSHOVER_TIMEOUT/);
   });
 });

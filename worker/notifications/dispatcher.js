@@ -74,7 +74,19 @@ export async function dispatchPendingNotifications(env, deps = {}) {
         logSafe("warn", "Notification lease was lost mid-flight", { code: "LEASE_LOST", outboxId: job.id, channel: job.channel });
         continue;
       }
-      logSafe("warn", "Notification delivery failed", { code: normalized.code, outboxId: job.id, channel: job.channel, attempt: attempts, duration: Date.now() - startedAt, reason: String(normalized.detail || normalized.cause?.message || "").slice(0, 200) });
+      const logMeta = {
+        code: normalized.code,
+        outboxId: job.id,
+        channel: job.channel,
+        attempt: attempts,
+        duration: Date.now() - startedAt,
+        retryable: normalized.retryable
+      };
+      if (normalized.metadata) {
+        if (normalized.metadata.providerStatus !== undefined) logMeta.providerStatus = normalized.metadata.providerStatus;
+        if (normalized.metadata.phase !== undefined) logMeta.phase = normalized.metadata.phase;
+      }
+      logSafe("warn", "Notification delivery failed", logMeta);
       outcomes.push({ id: job.id, channel: job.channel, status: terminal ? "failed" : "pending", code: normalized.code, duration: Date.now() - startedAt });
     }
   }

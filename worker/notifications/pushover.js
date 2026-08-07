@@ -29,10 +29,12 @@ export async function sendPushover(job, env, deps = {}) {
     try { responseBody = await response.json(); } catch { responseBody = null; }
     if (response.ok && responseBody?.status === 1) return { providerMessageId: String(responseBody.request || response.headers.get("x-request-id") || "").slice(0, 128) || null };
     if (response.status === 429 || response.status >= 500) throw new NotificationError("PUSHOVER_RETRYABLE", { retryable: true });
-    throw new NotificationError("PUSHOVER_REJECTED");
+    const rejected = new NotificationError("PUSHOVER_REJECTED");
+    rejected.detail = Array.isArray(responseBody?.errors) ? responseBody.errors.join("; ") : null;
+    throw rejected;
   } catch (error) {
     if (error instanceof NotificationError) throw error;
-    if (error?.name === "AbortError") throw new NotificationError("PUSHOVER_TIMEOUT", { retryable: true });
-    throw new NotificationError("PUSHOVER_UNAVAILABLE", { retryable: true });
+    if (error?.name === "AbortError") throw new NotificationError("PUSHOVER_TIMEOUT", { retryable: true, cause: error });
+    throw new NotificationError("PUSHOVER_UNAVAILABLE", { retryable: true, cause: error });
   } finally { clearTimeout(timeout); }
 }

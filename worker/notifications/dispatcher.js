@@ -74,7 +74,7 @@ export async function dispatchPendingNotifications(env, deps = {}) {
         logSafe("warn", "Notification lease was lost mid-flight", { code: "LEASE_LOST", outboxId: job.id, channel: job.channel });
         continue;
       }
-      logSafe("warn", "Notification delivery failed", { code: normalized.code, outboxId: job.id, channel: job.channel, attempt: attempts, duration: Date.now() - startedAt });
+      logSafe("warn", "Notification delivery failed", { code: normalized.code, outboxId: job.id, channel: job.channel, attempt: attempts, duration: Date.now() - startedAt, reason: String(normalized.detail || normalized.cause?.message || "").slice(0, 200) });
       outcomes.push({ id: job.id, channel: job.channel, status: terminal ? "failed" : "pending", code: normalized.code, duration: Date.now() - startedAt });
     }
   }

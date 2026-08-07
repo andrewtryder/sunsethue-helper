@@ -96,8 +96,8 @@ export async function sendWebhook(job, env, deps = {}) {
       },
       body: rawBody
     });
-  } catch {
-    throw new NotificationError("WEBHOOK_NETWORK", { retryable: true });
+  } catch (error) {
+    throw new NotificationError("WEBHOOK_NETWORK", { retryable: true, cause: error });
   } finally {
     clearTimeout(timer);
   }
@@ -142,7 +142,9 @@ export async function sendWebhook(job, env, deps = {}) {
   }
 
   if (!classification.ok) {
-    throw new NotificationError(classification.code, { retryable: classification.retryable });
+    const error = new NotificationError(classification.code, { retryable: classification.retryable });
+    error.detail = `HTTP ${response.status}`;
+    throw error;
   }
   return { providerMessageId: deliveryId };
 }

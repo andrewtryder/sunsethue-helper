@@ -53,7 +53,7 @@ test("route contract matrix includes the notification-platform paths", () => {
   ]) {
     assert.ok(paths.has(required), `missing contract for ${required}`);
   }
-  assert.equal(API_ROUTE_CONTRACTS.length, 27);
+  assert.equal(API_ROUTE_CONTRACTS.length, 26);
 });
 
 test("disallowed methods return 405 with the frozen Allow header", async () => {

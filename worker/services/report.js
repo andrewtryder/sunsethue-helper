@@ -11,6 +11,8 @@ import { NotificationError } from "../notifications/errors.js";
 import { getSettings } from "../notifications/settings.js";
 import { filterResultsForChannel } from "../notifications/rules.js";
 import { hasWebhookTransportAsync } from "../notifications/webhook.js";
+import { listLocationNotificationRules } from "../repositories/notification-rules.js";
+import { listWebPushSubscriptions } from "../repositories/webpush.js";
 import { resolveDisplayTimeZone } from "../../shared/time-format.js";
 
 export { buildHtmlEmail } from "../notifications/email.js";
@@ -128,7 +130,7 @@ function channelJobsForTargets({
  */
 export async function enqueueNotifications(model, env, deps = {}) {
   const settings = deps.settings || await getSettings(env);
-  const allRules = deps.rules || await db.listLocationNotificationRules(env);
+  const allRules = deps.rules || await listLocationNotificationRules(env);
   const jobs = [];
 
   const channelPlan = [];
@@ -137,7 +139,7 @@ export async function enqueueNotifications(model, env, deps = {}) {
   if (Number(settings.webhookEnabled) === 1 && (deps.webhookConfigured ?? await hasWebhookTransportAsync(env))) {
     channelPlan.push({ channel: "webhook", targets: [null] });
   }
-  const pushSubs = deps.webPushSubscriptions || await db.listWebPushSubscriptions(env, { enabledOnly: true });
+  const pushSubs = deps.webPushSubscriptions || await listWebPushSubscriptions(env, { enabledOnly: true });
   if (pushSubs.length > 0) {
     channelPlan.push({ channel: "webpush", targets: pushSubs.map((s) => s.id) });
   }

@@ -32,13 +32,11 @@ function formatChannelSubtitle(ch, formatDateTime) {
 
 export function initHealth({ api, formatDateTime = (v) => v, capabilities }) {
   async function fetchOperationalStatus() {
-    const summary = document.getElementById("notification-health-summary")
-      || document.getElementById("ops-status-summary");
+    const summary = document.getElementById("notification-health-summary");
     const channelsHost = document.getElementById("notification-health-channels");
     const scheduleHost = document.getElementById("notification-health-schedule");
     const skipsHost = document.getElementById("notification-health-skips");
     const selfTestHost = document.getElementById("notification-health-selftest");
-    const legacyList = document.getElementById("ops-status-list");
     if (!summary) return;
     try {
       const health = await api.get("/api/notification-health");
@@ -87,13 +85,6 @@ export function initHealth({ api, formatDateTime = (v) => v, capabilities }) {
           ? `Latest self-test: ${health.selfTest.checkType} · ${health.selfTest.status} · ${health.selfTest.code || ""}`
           : "No self-test runs yet.";
         window.__lastSelfTestSummary = selfTestHost.textContent;
-      }
-      if (legacyList) {
-        legacyList.replaceChildren();
-      }
-      const legacySummary = document.getElementById("ops-status-summary");
-      if (legacySummary && legacySummary !== summary) {
-        legacySummary.textContent = summary.textContent;
       }
     } catch {
       summary.textContent = "Unable to load notification health.";

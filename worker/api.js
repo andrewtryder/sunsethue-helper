@@ -1,6 +1,7 @@
 import { fetchApiCredits } from "./sunsethue.js";
-import { enqueueNotifications, runAndSendReport } from "./report.js";
+import { enqueueNotifications, runAndSendReport } from "./services/report.js";
 import * as db from "./db.js";
+import { listWebPushSubscriptions } from "./repositories/webpush.js";
 import { dispatchPendingNotifications } from "./notifications/dispatcher.js";
 import { NotificationError } from "./notifications/errors.js";
 import {
@@ -328,7 +329,7 @@ export async function handleHttpRequest(request, env, authContext = null, deps =
       if (body.channel === "pushover" && (!settings.pushoverEnabled || !(await hasPushoverTransportAsync(env)))) return errorResponse("PROVIDER_NOT_CONFIGURED", "Pushover is not configured.", 409, requestId);
       if (body.channel === "webhook" && (!settings.webhookEnabled || !(await hasWebhookTransportAsync(env)))) return errorResponse("PROVIDER_NOT_CONFIGURED", "Webhook is not configured.", 409, requestId);
       if (body.channel === "webpush") {
-        const subs = await db.listWebPushSubscriptions(env, { enabledOnly: true });
+        const subs = await listWebPushSubscriptions(env, { enabledOnly: true });
         if (subs.length === 0) return errorResponse("PROVIDER_NOT_CONFIGURED", "No browser push devices are enabled.", 409, requestId);
       }
       if (body.channel === "email" && !settings.emailTo) {
@@ -343,7 +344,7 @@ export async function handleHttpRequest(request, env, authContext = null, deps =
           webhookEnabled: body.channel === "webhook" ? 1 : 0
         },
         webPushSubscriptions: body.channel === "webpush"
-          ? await db.listWebPushSubscriptions(env, { enabledOnly: true })
+          ? await listWebPushSubscriptions(env, { enabledOnly: true })
           : []
       });
       const outcomes = await dispatchPendingNotifications(env, deps);
@@ -536,16 +537,6 @@ export async function handleHttpRequest(request, env, authContext = null, deps =
       if (request.method !== "GET") return methodNotAllowed("GET", requestId);
       const runs = await db.getRuns(env);
       return jsonResponse(runs, 200, requestId);
-    }
-
-    if (path === "/api/operational-status") {
-      if (request.method !== "GET") return methodNotAllowed("GET", requestId);
-      const status = await db.getOperationalStatus(env, deps.now ?? Date.now());
-      const rows = await db.listProviderCredentialStatus(env);
-      const byProvider = Object.fromEntries(rows.map((row) => [row.provider, row]));
-      status.emailTransport = Number(byProvider.email?.configured) === 1 ? "secrets_store" : "not_configured";
-      status.pushoverTransport = Number(byProvider.pushover?.configured) === 1 ? "secrets_store" : "not_configured";
-      return jsonResponse(status, 200, requestId);
     }
 
     // Obsolete public config endpoint removed; keep a generic not-found.

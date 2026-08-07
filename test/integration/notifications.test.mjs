@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import * as db from "../../worker/db.js";
-import { enqueueNotifications } from "../../worker/report.js";
+import { enqueueNotifications } from "../../worker/services/report.js";
 import { dispatchPendingNotifications, nextAttemptAt } from "../../worker/notifications/dispatcher.js";
 import { sendPushover } from "../../worker/notifications/pushover.js";
 import { asNotificationError, NotificationError } from "../../worker/notifications/errors.js";
@@ -445,7 +445,7 @@ test("runAndSendReport surfaces REPORT_IN_PROGRESS when the lock is held", async
     // Claim the report lock under a foreign token; runAndSendReport must fail
     // fast with REPORT_IN_PROGRESS rather than run generateReport twice.
     assert.equal(await db.claimReportLock(env, NOW, NOW + 60_000, TOKEN_A), true);
-    const { runAndSendReport } = await import("../../worker/report.js");
+    const { runAndSendReport } = await import("../../worker/services/report.js");
     env.SUNSETHUE_API_KEY = "test-key";
     await assert.rejects(
       () => runAndSendReport("Manual Test", env, { fetch: () => { throw new Error("must not be called"); }, now: NOW + 1 }),

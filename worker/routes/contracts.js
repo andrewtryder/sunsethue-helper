@@ -43,7 +43,6 @@ export const API_ROUTE_CONTRACTS = [
     allow: "PUT, DELETE"
   },
   { path: "/api/runs", methods: ["GET"], allow: "GET" },
-  { path: "/api/operational-status", methods: ["GET"], allow: "GET" },
   { path: "/api/notification-health", methods: ["GET"], allow: "GET" },
   { path: "/api/setup-status", methods: ["GET"], allow: "GET" },
   { path: "/api/history/export", methods: ["GET"], allow: "GET" },

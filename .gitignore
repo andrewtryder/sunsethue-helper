@@ -1,21 +1,15 @@
 # Dependency directories
 node_modules/
-functions/node_modules/
 
 # Build outputs
 dist/
-public/dist/
-/lib/
+coverage/
 
 # Environment and secrets
 .env*
 !.env.example
 .dev.vars*
 !.dev.vars.example
-functions/.env
-functions/.env.*
-functions/.secret.local
-config.json
 
 # Keys, certificates, and tokens
 *.pem
@@ -29,39 +23,18 @@ config.json
 *.sqlite
 *.sqlite3
 
-# Cloudflare state and rollback snapshots
-cloudflare-state/
-rollback-snapshots/
-
 # Wrangler state
 .wrangler/
-
-# Firebase logs
-firebase-debug.log*
-firestore-debug.log*
-ui-debug.log*
-functions-debug.log*
-hosting-debug.log*
-pubsub-debug.log*
-
-# Test coverage
-coverage/
-functions/coverage/
 
 # Playwright
 test-results/
 playwright-report/
 blob-report/
 playwright/.cache/
-test-results/
-playwright-report/
-blob-report/
 e2e/__screenshots__/
 
-# Generated previews and local Cloudflare rollback snapshots
+# Generated previews and local Cloudflare tooling state
 .tmp/
-.tmp/cloudflare-access/
-wrangler.jwt-public.toml
 
 # Local public-release audit needles (real identifiers; never commit)
 .release-audit.local.json

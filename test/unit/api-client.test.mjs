@@ -99,7 +99,6 @@ test("createDemoClient fixture routing", async () => {
     runs: [{ id: "r1" }],
     notificationHealth: { state: "healthy" },
     setupStatus: { databaseTables: "ready" },
-    operationalStatus: { ok: true },
     applicationSettings: { scheduleTimezone: "UTC" },
     notificationSettings: { emailEnabled: true },
     rules: [{ locationId: "1", channel: "email" }],
@@ -114,7 +113,6 @@ test("createDemoClient fixture routing", async () => {
   assert.deepStrictEqual(await api.get("/api/runs"), fixtures.runs);
   assert.deepStrictEqual(await api.get("/api/notification-health"), fixtures.notificationHealth);
   assert.deepStrictEqual(await api.get("/api/setup-status"), fixtures.setupStatus);
-  assert.deepStrictEqual(await api.get("/api/operational-status"), fixtures.operationalStatus);
   assert.deepStrictEqual(await api.get("/api/application-settings"), fixtures.applicationSettings);
   assert.deepStrictEqual(await api.get("/api/notification-settings"), fixtures.notificationSettings);
   assert.deepStrictEqual(await api.get("/api/location-notification-rules"), fixtures.rules);

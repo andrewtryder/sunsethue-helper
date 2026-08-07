@@ -6,6 +6,8 @@ import { pushoverTransportSource } from "../notifications/resolve-pushover-trans
 import { hasWebhookTransportAsync } from "../notifications/webhook.js";
 import { hasWebPushConfiguredAsync, resolveWebPushConfig } from "../notifications/webpush.js";
 import * as db from "../db.js";
+import { insertHealthCheckRun } from "../repositories/health-checks.js";
+import { listWebPushSubscriptions } from "../repositories/webpush.js";
 
 export function buildSelfTestOccurrenceKey(scheduleTimezone, parts) {
   return `SELFTEST:${scheduleTimezone}:${parts.dateKey}`;
@@ -59,7 +61,7 @@ export async function runPassiveSelfTest(env, deps = {}) {
   const vapid = await resolveWebPushConfig(env);
   checks.push({ name: "webpush_vapid", ok: true, code: vapid.configured ? "READY" : "NOT_CONFIGURED" });
 
-  const subs = await db.listWebPushSubscriptions(env, { enabledOnly: true });
+  const subs = await listWebPushSubscriptions(env, { enabledOnly: true });
   const structuralOk = subs.every((s) => typeof s.endpoint === "string" && s.endpoint.startsWith("https://") && s.p256dh && s.auth);
   checks.push({
     name: "webpush_subscriptions",
@@ -81,7 +83,7 @@ export async function runPassiveSelfTest(env, deps = {}) {
     durationMs: completedAt - startedAt,
     details: JSON.stringify({ checks })
   };
-  await db.insertHealthCheckRun(env, row);
+  await insertHealthCheckRun(env, row);
   return row;
 }
 
@@ -92,7 +94,7 @@ export async function runActiveSelfTest(env, deps = {}) {
   const pushoverReady = (await pushoverTransportSource(env)) !== "not_configured";
   const webhookReady = await hasWebhookTransportAsync(env);
   const webpushReady = await hasWebPushConfiguredAsync(env);
-  const pushSubs = await db.listWebPushSubscriptions(env, { enabledOnly: true });
+  const pushSubs = await listWebPushSubscriptions(env, { enabledOnly: true });
 
   const effectiveSettings = {
     ...settings,
@@ -134,7 +136,7 @@ export async function runActiveSelfTest(env, deps = {}) {
       outcomes: outcomes.map((o) => ({ channel: o.channel, status: o.status, code: o.code || null }))
     })
   };
-  await db.insertHealthCheckRun(env, row);
+  await insertHealthCheckRun(env, row);
   return row;
 }
 

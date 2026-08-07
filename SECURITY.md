@@ -44,5 +44,4 @@ There is no bug bounty program for this personal project.
 ## Local hardening expectations
 
 Contributors must never commit `.env`, `.dev.vars`, generated Wrangler configs,
-or `.release-audit.local.json`. See [CONTRIBUTING.md](CONTRIBUTING.md) and
-[docs/public-release-checklist.md](docs/public-release-checklist.md).
+or `.release-audit.local.json`. See [CONTRIBUTING.md](CONTRIBUTING.md).

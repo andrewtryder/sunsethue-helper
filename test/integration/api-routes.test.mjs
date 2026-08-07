@@ -270,31 +270,6 @@ test("GET /api/runs returns parsed run history", async () => {
   });
 });
 
-test("GET /api/operational-status returns non-sensitive transport and queue fields", async () => {
-  await withApi(async ({ call, env }) => {
-    await db.addRun(env, {
-      id: "run-ops",
-      timestamp: Date.parse("2026-07-31T16:00:00Z"),
-      triggerType: "NOON",
-      status: "success",
-      locationsCount: 1,
-      results: [],
-      error: null
-    });
-    const response = await call("/api/operational-status");
-    assert.equal(response.status, 200);
-    const body = await response.json();
-    assert.equal(body.requiredTablesPresent, true);
-    assert.ok(["secrets_store", "not_configured"].includes(body.emailTransport));
-    assert.ok(["secrets_store", "not_configured"].includes(body.pushoverTransport));
-    assert.equal(typeof body.pendingDeliveries, "number");
-    assert.equal(typeof body.failedDeliveries, "number");
-    assert.equal(body.secretNames, undefined);
-    assert.equal(body.CLOUDFLARE_API_TOKEN, undefined);
-    assert.equal(body.storeId, undefined);
-  });
-});
-
 test("GET /api/notification-health and setup-status stay non-sensitive", async () => {
   await withApi(async ({ call }) => {
     const healthRes = await call("/api/notification-health");

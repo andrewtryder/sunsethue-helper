@@ -1,13 +1,11 @@
 # Operations
 
-## Operational status
+## Notification health
 
-Authenticated `GET /api/operational-status` remains for backward compatibility.
-
-Prefer **Notification health** in Settings, backed by `GET /api/notification-health`:
+Prefer **Notification health** / overview in Settings, backed by `GET /api/notification-health`:
 
 - Overall state: `healthy` | `degraded` | `action_required` | `disabled`
-- Per-channel cards, schedule/quota, threshold skip samples, latest self-test
+- Per-channel status, schedule/quota, threshold skip samples, latest self-test
 - Aggregates only — no secret names, endpoints, keys, store IDs, or Access config
 
 `GET /api/setup-status` powers the first-run checklist (Ready / Missing / Not configured).
@@ -45,11 +43,9 @@ Hourly cron prunes:
 
 Adjust `pruneOperationalData` retain window if needed.
 
-## Schedule and thresholds (R1+)
+## Schedule and thresholds
 
-Report schedule times and timezone live in `application_settings`. The Worker keeps an hourly UTC cron and evaluates local whole-hour slots with occurrence dedupe (`scheduled_occurrences`). Per-location channel thresholds live in `location_notification_rules`. Skipped deliveries use `NO_LOCATION_ABOVE_THRESHOLD` when no location qualifies.
-
-
+Report schedule times and timezone live in `application_settings`. Locations may override with their own `scheduleTimes` (NULL inherits the global schedule). The Worker keeps an hourly UTC cron and evaluates local whole-hour slots with occurrence dedupe (`scheduled_occurrences`), fetching only locations due for that slot. Per-location channel thresholds live in `location_notification_rules`. Skipped deliveries use `NO_LOCATION_ABOVE_THRESHOLD` when no location qualifies.
 
 ## Operator CLIs
 

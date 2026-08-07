@@ -1,9 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { handleScheduledReport } from "../../worker/cron.js";
+import { handleScheduledReport } from "../../worker/services/scheduler.js";
 
 /**
- * The Worker cron fires hourly in UTC and worker/cron.js decides which report to
+ * The Worker cron fires hourly in UTC and worker/services/scheduler.js decides which report to
  * send from the configured schedule timezone wall clock (default America/New_York).
  *
  * 2026 US DST: starts Sun Mar 8 (EST -05:00 -> EDT -04:00),

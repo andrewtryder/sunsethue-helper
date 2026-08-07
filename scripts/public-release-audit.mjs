@@ -575,7 +575,7 @@ function printReport(report) {
     );
   }
   console.error("=========================================\n");
-  console.error("Do not publish until every finding is cleared or rotated. See docs/public-release-checklist.md.");
+  console.error("Do not publish until every finding is cleared or rotated. See SECURITY.md and CONTRIBUTING.md.");
 }
 
 async function main() {

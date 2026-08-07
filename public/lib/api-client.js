@@ -49,30 +49,6 @@ export function createDemoClient(fixtures) {
   };
 }
 
-export function patchFetchForDemo(api) {
-  const originalFetch = globalThis.fetch.bind(globalThis);
-  globalThis.fetch = async (input, init = {}) => {
-    const url = typeof input === "string" ? input : input.url;
-    const path = url.replace(/^https?:\/\/[^/]+/, "").split("?")[0];
-    const method = (init.method || "GET").toUpperCase();
-    if (method !== "GET") {
-      return new Response(JSON.stringify({ code: "DEMO_READ_ONLY" }), {
-        status: 403,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
-    try {
-      const data = await api.get(path.startsWith("/api") ? path : `/api${path}`);
-      return new Response(JSON.stringify(data), {
-        status: 200,
-        headers: { "Content-Type": "application/json" }
-      });
-    } catch {
-      return originalFetch(input, init);
-    }
-  };
-}
-
 export function initApi() {
   const DEMO_MODE = new URLSearchParams(window.location.search).has("demo")
     || window.__SUNSETHUE_DEMO__ === true
@@ -86,7 +62,6 @@ export function initApi() {
   if (DEMO_MODE) {
     const banner = document.getElementById("demo-banner");
     if (banner) banner.hidden = false;
-    patchFetchForDemo(api);
   }
 
   return { api, DEMO_MODE, DEMO_READ_ONLY };

@@ -1,4 +1,4 @@
-export function initSchedule({ api, showSuccess, showError, onSettingsUpdate }) {
+export function initSchedule({ api, showSuccess, showError, onSettingsUpdate, capabilities }) {
   const HOUR_OPTIONS = Array.from({ length: 24 }, (_, hour) => `${String(hour).padStart(2, "0")}:00`);
   const SCHEDULE_PRESETS = {
     once: ["06:00"],
@@ -71,6 +71,10 @@ export function initSchedule({ api, showSuccess, showError, onSettingsUpdate }) 
 
   document.getElementById("application-settings-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
+    if (!capabilities?.mutations) {
+      showError("Saving application settings is disabled in the static demo.");
+      return;
+    }
     const mode = document.querySelector('input[name="display-timezone-mode"]:checked')?.value || "schedule";
     const body = {
       scheduleTimezone: document.getElementById("schedule-timezone")?.value || "America/New_York",

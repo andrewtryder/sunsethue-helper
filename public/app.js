@@ -31,6 +31,14 @@ import { initSetupStatus } from "./features/setup-status.js";
 // API
 const { api, DEMO_MODE, DEMO_READ_ONLY } = initApi();
 
+export const capabilities = Object.freeze({
+  liveApi: !DEMO_MODE,
+  mutations: !DEMO_MODE,
+  webPush: !DEMO_MODE,
+  credentialManagement: !DEMO_MODE,
+  externalRequests: !DEMO_MODE
+});
+
 // DOM Elements
 const appContainer = document.getElementById("app-container");
 const locationForm = document.getElementById("location-form");
@@ -145,38 +153,69 @@ async function fetchNotificationDeliveries() {
 // ── Feature wiring ───────────────────────────────────────────────────
 
 const { fetchNotificationSettings, fetchProviderCredentials } = initNotifications({
-  api, showSuccess, showError, CREDENTIAL_ADMIN_HEADER,
+  api, 
+  showBanner, 
+  showSuccess, 
+  showError, 
+  DEMO_READ_ONLY,
+  capabilities,
+  CREDENTIAL_ADMIN_HEADER,
   fetchDeliveries: () => fetchNotificationDeliveries()
 });
 
 const { fetchApplicationSettings } = initSchedule({ 
   api, 
   showSuccess, 
-  showError,
+  showError, 
+  DEMO_READ_ONLY,
+  capabilities,
   onSettingsUpdate: updateDisplayTimeZone
 });
 
 const { fetchLocationRules } = initThresholds({
-  api, showSuccess, showError,
+  api, 
+  showSuccess, 
+  showError, 
+  locationsListContainer, 
+  DEMO_READ_ONLY,
+  capabilities,
   getLocationsList: () => locationsList
 });
 
 const { fetchWebPushDevices } = initWebPush({
-  api, showSuccess, showError, DEMO_READ_ONLY
+  api, 
+  showSuccess, 
+  showError, 
+  DEMO_READ_ONLY,
+  capabilities
 });
 
 initWebhook({
-  api, showSuccess, showError, CREDENTIAL_ADMIN_HEADER,
+  api, 
+  showSuccess, 
+  showError, 
+  DEMO_READ_ONLY,
+  capabilities,
+  CREDENTIAL_ADMIN_HEADER,
   fetchNotificationSettings
 });
 
 const { fetchOperationalStatus } = initHealth({ 
   api, 
+  showSuccess, 
+  showError, 
+  DEMO_READ_ONLY,
+  capabilities,
   formatDateTime: (iso) => formatDateTimeMediumWithZone(iso, currentDisplayTimeZone) 
 });
 
 const { refreshHistoryCounts } = initHistory({
-  api, DEMO_READ_ONLY, showSuccess, showError,
+  api, 
+  showBanner, 
+  showSuccess, 
+  showError, 
+  DEMO_READ_ONLY,
+  capabilities,
   afterClear: () => Promise.all([
     fetchRuns(),
     fetchNotificationDeliveries(),
@@ -184,7 +223,7 @@ const { refreshHistoryCounts } = initHistory({
   ])
 });
 
-const { fetchSetupChecklist } = initSetupStatus({ api });
+const { fetchSetupChecklist } = initSetupStatus({ api, capabilities });
 
 // ── Init ─────────────────────────────────────────────────────────────
 
@@ -555,6 +594,10 @@ async function saveInlineLocationEdit(id, { name, latitude, longitude }, saveBtn
 
 locationForm.addEventListener("submit", async (e) => {
   e.preventDefault();
+  if (!capabilities.mutations) {
+    showBanner(dbErrorBanner, "Editing locations is disabled in the static demo.");
+    return;
+  }
 
   const id = locationIdInput.value;
   const name = locationNameInput.value.trim();
@@ -624,6 +667,10 @@ function resetForm() {
 cancelEditBtn.addEventListener("click", closeLocationDrawer);
 
 async function deleteLocation(id) {
+  if (!capabilities.mutations) {
+    showBanner(dbErrorBanner, "Deleting locations is disabled in the static demo.");
+    return;
+  }
   const loc = locationsList.find(l => l.id === id);
   if (!loc) return;
 
@@ -650,6 +697,10 @@ async function deleteLocation(id) {
 // ── Trigger Report ───────────────────────────────────────────────────
 
 triggerTestBtn.addEventListener("click", async () => {
+  if (!capabilities.mutations) {
+    showBanner(dbErrorBanner, "Manual report execution is disabled in the static demo.");
+    return;
+  }
   if (locationsList.length === 0) {
     showBanner(dbErrorBanner, "Cannot trigger test: You need to add at least 1 location.");
     return;

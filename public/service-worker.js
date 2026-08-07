@@ -12,14 +12,14 @@ self.addEventListener("push", (event) => {
   const title = "Sunsethue Helper";
   const options = {
     body: "A forecast notification is ready. Open the dashboard for details.",
-    data: { url: "/" }
+    data: { url: "./" }
   };
   event.waitUntil(self.registration.showNotification(title, options));
 });
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const target = event.notification?.data?.url || "/";
+  const target = event.notification?.data?.url || "./";
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
       for (const client of clients) {

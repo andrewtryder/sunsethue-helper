@@ -1,6 +1,16 @@
-export function initWebhook({ api, showSuccess, showError, CREDENTIAL_ADMIN_HEADER, fetchNotificationSettings }) {
+export function initWebhook({ api, showSuccess, showError, CREDENTIAL_ADMIN_HEADER, fetchNotificationSettings, capabilities }) {
+  const statusEl = document.getElementById("webhook-credentials-status");
+
   document.getElementById("webhook-credentials-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
+    if (!capabilities?.mutations || !capabilities?.credentialManagement) {
+      if (statusEl) {
+        statusEl.className = "pane-subtext error";
+        statusEl.textContent = "Webhook configuration is disabled in the static demo.";
+      }
+      return;
+    }
+    if (statusEl) statusEl.className = "pane-subtext";
     try {
       const putRes = await api.send("/api/webhook-credentials", {
         method: "PUT",
@@ -35,6 +45,10 @@ export function initWebhook({ api, showSuccess, showError, CREDENTIAL_ADMIN_HEAD
   });
 
   document.getElementById("test-webhook-btn")?.addEventListener("click", async () => {
+    if (!capabilities?.mutations) {
+      showError("Testing webhook is disabled in the static demo.");
+      return;
+    }
     try {
       const response = await api.send("/api/notifications/test", {
         method: "POST",
@@ -49,6 +63,10 @@ export function initWebhook({ api, showSuccess, showError, CREDENTIAL_ADMIN_HEAD
   });
 
   document.getElementById("remove-webhook-btn")?.addEventListener("click", async () => {
+    if (!capabilities?.credentialManagement) {
+      showError("Removing webhook is disabled in the static demo.");
+      return;
+    }
     try {
       await api.send("/api/webhook-credentials", {
         method: "DELETE",

@@ -1,9 +1,16 @@
-export function initWebPush({ api, showSuccess, showError, DEMO_READ_ONLY }) {
+export function initWebPush({ api, showSuccess, showError, DEMO_READ_ONLY, capabilities }) {
   function urlBase64ToUint8Array(base64String) {
     const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
     const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
     const raw = atob(base64);
     return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
+  }
+
+  const pushBtn = document.getElementById("enable-web-push-btn");
+  if (pushBtn && !capabilities?.webPush) {
+    pushBtn.disabled = true;
+    pushBtn.textContent = "Available in a deployed instance";
+    pushBtn.title = "Browser Push is disabled in the static demo.";
   }
 
   async function fetchWebPushDevices() {
@@ -19,12 +26,13 @@ export function initWebPush({ api, showSuccess, showError, DEMO_READ_ONLY }) {
     }
     host.innerHTML = devices.map((device) =>
       `<div class="settings-toggle-row"><span>${device.deviceName} — ${device.enabled ? "Enabled" : "Disabled"}</span>
-        <button type="button" class="btn btn-secondary" data-push-disable="${device.id}">Disable</button>
-        <button type="button" class="btn btn-secondary" data-push-remove="${device.id}">Remove</button></div>`
+        <button type="button" class="btn btn-secondary" data-push-disable="${device.id}" ${!capabilities?.mutations ? "disabled" : ""}>Disable</button>
+        <button type="button" class="btn btn-secondary" data-push-remove="${device.id}" ${!capabilities?.mutations ? "disabled" : ""}>Remove</button></div>`
     ).join("");
     host.querySelectorAll("[data-push-disable]").forEach((btn) => {
       btn.addEventListener("click", async () => {
         try {
+          if (!capabilities?.mutations) return;
           await api.send(`/api/web-push/subscriptions/${btn.getAttribute("data-push-disable")}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
@@ -37,6 +45,7 @@ export function initWebPush({ api, showSuccess, showError, DEMO_READ_ONLY }) {
     host.querySelectorAll("[data-push-remove]").forEach((btn) => {
       btn.addEventListener("click", async () => {
         try {
+          if (!capabilities?.mutations) return;
           await api.send(`/api/web-push/subscriptions/${btn.getAttribute("data-push-remove")}`, {
             method: "DELETE"
           });
@@ -46,13 +55,14 @@ export function initWebPush({ api, showSuccess, showError, DEMO_READ_ONLY }) {
     });
   }
 
-  document.getElementById("enable-web-push-btn")?.addEventListener("click", async () => {
+  pushBtn?.addEventListener("click", async () => {
     try {
+      if (!capabilities?.webPush) throw new Error("Browser Push is disabled in the static demo.");
       if (DEMO_READ_ONLY) throw new Error("DEMO_READ_ONLY");
       if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
         throw new Error("Browser push is not supported in this browser.");
       }
-      const reg = await navigator.serviceWorker.register("/service-worker.js");
+      const reg = await navigator.serviceWorker.register("./service-worker.js");
       const permission = await Notification.requestPermission();
       if (permission !== "granted") throw new Error("Notification permission was not granted.");
       const vapidRes = await api.send("/api/web-push/vapid-public-key");

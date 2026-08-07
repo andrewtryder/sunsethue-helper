@@ -1,6 +1,6 @@
 import { escapeHtml } from "../lib/helpers.js";
 
-export function initSetupStatus({ api }) {
+export function initSetupStatus({ api, capabilities }) {
   async function fetchSetupChecklist() {
     const list = document.getElementById("setup-checklist");
     if (!list) return;

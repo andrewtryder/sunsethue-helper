@@ -24,4 +24,18 @@ html = html
   );
 writeFileSync(resolve(OUT, "index.html"), html);
 writeFileSync(resolve(OUT, "fixtures.json"), JSON.stringify(fixtures, null, 2));
+
+// GitHub Pages needs this to serve files starting with underscores and avoid Jekyll processing
+writeFileSync(resolve(OUT, ".nojekyll"), "");
+
+// Validate that no absolute root paths leaked into the index
+if (html.includes('href="/') || html.includes('src="/')) {
+  throw new Error("Demo build failed: Found root-relative paths in index.html, which breaks on subpaths.");
+}
+
+const manifestPath = resolve(OUT, "manifest.webmanifest");
+if (readFileSync(manifestPath, "utf8").includes('"/"')) {
+  throw new Error("Demo build failed: Found root-relative paths in manifest.webmanifest.");
+}
+
 console.log(`Demo artifact written to ${OUT}`);

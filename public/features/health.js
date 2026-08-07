@@ -1,6 +1,6 @@
 import { escapeHtml } from "../lib/helpers.js";
 
-export function initHealth({ api, formatDateTime = (v) => v }) {
+export function initHealth({ api, formatDateTime = (v) => v, capabilities }) {
   async function fetchOperationalStatus() {
     const summary = document.getElementById("notification-health-summary")
       || document.getElementById("ops-status-summary");

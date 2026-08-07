@@ -1,4 +1,4 @@
-export function initHistory({ api, DEMO_READ_ONLY, showSuccess, showError, afterClear }) {
+export function initHistory({ api, DEMO_READ_ONLY, showSuccess, showError, afterClear, capabilities }) {
   function selectedHistoryScopes() {
     const all = document.querySelector("[data-history-scope=\"all\"]");
     if (all?.checked) return ["all"];
@@ -48,6 +48,7 @@ export function initHistory({ api, DEMO_READ_ONLY, showSuccess, showError, after
   document.getElementById("history-export-btn")?.addEventListener("click", async () => {
     const status = document.getElementById("clear-history-status");
     try {
+      if (!capabilities?.mutations) throw new Error("Exporting history is disabled in the static demo.");
       if (DEMO_READ_ONLY) throw new Error("DEMO_READ_ONLY");
       const scopes = selectedHistoryScopes();
       const response = await api.send(`/api/history/export?scopes=${encodeURIComponent(scopes.join(","))}`);
@@ -69,6 +70,7 @@ export function initHistory({ api, DEMO_READ_ONLY, showSuccess, showError, after
   document.getElementById("history-clear-btn")?.addEventListener("click", async () => {
     const status = document.getElementById("clear-history-status");
     try {
+      if (!capabilities?.mutations) throw new Error("Clearing history is disabled in the static demo.");
       if (DEMO_READ_ONLY) throw new Error("DEMO_READ_ONLY");
       const scopes = selectedHistoryScopes();
       if (scopes.length === 0) throw new Error("Select a scope");

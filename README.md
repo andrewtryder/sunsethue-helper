@@ -21,7 +21,7 @@ Sunsethue Helper checks sunrise and sunset photo-quality forecasts for the place
 
 Private sunrise/sunset quality notifier for a single authorized user.
 
-Notification platform Releases 3–4 (health, self-test, clear history, doctor/setup/upgrade, static demo) ship in this tree. Design notes: [docs/design/notification-platform-roadmap.md](docs/design/notification-platform-roadmap.md).
+Notification platform Releases 3–4 (health, self-test, clear history, doctor/setup/upgrade, static demo) ship in this tree. Design notes: [docs/design/notification-platform-roadmap.md](docs/design/notification-platform-roadmap.md). Production soak checklist: [docs/notification-platform-acceptance.md](docs/notification-platform-acceptance.md).
 
 Operator CLIs:
 

@@ -2,6 +2,9 @@
 
 Releases 1–2 (scheduling, thresholds, outbox rebuild, browser push, signed webhook) and Releases 3–4 (notification health, weekly self-test, clear history, doctor/setup/upgrade CLIs, first-run checklist, GitHub Pages demo) are **implemented** in the main codebase.
 
+**Next:** production acceptance and soak testing — see
+[notification-platform-acceptance.md](../notification-platform-acceptance.md).
+
 This document remains as design background and operator orientation.
 
 ## Defaults carried forward

@@ -193,7 +193,9 @@ export async function bootstrapSecretsStore({ storeName = STORE_NAME } = {}) {
 
   const specs = [
     { name: EMAIL_SECRET_NAME, comment: "sunsethue-helper email transport (Gmail SMTP)" },
-    { name: PUSHOVER_SECRET_NAME, comment: "sunsethue-helper pushover transport" }
+    { name: PUSHOVER_SECRET_NAME, comment: "sunsethue-helper pushover transport" },
+    { name: WEBHOOK_SECRET_NAME, comment: "sunsethue-helper webhook transport" },
+    { name: WEB_PUSH_VAPID_SECRET_NAME, comment: "sunsethue-helper web push vapid keys" }
   ];
 
   for (const spec of specs) {

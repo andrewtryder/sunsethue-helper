@@ -9,6 +9,7 @@ import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { generateWranglerConfig } from "./generate-wrangler-config.mjs";
 import { resolveProject } from "./lib/project-config.mjs";
+import { applySchemaAlters } from "./lib/apply-schema-alters.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -34,7 +35,14 @@ async function main() {
 
   if (result.status !== 0) {
     process.exitCode = result.status ?? 1;
+    return;
   }
+
+  applySchemaAlters({
+    d1Name: project.d1Name,
+    remote: false,
+    cwd: ROOT
+  });
 }
 
 main().catch((error) => {

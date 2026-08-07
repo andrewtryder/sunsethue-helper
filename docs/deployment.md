@@ -39,7 +39,7 @@ First-time operators can run `npm run setup` (interactive) and later `npm run do
 For any change that adds tables, columns, or indexes:
 
 1. Snapshot production D1 with Cloudflare **Time Travel** first.
-2. Run `npm run db:schema:remote` locally (or from a trusted environment with `CLOUDFLARE_API_TOKEN`) to apply the new `schema.sql`. It is idempotent and never drops or mutates data.
+2. Run `npm run db:schema:remote` locally (or from a trusted environment with `CLOUDFLARE_API_TOKEN`) to apply the new `schema.sql` and any additive alters (for example `locations.scheduleTimes`). The script is idempotent and never drops or mutates existing rows.
 3. Trigger the `Production` workflow. The preflight check confirms the required tables exist before Wrangler ships Worker code that would depend on them.
 
 Access (Zero Trust) setup is also outside this pipeline; use the local `access:*` scripts.

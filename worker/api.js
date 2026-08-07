@@ -26,6 +26,7 @@ import {
   validateLocationName,
   validateSearchQuery
 } from "./validation.js";
+import { validateLocationScheduleTimesInput } from "../shared/time-format.js";
 import { assertCredentialRequestGuards, MAX_CREDENTIAL_BODY_BYTES } from "./credential-guards.js";
 import {
   adminRemoveEmail,
@@ -477,11 +478,32 @@ export async function handleHttpRequest(request, env, authContext = null, deps =
       return methodNotAllowed("GET, POST", requestId);
     }
 
-    // PUT /api/locations/:id and DELETE /api/locations/:id
+    // PUT /api/locations/:id/schedule, PUT /api/locations/:id, DELETE /api/locations/:id
     if (path.startsWith("/api/locations/")) {
-      const id = path.substring("/api/locations/".length);
+      const remainder = path.substring("/api/locations/".length);
+      const scheduleMatch = remainder.match(/^([^/]+)\/schedule$/);
+      const id = scheduleMatch ? scheduleMatch[1] : remainder;
       if (!isUuid(id)) {
         return errorResponse("BAD_REQUEST", "Invalid ID.", 400, requestId);
+      }
+
+      if (scheduleMatch) {
+        if (request.method !== "PUT") return methodNotAllowed("PUT", requestId);
+        const parsed = await readJsonBody(request);
+        if ("error" in parsed) return bodyErrorResponse(parsed.error, requestId);
+        if (rejectUnknownFields(parsed.value, new Set(["scheduleTimes"])).ok === false) {
+          return errorResponse("BAD_REQUEST", "Unexpected fields in request.", 400, requestId);
+        }
+        if (!Object.prototype.hasOwnProperty.call(parsed.value, "scheduleTimes")) {
+          return errorResponse("BAD_REQUEST", "Missing scheduleTimes.", 400, requestId);
+        }
+        const timesCheck = validateLocationScheduleTimesInput(parsed.value.scheduleTimes);
+        if (!timesCheck.ok) {
+          return errorResponse(timesCheck.code || "INVALID_SCHEDULE", "Invalid location schedule.", 400, requestId);
+        }
+        const updated = await db.updateLocationSchedule(env, id, timesCheck.times);
+        if (!updated) return errorResponse("NOT_FOUND", "Location not found.", 404, requestId);
+        return jsonResponse({ success: true, scheduleTimes: timesCheck.times }, 200, requestId);
       }
 
       if (request.method === "PUT") {

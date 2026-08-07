@@ -1133,6 +1133,21 @@ input:disabled {
   gap: var(--space-sm);
 }
 
+.location-schedule-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding-bottom: var(--space-sm);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: var(--space-xs);
+}
+
+.location-schedule-editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
 .location-rule-channel {
   display: flex;
   flex-direction: column;

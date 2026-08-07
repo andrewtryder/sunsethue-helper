@@ -4,6 +4,7 @@ import { pruneOperationalData } from "../db.js";
 import { getApplicationSettings } from "../notifications/application-settings.js";
 import {
   buildOccurrenceKey,
+  effectiveLocationScheduleTimes,
   getZonedParts,
   parseScheduleTimes
 } from "../../shared/time-format.js";
@@ -18,6 +19,7 @@ import { maybeRunWeeklySelfTest } from "./selftest.js";
  *   runAndSendReport?: typeof runAndSendReport,
  *   dispatchPendingNotifications?: typeof dispatchPendingNotifications,
  *   getApplicationSettings?: typeof getApplicationSettings,
+ *   getLocations?: typeof db.getLocations,
  *   claimScheduledOccurrence?: typeof db.claimScheduledOccurrence,
  *   bindOccurrenceRun?: typeof db.bindOccurrenceRun,
  *   maybeRunWeeklySelfTest?: typeof maybeRunWeeklySelfTest
@@ -28,6 +30,7 @@ export async function handleScheduledReport(event, env, deps = {}) {
   const runReport = deps.runAndSendReport || runAndSendReport;
   const dispatch = deps.dispatchPendingNotifications || dispatchPendingNotifications;
   const loadSettings = deps.getApplicationSettings || getApplicationSettings;
+  const loadLocations = deps.getLocations || db.getLocations;
   const claimOccurrence = deps.claimScheduledOccurrence || db.claimScheduledOccurrence;
   const bindRun = deps.bindOccurrenceRun || db.bindOccurrenceRun;
   const runSelfTest = deps.maybeRunWeeklySelfTest || maybeRunWeeklySelfTest;
@@ -55,7 +58,7 @@ export async function handleScheduledReport(event, env, deps = {}) {
   }
 
   const timeZone = settings.scheduleTimezone || "America/New_York";
-  const scheduleTimes = parseScheduleTimes(settings.scheduleTimes);
+  const globalScheduleTimes = parseScheduleTimes(settings.scheduleTimes);
   const parts = getZonedParts(now, timeZone);
   const slot = `${String(parts.hour).padStart(2, "0")}:00`;
 
@@ -72,8 +75,19 @@ export async function handleScheduledReport(event, env, deps = {}) {
     return null;
   }
 
-  if (!scheduleTimes.includes(slot)) {
-    console.log(`No scheduled report matched for hour ${parts.hour} in ${timeZone}.`);
+  let locations = [];
+  try {
+    locations = await loadLocations(env);
+  } catch {
+    locations = [];
+  }
+
+  const dueLocations = locations.filter((loc) =>
+    effectiveLocationScheduleTimes(loc, globalScheduleTimes).includes(slot)
+  );
+
+  if (dueLocations.length === 0) {
+    console.log(`No locations due for hour ${parts.hour} in ${timeZone}.`);
     return null;
   }
 
@@ -85,9 +99,14 @@ export async function handleScheduledReport(event, env, deps = {}) {
   }
 
   const triggerType = `SCHEDULED:${slot}`;
-  console.log(`Time match: Running scheduled ${triggerType} (${occurrenceKey})...`);
+  console.log(
+    `Time match: Running scheduled ${triggerType} for ${dueLocations.length}/${locations.length} locations (${occurrenceKey})...`
+  );
   try {
-    const result = await runReport(triggerType, env, deps);
+    const result = await runReport(triggerType, env, {
+      ...deps,
+      locations: dueLocations
+    });
     if (result?.runId) {
       await bindRun(env, occurrenceKey, result.runId);
     }

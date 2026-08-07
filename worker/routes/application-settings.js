@@ -31,13 +31,15 @@ export async function tryHandle(ctx) {
       ...settings,
       quota: estimateForecastQuota({
         scheduleTimes: settings.scheduleTimes,
+        locations,
         activeLocations: locations.length,
         remainingCredits
       }),
       quotaNotes: {
         channelsDoNotAffectForecastQuota: true,
         manualReportsExcluded: true,
-        retriesReuseStoredPayload: true
+        retriesReuseStoredPayload: true,
+        perLocationSchedulesCounted: true
       }
     }, 200, requestId);
   }

@@ -120,6 +120,7 @@ test("Frontend File Structure & Integrity Checks", () => {
     "location-rules-grid",
     "schedule-times-pills",
     "check-times-locations-section",
+    "location-rules-title",
     "enable-web-push-btn",
     "webhook-credentials-form",
   ];

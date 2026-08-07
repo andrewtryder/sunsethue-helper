@@ -156,6 +156,42 @@ test("PUT and DELETE /api/locations/:id mutate the addressed row", async () => {
   );
 });
 
+test("PUT /api/locations/:id/schedule sets and clears custom check times", async () => {
+  await withApi(
+    async ({ call }) => {
+      const listed = await call("/api/locations");
+      assert.equal(listed.status, 200);
+      const before = await listed.json();
+      assert.equal(before[0].scheduleTimes, null);
+
+      const setCustom = await call(`/api/locations/${LOCATION_ID_A}/schedule`, {
+        method: "PUT",
+        body: { scheduleTimes: ["09:00", "15:00"] }
+      });
+      assert.equal(setCustom.status, 200);
+      assert.deepEqual((await setCustom.json()).scheduleTimes, ["09:00", "15:00"]);
+
+      const afterSet = await (await call("/api/locations")).json();
+      assert.deepEqual(afterSet[0].scheduleTimes, ["09:00", "15:00"]);
+
+      const invalid = await call(`/api/locations/${LOCATION_ID_A}/schedule`, {
+        method: "PUT",
+        body: { scheduleTimes: ["09:30"] }
+      });
+      assert.equal(invalid.status, 400);
+
+      const clear = await call(`/api/locations/${LOCATION_ID_A}/schedule`, {
+        method: "PUT",
+        body: { scheduleTimes: null }
+      });
+      assert.equal(clear.status, 200);
+      const afterClear = await (await call("/api/locations")).json();
+      assert.equal(afterClear[0].scheduleTimes, null);
+    },
+    { locations: [{ id: LOCATION_ID_A, name: "Beach", latitude: 1, longitude: 2, createdAt: 1 }] }
+  );
+});
+
 test("PUT /api/locations/:id validates the body and 404s a missing row", async () => {
   await withApi(async ({ call }) => {
     const invalid = await call(`/api/locations/${LOCATION_ID_A}`, { method: "PUT", body: { name: "Only name" } });

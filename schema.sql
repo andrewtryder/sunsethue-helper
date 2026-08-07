@@ -3,12 +3,16 @@
 -- Apply locally with: npm run db:schema:local
 -- Apply to production D1 with: npm run db:schema:remote
 --   (creates missing tables/indexes; never mutates existing rows).
+-- Additive column changes for existing DBs are applied afterward via
+-- scripts/lib/apply-schema-alters.mjs (duplicate-column errors ignored).
 
 CREATE TABLE IF NOT EXISTS locations (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   latitude REAL NOT NULL,
   longitude REAL NOT NULL,
+  -- JSON array of whole-hour slots, or NULL to inherit application_settings.scheduleTimes
+  scheduleTimes TEXT,
   latestSunriseTime TEXT,
   latestSunriseQuality REAL,
   latestSunriseText TEXT,

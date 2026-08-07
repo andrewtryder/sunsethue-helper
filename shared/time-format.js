@@ -72,6 +72,50 @@ export function validateScheduleTimes(times) {
 }
 
 /**
+ * Parse a location override schedule.
+ * `null` / missing / blank means inherit the global application schedule.
+ * @param {unknown} raw
+ * @returns {string[]|null}
+ */
+export function parseOptionalLocationScheduleTimes(raw) {
+  if (raw == null || raw === "") return null;
+  let list = raw;
+  if (typeof raw === "string") {
+    try {
+      list = JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+  if (!Array.isArray(list) || list.length === 0) return null;
+  const validated = validateScheduleTimes(list);
+  return validated.ok ? validated.times : null;
+}
+
+/**
+ * Effective whole-hour slots for a location (custom override or global default).
+ * @param {{ scheduleTimes?: unknown }|null|undefined} location
+ * @param {unknown} globalScheduleTimes
+ * @returns {string[]}
+ */
+export function effectiveLocationScheduleTimes(location, globalScheduleTimes) {
+  const custom = parseOptionalLocationScheduleTimes(location?.scheduleTimes);
+  if (custom) return custom;
+  return parseScheduleTimes(globalScheduleTimes);
+}
+
+/**
+ * Validate a location schedule PUT body value.
+ * `null` clears the override (inherit global). Non-null must be a valid non-empty schedule.
+ * @param {unknown} value
+ * @returns {{ ok: true, times: string[]|null } | { ok: false, code: string }}
+ */
+export function validateLocationScheduleTimesInput(value) {
+  if (value === null) return { ok: true, times: null };
+  return validateScheduleTimes(value);
+}
+
+/**
  * Parts of `instant` in `timeZone` (hour 0–23, minute, YYYY-MM-DD calendar date).
  * @param {Date|number} instant
  * @param {string} timeZone

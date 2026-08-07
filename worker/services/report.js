@@ -34,7 +34,11 @@ export async function generateReport(triggerType, env, deps = {}) {
   const fetchImpl = deps.fetch || fetch;
   const now = deps.now ?? Date.now();
   validateReportEnv(env);
-  const locations = await db.getLocations(env);
+  let locations = Array.isArray(deps.locations) ? deps.locations : await db.getLocations(env);
+  if (Array.isArray(deps.locationIds)) {
+    const idSet = new Set(deps.locationIds);
+    locations = locations.filter((loc) => idSet.has(loc.id));
+  }
   const activeLocations = locations.slice(0, 10);
   const results = await Promise.all(activeLocations.map(async (loc) => {
     try {

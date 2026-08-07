@@ -176,6 +176,7 @@ export async function getNotificationHealth(env, deps = {}) {
       times: settings.scheduleTimes,
       quota: estimateForecastQuota({
         scheduleTimes: settings.scheduleTimes,
+        locations,
         activeLocations: locations.length
       })
     },

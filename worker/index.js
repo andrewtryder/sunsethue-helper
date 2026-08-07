@@ -1,5 +1,5 @@
 import { handleHttpRequest } from "./api.js";
-import { handleScheduledReport } from "./cron.js";
+import { handleScheduledReport } from "./services/scheduler.js";
 import { authenticateRequest, AuthError } from "./auth.js";
 import { createRequestId, errorResponse, logSafe } from "./http.js";
 

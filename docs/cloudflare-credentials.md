@@ -115,7 +115,5 @@ npm run security:scan
 
 Neither command is part of `npm run ci`. The weekly/manual
 [security workflow](../.github/workflows/security.yml) runs the same
-digest-pinned scanners without production secrets. See
-[docs/public-release-checklist.md](public-release-checklist.md).
-
-A one-time history rewrite removed personal email addresses and the previously committed production D1 database id from every reachable commit. Treat that D1 id as previously disclosed inventory: it is not a credential, but it must live only in the `D1_DATABASE_ID` GitHub environment secret going forward. GitHub may keep unreachable objects addressable by SHA until its own garbage collection runs; contact GitHub Support if a complete purge of cached views is required.
+digest-pinned scanners without production secrets. See [SECURITY.md](../SECURITY.md)
+and [CONTRIBUTING.md](../CONTRIBUTING.md) for reporting and local hardening expectations.

@@ -21,13 +21,12 @@ Sunsethue Helper checks sunrise and sunset photo-quality forecasts for the place
 
 Private sunrise/sunset quality notifier for a single authorized user.
 
-Notification platform Releases 3–4 (health, self-test, clear history, doctor/setup/upgrade, static demo) ship in this tree. Design notes: [docs/design/notification-platform-roadmap.md](docs/design/notification-platform-roadmap.md). Release acceptance matrix: [docs/release-acceptance.md](docs/release-acceptance.md).
+Release acceptance matrix: [docs/release-acceptance.md](docs/release-acceptance.md).
 
 Operator CLIs:
 
 - `npm run doctor` — read-only deployment checklist
 - `npm run setup` — interactive first-time orchestrator (never collects Gmail/Pushover in the terminal)
-- `npm run upgrade` — pending reviewed D1 upgrades + redeploy + verify
 - `npm run demo:build` — build static GitHub Pages demo artifact
 - `npm run demo:serve` — serve static demo artifact locally
 - `npm run test:demo` — run E2E tests against static demo
@@ -230,7 +229,7 @@ Use the **Rollback production** workflow with the exact Worker version id and Pa
 
 D1 recovery uses Time Travel or re-applying `schema.sql`; the rollback workflow does not modify the database.
 
-After a controlled recovery drill, record measured RTO/RPO in [docs/recovery-exercise.md](docs/recovery-exercise.md).
+After a controlled recovery drill, record measured RTO/RPO (see the archive note in [docs/archive/recovery-exercise-2026-08-01.md](docs/archive/recovery-exercise-2026-08-01.md) for an example).
 
 ### Manual browser verification
 
@@ -257,8 +256,8 @@ Never point Playwright at production, real SMTP, Pushover, or Secrets Store.
 | Pin | Source of truth |
 | --- | --- |
 | Node.js 24 | `.nvmrc`, `.node-version`, `package.json` engines, CI `node-version-file` |
-| Wrangler 4.115.0 | `package.json` `devDependencies.wrangler` and every `wranglerVersion:` in workflows |
-| Gitleaks 8.30.1 / TruffleHog 3.96.0 | `scripts/lib/scanner-versions.mjs` and `.github/workflows/security.yml` digests |
+| Wrangler | `package.json` `devDependencies.wrangler` and every `wranglerVersion:` in workflows |
+| Gitleaks / TruffleHog | `scripts/lib/scanner-versions.mjs` and `.github/workflows/security.yml` digests |
 
 `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24` is set on workflows so GitHub Actions that still declare Node 20 runtimes execute on Node 24. It is not an application Node-version setting. Revisit and remove it once every pinned action natively supports Node 24.
 
@@ -267,6 +266,4 @@ Never point Playwright at production, real SMTP, Pushover, or Secrets Store.
 ## License and contributing
 
 This project is [MIT](LICENSE)-licensed. See [CONTRIBUTING.md](CONTRIBUTING.md),
-[SECURITY.md](SECURITY.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), and the
-[public release checklist](docs/public-release-checklist.md) before publishing
-a fork or making the repository public.
+[SECURITY.md](SECURITY.md), and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).

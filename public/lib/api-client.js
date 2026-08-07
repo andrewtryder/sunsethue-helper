@@ -55,7 +55,6 @@ export function createDemoClient(fixtures) {
   async function get(path) {
     if (path.startsWith("/api/notification-health")) return fixtures.notificationHealth;
     if (path.startsWith("/api/setup-status")) return fixtures.setupStatus;
-    if (path.startsWith("/api/operational-status")) return fixtures.operationalStatus;
     if (path.startsWith("/api/application-settings")) return fixtures.applicationSettings;
     if (path.startsWith("/api/notification-settings")) return fixtures.notificationSettings;
     if (path.startsWith("/api/locations")) return fixtures.locations;

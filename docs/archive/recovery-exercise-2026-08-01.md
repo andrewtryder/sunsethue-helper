@@ -68,7 +68,7 @@ Prefer Time Travel restore into a **fork/export**, never an unattended restore o
 
 ### 6. Provider credential recreate (UI)
 
-Remove and re-save Gmail or Pushover via Settings → provider cards. Confirm `/api/operational-status` shows `secrets_store` after save and a test send succeeds.
+Remove and re-save Gmail or Pushover via Settings → provider cards. Confirm Notification health / credential status shows configured Secrets Store-backed transports after save and a test send succeeds.
 
 ## Measured drill (2026-08-01)
 

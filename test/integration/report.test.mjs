@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { runAndSendReport, buildHtmlEmail } from "../../worker/report.js";
-import { handleScheduledReport } from "../../worker/cron.js";
+import { runAndSendReport, buildHtmlEmail } from "../../worker/services/report.js";
+import { handleScheduledReport } from "../../worker/services/scheduler.js";
 import * as db from "../../worker/db.js";
 import { saveSettings } from "../../worker/notifications/settings.js";
 import { createLocalD1 } from "../support/local-d1.mjs";

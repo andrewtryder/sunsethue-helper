@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import worker from "../../worker/index.js";
-import { handleScheduledReport } from "../../worker/cron.js";
+import { handleScheduledReport } from "../../worker/services/scheduler.js";
 import { AuthError, createTestJwks, setAuthDependencies } from "../../worker/auth.js";
 import {
   AUTHORIZED_EMAIL,

@@ -1,6 +1,11 @@
 import * as db from "../db.js";
 import { getSettings } from "../notifications/settings.js";
 import { listRules, saveRule } from "../notifications/rules.js";
+import {
+  copyLocationRulesToAll,
+  setChannelEnabledForAllLocations,
+  upsertLocationNotificationRule
+} from "../repositories/notification-rules.js";
 import { jsonResponse, errorResponse, methodNotAllowed } from "../http.js";
 import { readJsonBody } from "../validation.js";
 import { bodyErrorResponse } from "./_shared.js";
@@ -36,7 +41,7 @@ export async function tryHandle(ctx) {
       if (typeof sourceLocationId !== "string") {
         return errorResponse("INVALID_LOCATION", "sourceLocationId is required.", 400, requestId);
       }
-      await db.copyLocationRulesToAll(env, sourceLocationId, now);
+      await copyLocationRulesToAll(env, sourceLocationId, now);
       return jsonResponse({ rules: await listRules(env) }, 200, requestId);
     }
     if (action === "set-channel-enabled") {
@@ -45,7 +50,7 @@ export async function tryHandle(ctx) {
       if (typeof channel !== "string" || typeof enabled !== "boolean") {
         return errorResponse("INVALID_RULE", "channel and enabled are required.", 400, requestId);
       }
-      await db.setChannelEnabledForAllLocations(env, channel, enabled, now);
+      await setChannelEnabledForAllLocations(env, channel, enabled, now);
       return jsonResponse({ rules: await listRules(env) }, 200, requestId);
     }
     if (action === "reset-defaults") {
@@ -57,7 +62,7 @@ export async function tryHandle(ctx) {
             : channel === "pushover" ? settings.pushoverEnabled
               : channel === "webhook" ? settings.webhookEnabled
                 : 1;
-          await db.upsertLocationNotificationRule(env, {
+          await upsertLocationNotificationRule(env, {
             locationId: loc.id,
             channel,
             enabled: Number(master) === 1,

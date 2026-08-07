@@ -281,8 +281,8 @@ test("gitignore ignores secrets and preserves intentional examples", async () =>
     "*.pem",
     "*.key",
     "*.sqlite",
-    "cloudflare-state/",
-    "rollback-snapshots/"
+    ".wrangler/",
+    ".tmp/"
   ]) {
     assert.match(
       gitignore,

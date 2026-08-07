@@ -55,7 +55,6 @@
     "access:plan": "node scripts/cloudflare-access.mjs plan",
     "access:apply": "node scripts/cloudflare-access.mjs apply",
     "access:verify": "node scripts/cloudflare-access.mjs verify",
-    "preview:email": "node scripts/preview-email.js",
     "prepare": "husky"
   },
   "dependencies": {

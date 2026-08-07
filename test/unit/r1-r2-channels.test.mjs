@@ -37,6 +37,11 @@ import {
 import { qualityToPercent } from "../../worker/helpers.js";
 import { createLocalD1 } from "../support/local-d1.mjs";
 import * as db from "../../worker/db.js";
+import {
+  getWebPushSubscription,
+  publicWebPushSubscriptions,
+  updateWebPushSubscriptionMeta
+} from "../../worker/repositories/webpush.js";
 
 test("application settings validation rejects bad timezones and schedules", () => {
   assert.throws(
@@ -449,7 +454,7 @@ test("web push registration and send classification", async () => {
       deviceName: "Phone"
     }, { userAgent: "TestAgent/1.0" }, 10);
     assert.equal(device.deviceName, "Phone");
-    assert.equal((await db.publicWebPushSubscriptions(env))[0].enabled, true);
+    assert.equal((await publicWebPushSubscriptions(env))[0].enabled, true);
 
     const ok = await sendWebPush(
       { deliveryTargetId: device.id, payload: JSON.stringify({ version: 1, triggerType: "TEST", generatedAt: 1, locations: [] }) },
@@ -468,11 +473,11 @@ test("web push registration and send classification", async () => {
       }),
       (error) => error.code === "WEBPUSH_SUBSCRIPTION_GONE"
     );
-    const gone = await db.getWebPushSubscription(env, device.id);
+    const gone = await getWebPushSubscription(env, device.id);
     assert.equal(Number(gone.enabled), 0);
 
     // Re-enable for further classification paths.
-    await db.updateWebPushSubscriptionMeta(env, device.id, { enabled: true, lastSeenAt: 40 });
+    await updateWebPushSubscriptionMeta(env, device.id, { enabled: true, lastSeenAt: 40 });
     await assert.rejects(
       () => sendWebPush({ deliveryTargetId: device.id, payload: "{}" }, env, {
         now: 41,
@@ -480,7 +485,7 @@ test("web push registration and send classification", async () => {
       }),
       (error) => error.code === "WEBPUSH_REVOKED"
     );
-    await db.updateWebPushSubscriptionMeta(env, device.id, { enabled: true, lastSeenAt: 50 });
+    await updateWebPushSubscriptionMeta(env, device.id, { enabled: true, lastSeenAt: 50 });
     await assert.rejects(
       () => sendWebPush({ deliveryTargetId: device.id, payload: "{}" }, env, {
         now: 51,
@@ -530,7 +535,7 @@ test("web push registration and send classification", async () => {
       }),
       (error) => error.code === "INVALID_DEVICE_NAME"
     );
-    await db.updateWebPushSubscriptionMeta(env, device.id, { enabled: false, lastSeenAt: 55 });
+    await updateWebPushSubscriptionMeta(env, device.id, { enabled: false, lastSeenAt: 55 });
     await assert.rejects(
       () => sendWebPush({ deliveryTargetId: device.id, payload: "{}" }, env, { now: 60 }),
       (error) => error.code === "WEB_PUSH_SUBSCRIPTION_DISABLED"

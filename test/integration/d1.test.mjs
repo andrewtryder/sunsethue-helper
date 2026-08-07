@@ -52,11 +52,11 @@ test("schema.sql creates the tables and indexes the Worker queries", async () =>
   });
 });
 
-test("operational status reports a missing required table", async () => {
+test("setup status reports a missing required table", async () => {
   await withDatabase(async (env, local) => {
     local.database.exec("DROP TABLE provider_credential_limiter");
-    const status = await db.getOperationalStatus(env);
-    assert.equal(status.requiredTablesPresent, false);
+    const status = await db.getSetupStatus(env);
+    assert.equal(status.databaseTables, "missing");
   });
 });
 

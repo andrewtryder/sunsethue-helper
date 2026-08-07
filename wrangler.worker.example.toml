@@ -18,7 +18,7 @@ preview_urls = false
 # CLOUDFLARE_API_TOKEN must never be present on this Worker.
 
 [triggers]
-# Hourly UTC; worker/cron.js evaluates local scheduleTimes in scheduleTimezone.
+# Hourly UTC; worker/services/scheduler.js evaluates local scheduleTimes in scheduleTimezone.
 crons = ["0 * * * *"]
 
 [[d1_databases]]

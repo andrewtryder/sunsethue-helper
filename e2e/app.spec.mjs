@@ -17,22 +17,6 @@ test.describe("Horizon app smoke", () => {
       }
       await route.fulfill({ status: 200, contentType: "application/json", body: "{}" });
     });
-    await page.route("**/api/operational-status", async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          lastScheduledRunAt: null,
-          lastSuccessfulRunAt: null,
-          oldestPendingDeliveryAgeSeconds: 0,
-          pendingDeliveries: 0,
-          failedDeliveries: 0,
-          emailTransport: "not_configured",
-          pushoverTransport: "not_configured",
-          requiredTablesPresent: true
-        })
-      });
-    });
   });
 
   test("initializes and switches tabs", async ({ page }) => {

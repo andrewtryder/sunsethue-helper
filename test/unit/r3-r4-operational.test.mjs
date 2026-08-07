@@ -7,7 +7,7 @@ import {
   runPassiveSelfTest,
   runActiveSelfTest,
   maybeRunWeeklySelfTest
-} from "../../worker/notifications/selftest.js";
+} from "../../worker/services/selftest.js";
 import {
   clearHistory,
   expandHistoryScopes,
@@ -18,6 +18,17 @@ import {
 import { NotificationError } from "../../worker/notifications/errors.js";
 import { createLocalD1 } from "../support/local-d1.mjs";
 import * as db from "../../worker/db.js";
+import {
+  getLatestHealthCheckRun,
+  insertAdminAuditEvent,
+  insertHealthCheckRun
+} from "../../worker/repositories/health-checks.js";
+import {
+  clearHistoryScopes,
+  countHistoryScope,
+  exportHistoryScope
+} from "../../worker/repositories/history.js";
+import { upsertWebPushSubscription } from "../../worker/repositories/webpush.js";
 import {
   checkCron,
   checkD1Tables,
@@ -153,7 +164,7 @@ test("passive self-test writes health_check_runs", async () => {
     };
     const row = await runPassiveSelfTest(env, { now: 1000 });
     assert.equal(row.checkType, "weekly_passive");
-    const stored = await db.getLatestHealthCheckRun(env);
+    const stored = await getLatestHealthCheckRun(env);
     assert.equal(stored.id, row.id);
     assert.ok(["pass", "fail"].includes(stored.status));
 
@@ -189,7 +200,7 @@ test("setup status and remaining history scopes", async () => {
   const local = await createLocalD1();
   try {
     const env = { DB: local.DB };
-    await db.insertAdminAuditEvent(env, {
+    await insertAdminAuditEvent(env, {
       id: "a1",
       eventType: "credential_updated",
       categories: "[]",
@@ -199,10 +210,10 @@ test("setup status and remaining history scopes", async () => {
     const setup = await db.getSetupStatus(env);
     assert.equal(setup.accessReady, true);
     assert.equal(setup.databaseTables, "ready");
-    assert.equal((await db.exportHistoryScope(env, "credential_audit")).length, 1);
-    assert.equal(await db.countHistoryScope(env, "credential_audit"), 1);
-    assert.equal(await db.countHistoryScope(env, "bogus"), 0);
-    await db.clearHistoryScopes(env, ["credential_audit"]);
+    assert.equal((await exportHistoryScope(env, "credential_audit")).length, 1);
+    assert.equal(await countHistoryScope(env, "credential_audit"), 1);
+    assert.equal(await countHistoryScope(env, "bogus"), 0);
+    await clearHistoryScopes(env, ["credential_audit"]);
   } finally {
     local.close();
   }
@@ -302,7 +313,7 @@ test("notification health aggregates without secrets", async () => {
         (id, runId, channel, status, payload, attempts, nextAttemptAt, createdAt)
        VALUES ('pend-e', 'run-health', 'webpush', 'pending', '{}', 0, 950, 90)`
     ).run();
-    await db.upsertWebPushSubscription(env, {
+    await upsertWebPushSubscription(env, {
       id: "push-1",
       endpoint: "https://push.example.com/a",
       p256dh: "p",
@@ -313,7 +324,7 @@ test("notification health aggregates without secrets", async () => {
       createdAt: 1,
       lastSeenAt: 1
     });
-    await db.insertHealthCheckRun(env, {
+    await insertHealthCheckRun(env, {
       id: "hc-1",
       checkType: "weekly_passive",
       provider: "system",
@@ -352,7 +363,7 @@ test("history parse scopes from query string", async () => {
   const local = await createLocalD1();
   try {
     const env = { DB: local.DB };
-    await db.insertHealthCheckRun(env, {
+    await insertHealthCheckRun(env, {
       id: "h1",
       checkType: "manual",
       provider: "system",
@@ -384,7 +395,7 @@ test("history parse scopes from query string", async () => {
 });
 
 test("maybeRunWeeklySelfTest claims occurrence once", async () => {
-  const { maybeRunWeeklySelfTest } = await import("../../worker/notifications/selftest.js");
+  const { maybeRunWeeklySelfTest } = await import("../../worker/services/selftest.js");
   const local = await createLocalD1();
   try {
     const env = { DB: local.DB };
@@ -421,7 +432,7 @@ test("maybeRunWeeklySelfTest claims occurrence once", async () => {
 });
 
 test("active self-test enqueues through injected deps", async () => {
-  const { runActiveSelfTest } = await import("../../worker/notifications/selftest.js");
+  const { runActiveSelfTest } = await import("../../worker/services/selftest.js");
   const local = await createLocalD1();
   try {
     const env = { DB: local.DB, WEBAPP_URL: "https://example.com" };

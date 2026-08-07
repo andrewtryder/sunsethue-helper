@@ -38,18 +38,6 @@ Recipient email, Pushover device/priority/sound, webhook enable/masked hostname,
 
 Non-secret Web Push config on the Worker: `WEB_PUSH_VAPID_PUBLIC_KEY` and `WEB_PUSH_SUBJECT` (mailto: or https URL).
 
-## Schema upgrades (existing installs)
-
-New installs use [`schema.sql`](../schema.sql). Existing production D1 databases need reviewed operator scripts (Time Travel bookmark first):
-
-```bash
-npm run db:upgrade:r1 -- --remote    # application_settings, location rules, occurrences
-npm run db:upgrade:r2 -- --remote    # outbox rebuild, web_push_subscriptions, webhook columns
-npm run db:upgrade:r3 -- --remote    # health_check_runs, admin_audit_events
-# Or: npm run upgrade  (detects pending reviewed upgrades, redeploys, verifies)
-```
-
-See [notification-platform-roadmap.md](design/notification-platform-roadmap.md) for Releases 3–4.
 
 ## One-time bootstrap
 

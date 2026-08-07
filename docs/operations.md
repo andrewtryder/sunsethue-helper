@@ -49,11 +49,10 @@ Adjust `pruneOperationalData` retain window if needed.
 
 Report schedule times and timezone live in `application_settings`. The Worker keeps an hourly UTC cron and evaluates local whole-hour slots with occurrence dedupe (`scheduled_occurrences`). Per-location channel thresholds live in `location_notification_rules`. Skipped deliveries use `NO_LOCATION_ABOVE_THRESHOLD` when no location qualifies.
 
-Existing D1 installs: run `npm run db:upgrade:r1`, `npm run db:upgrade:r2`, then `npm run db:upgrade:r3` after a Time Travel bookmark (or `npm run upgrade`). See [secrets-store-credentials.md](secrets-store-credentials.md).
+
 
 ## Operator CLIs
 
 - `npm run doctor` — read-only checklist (token, D1 tables, Secrets Store, private Workers, Pages binding, cron, Access redirect)
 - `npm run setup` — interactive first-time orchestrator; never collects Gmail/Pushover in the terminal
-- `npm run upgrade` — pending reviewed `db:upgrade:rN` scripts, redeploy, verify, print rollback ids
 - `npm run demo:build` — static demo artifact for GitHub Pages

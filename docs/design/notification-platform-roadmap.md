@@ -3,7 +3,7 @@
 Releases 1–2 (scheduling, thresholds, outbox rebuild, browser push, signed webhook) and Releases 3–4 (notification health, weekly self-test, clear history, doctor/setup/upgrade CLIs, first-run checklist, GitHub Pages demo) are **implemented** in the main codebase.
 
 **Next:** production acceptance and soak testing — see
-[notification-platform-acceptance.md](../notification-platform-acceptance.md).
+[release-acceptance.md](../release-acceptance.md).
 
 This document remains as design background and operator orientation.
 
@@ -28,7 +28,7 @@ This document remains as design background and operator orientation.
 
 ## Non-goals already decided for R1–R2
 
-- No full migration framework (only reviewed operator upgrade scripts)
+- No full migration framework
 - No “each location’s timezone” display mode
 - No multi-webhook destinations
 
@@ -111,9 +111,6 @@ Do **not** collect Gmail/Pushover credentials in the terminal.
 
 Read-only report: token, D1, required tables, Secrets Store, provider docs, private Workers, Pages binding, Access app, cron, production Access redirect.
 
-### Guided upgrade (`npm run upgrade`)
-
-Compare schema requirements; apply only explicit reviewed upgrade scripts; deploy in order; verify; print rollback identifiers.
 
 ### First-run setup checklist (UI)
 
@@ -141,6 +138,6 @@ All items below are implemented:
 2. Weekly self-test (passive then active)
 3. Clear history + export — `/api/history/*`
 4. Setup wizard + doctor — `npm run setup` / `npm run doctor`
-5. Guided upgrade command — `npm run upgrade`
+
 6. First-run checklist UI — `GET /api/setup-status`
 7. GitHub Pages demo + README links — `npm run demo:build` / `publish-demo.yml`

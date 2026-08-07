@@ -20,3 +20,7 @@ compatibility_flags = [ "nodejs_compat" ]
 [[env.preview.services]]
 binding = "API_SERVICE"
 service = "{{WORKER_NAME}}"
+
+[observability]
+enabled = true
+head_sampling_rate = 1

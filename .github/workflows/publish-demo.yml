@@ -7,6 +7,11 @@ on:
       - "public/**"
       - "demo/**"
       - "scripts/build-demo.mjs"
+      - "scripts/serve-demo.mjs"
+      - "e2e/demo.spec.mjs"
+      - "playwright.demo.config.mjs"
+      - "package.json"
+      - "package-lock.json"
       - ".github/workflows/publish-demo.yml"
   workflow_dispatch:
 
@@ -39,7 +44,15 @@ jobs:
           node-version-file: .nvmrc
 
       - name: Build static demo
-        run: node scripts/build-demo.mjs
+        run: npm run demo:build
+
+      - name: Test static demo locally
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+          npm run demo:serve &
+          sleep 2
+          E2E_BASE_URL=http://127.0.0.1:3001 npm run test:demo
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0

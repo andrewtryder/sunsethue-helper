@@ -28,7 +28,9 @@ Operator CLIs:
 - `npm run doctor` — read-only deployment checklist
 - `npm run setup` — interactive first-time orchestrator (never collects Gmail/Pushover in the terminal)
 - `npm run upgrade` — pending reviewed D1 upgrades + redeploy + verify
-- `npm run demo:build` — static GitHub Pages demo artifact
+- `npm run demo:build` — build static GitHub Pages demo artifact
+- `npm run demo:serve` — serve static demo artifact locally
+- `npm run test:demo` — run E2E tests against static demo
 
 ### Architecture
 

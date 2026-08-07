@@ -1,6 +1,6 @@
 import { setStatusBadge } from "../ui/forms.js";
 
-export function initNotifications({ api, showSuccess, showError, CREDENTIAL_ADMIN_HEADER, fetchDeliveries }) {
+export function initNotifications({ api, showBanner, showSuccess, showError, CREDENTIAL_ADMIN_HEADER, fetchDeliveries, capabilities }) {
   const notificationEmailEnabled = document.getElementById("notification-email-enabled");
   const notificationEmailTo = document.getElementById("notification-email-to");
   const notificationPushoverEnabled = document.getElementById("notification-pushover-enabled");
@@ -99,6 +99,9 @@ export function initNotifications({ api, showSuccess, showError, CREDENTIAL_ADMI
   }
 
   async function testNotification(channel) {
+    if (!capabilities?.mutations) {
+      throw new Error(`Testing ${channel} is disabled in the static demo.`);
+    }
     const response = await api.send("/api/notifications/test", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -122,6 +125,10 @@ export function initNotifications({ api, showSuccess, showError, CREDENTIAL_ADMI
 
   notificationSettingsForm?.addEventListener("submit", async (event) => {
     event.preventDefault();
+    if (!capabilities?.mutations) {
+      showError("Saving notification settings is disabled in the static demo.");
+      return;
+    }
     const body = {
       emailEnabled: notificationEmailEnabled.checked,
       emailTo: notificationEmailTo.value || null,
@@ -145,6 +152,11 @@ export function initNotifications({ api, showSuccess, showError, CREDENTIAL_ADMI
 
   gmailCredentialsForm?.addEventListener("submit", async (event) => {
     event.preventDefault();
+    if (!capabilities?.credentialManagement) {
+      gmailCredentialsStatus.className = "pane-subtext error";
+      gmailCredentialsStatus.textContent = "Credential management is disabled in the static demo.";
+      return;
+    }
     const saveBtn = document.getElementById("save-gmail-credentials-btn");
     saveBtn && (saveBtn.disabled = true);
     try {
@@ -178,6 +190,11 @@ export function initNotifications({ api, showSuccess, showError, CREDENTIAL_ADMI
   });
 
   document.getElementById("remove-gmail-credentials-btn")?.addEventListener("click", async (event) => {
+    if (!capabilities?.credentialManagement) {
+      gmailCredentialsStatus.className = "pane-subtext error";
+      gmailCredentialsStatus.textContent = "Credential management is disabled in the static demo.";
+      return;
+    }
     const btn = event.currentTarget;
     if (!window.confirm("Remove Gmail credentials? Email delivery will be disabled until new credentials are saved.")) {
       btn.focus();
@@ -209,6 +226,11 @@ export function initNotifications({ api, showSuccess, showError, CREDENTIAL_ADMI
 
   pushoverCredentialsForm?.addEventListener("submit", async (event) => {
     event.preventDefault();
+    if (!capabilities?.credentialManagement) {
+      pushoverCredentialsStatus.className = "pane-subtext error";
+      pushoverCredentialsStatus.textContent = "Credential management is disabled in the static demo.";
+      return;
+    }
     const saveBtn = document.getElementById("save-pushover-credentials-btn");
     saveBtn && (saveBtn.disabled = true);
     try {
@@ -242,6 +264,11 @@ export function initNotifications({ api, showSuccess, showError, CREDENTIAL_ADMI
   });
 
   document.getElementById("remove-pushover-credentials-btn")?.addEventListener("click", async (event) => {
+    if (!capabilities?.credentialManagement) {
+      pushoverCredentialsStatus.className = "pane-subtext error";
+      pushoverCredentialsStatus.textContent = "Credential management is disabled in the static demo.";
+      return;
+    }
     const btn = event.currentTarget;
     if (!window.confirm("Remove Pushover credentials? Pushover delivery will be disabled until new credentials are saved.")) {
       btn.focus();

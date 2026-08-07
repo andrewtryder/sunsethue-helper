@@ -31,6 +31,14 @@ import { initSetupStatus } from "./features/setup-status.js";
 // API
 const { api, DEMO_MODE, DEMO_READ_ONLY } = initApi();
 
+export const capabilities = Object.freeze({
+  liveApi: !DEMO_MODE,
+  mutations: !DEMO_MODE,
+  webPush: !DEMO_MODE,
+  credentialManagement: !DEMO_MODE,
+  externalRequests: !DEMO_MODE
+});
+
 // DOM Elements
 const appContainer = document.getElementById("app-container");
 const locationForm = document.getElementById("location-form");
@@ -47,6 +55,21 @@ const searchAddressBtn = document.getElementById("search-address-btn");
 const useCurrentLocationBtn = document.getElementById("use-current-location-btn");
 const searchSuggestions = document.getElementById("search-suggestions");
 
+if (!capabilities.externalRequests) {
+  if (searchAddressInput) {
+    searchAddressInput.disabled = true;
+    searchAddressInput.title = "Address search is disabled in the static demo";
+    searchAddressInput.placeholder = "Address search disabled in demo";
+  }
+  if (searchAddressBtn) {
+    searchAddressBtn.disabled = true;
+    searchAddressBtn.title = "Address search is disabled in the static demo";
+  }
+  if (useCurrentLocationBtn) {
+    useCurrentLocationBtn.disabled = true;
+    useCurrentLocationBtn.title = "Geolocation is disabled in the static demo";
+  }
+}
 const logsListContainer = document.getElementById("logs-list-container");
 
 const locationsListContainer = document.getElementById("locations-list-container");
@@ -145,38 +168,69 @@ async function fetchNotificationDeliveries() {
 // ── Feature wiring ───────────────────────────────────────────────────
 
 const { fetchNotificationSettings, fetchProviderCredentials } = initNotifications({
-  api, showSuccess, showError, CREDENTIAL_ADMIN_HEADER,
+  api, 
+  showBanner, 
+  showSuccess, 
+  showError, 
+  DEMO_READ_ONLY,
+  capabilities,
+  CREDENTIAL_ADMIN_HEADER,
   fetchDeliveries: () => fetchNotificationDeliveries()
 });
 
 const { fetchApplicationSettings } = initSchedule({ 
   api, 
   showSuccess, 
-  showError,
+  showError, 
+  DEMO_READ_ONLY,
+  capabilities,
   onSettingsUpdate: updateDisplayTimeZone
 });
 
 const { fetchLocationRules } = initThresholds({
-  api, showSuccess, showError,
+  api, 
+  showSuccess, 
+  showError, 
+  locationsListContainer, 
+  DEMO_READ_ONLY,
+  capabilities,
   getLocationsList: () => locationsList
 });
 
 const { fetchWebPushDevices } = initWebPush({
-  api, showSuccess, showError, DEMO_READ_ONLY
+  api, 
+  showSuccess, 
+  showError, 
+  DEMO_READ_ONLY,
+  capabilities
 });
 
 initWebhook({
-  api, showSuccess, showError, CREDENTIAL_ADMIN_HEADER,
+  api, 
+  showSuccess, 
+  showError, 
+  DEMO_READ_ONLY,
+  capabilities,
+  CREDENTIAL_ADMIN_HEADER,
   fetchNotificationSettings
 });
 
 const { fetchOperationalStatus } = initHealth({ 
   api, 
+  showSuccess, 
+  showError, 
+  DEMO_READ_ONLY,
+  capabilities,
   formatDateTime: (iso) => formatDateTimeMediumWithZone(iso, currentDisplayTimeZone) 
 });
 
 const { refreshHistoryCounts } = initHistory({
-  api, DEMO_READ_ONLY, showSuccess, showError,
+  api, 
+  showBanner, 
+  showSuccess, 
+  showError, 
+  DEMO_READ_ONLY,
+  capabilities,
   afterClear: () => Promise.all([
     fetchRuns(),
     fetchNotificationDeliveries(),
@@ -184,7 +238,7 @@ const { refreshHistoryCounts } = initHistory({
   ])
 });
 
-const { fetchSetupChecklist } = initSetupStatus({ api });
+const { fetchSetupChecklist } = initSetupStatus({ api, capabilities });
 
 // ── Init ─────────────────────────────────────────────────────────────
 
@@ -523,6 +577,10 @@ async function updateLocation(id, { name, latitude, longitude }) {
 }
 
 async function saveInlineLocationEdit(id, { name, latitude, longitude }, saveBtn) {
+  if (!capabilities.mutations) {
+    showBanner(dbErrorBanner, "Editing locations is disabled in the static demo.");
+    return;
+  }
   if (!name) {
     showBanner(dbErrorBanner, "Location Name is required.");
     return;
@@ -555,6 +613,10 @@ async function saveInlineLocationEdit(id, { name, latitude, longitude }, saveBtn
 
 locationForm.addEventListener("submit", async (e) => {
   e.preventDefault();
+  if (!capabilities.mutations) {
+    showBanner(dbErrorBanner, "Editing locations is disabled in the static demo.");
+    return;
+  }
 
   const id = locationIdInput.value;
   const name = locationNameInput.value.trim();
@@ -624,6 +686,10 @@ function resetForm() {
 cancelEditBtn.addEventListener("click", closeLocationDrawer);
 
 async function deleteLocation(id) {
+  if (!capabilities.mutations) {
+    showBanner(dbErrorBanner, "Deleting locations is disabled in the static demo.");
+    return;
+  }
   const loc = locationsList.find(l => l.id === id);
   if (!loc) return;
 
@@ -650,6 +716,10 @@ async function deleteLocation(id) {
 // ── Trigger Report ───────────────────────────────────────────────────
 
 triggerTestBtn.addEventListener("click", async () => {
+  if (!capabilities.mutations) {
+    showBanner(dbErrorBanner, "Manual report execution is disabled in the static demo.");
+    return;
+  }
   if (locationsList.length === 0) {
     showBanner(dbErrorBanner, "Cannot trigger test: You need to add at least 1 location.");
     return;
@@ -725,6 +795,10 @@ useCurrentLocationBtn.addEventListener("click", () => {
 // ── Address Search & Autocomplete ────────────────────────────────────
 
 async function performAddressSearch() {
+  if (!capabilities.externalRequests) {
+    showBanner(dbErrorBanner, "Address search is disabled in the static demo.");
+    return;
+  }
   const queryText = searchAddressInput.value.trim();
   if (!queryText) {
     showBanner(dbErrorBanner, "Please enter an address or city to search.");
@@ -836,6 +910,14 @@ function updateActiveSuggestion(items) {
 
 searchAddressInput.addEventListener("input", () => {
   clearTimeout(autocompleteTimeout);
+
+  if (!capabilities.externalRequests) {
+    searchSuggestions.classList.add("hidden");
+    searchSuggestions.innerHTML = "";
+    currentSuggestions = [];
+    activeSuggestionIndex = -1;
+    return;
+  }
 
   const queryText = searchAddressInput.value.trim();
   if (!shouldSearchAutocomplete(queryText)) {

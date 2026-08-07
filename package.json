@@ -42,6 +42,8 @@
     "doctor": "node scripts/doctor.mjs",
     "setup": "node scripts/setup.mjs",
     "demo:build": "node scripts/build-demo.mjs",
+    "demo:serve": "node scripts/serve-demo.mjs",
+    "test:demo": "playwright test --config=playwright.demo.config.mjs",
     "secrets:upload": "node scripts/upload-worker-secrets.mjs",
     "secrets:upload:admin": "node scripts/upload-worker-secrets.mjs --target=admin",
     "secrets-store:bootstrap": "node scripts/secrets-store-bootstrap.mjs",

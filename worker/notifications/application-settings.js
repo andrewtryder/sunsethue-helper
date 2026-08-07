@@ -1,4 +1,7 @@
-import * as db from "../db.js";
+import {
+  getApplicationSettingsRow,
+  upsertApplicationSettings
+} from "../repositories/application-settings.js";
 import { NotificationError } from "./errors.js";
 import {
   defaultApplicationSettings,
@@ -43,7 +46,7 @@ function rowToPublic(row) {
 }
 
 export async function getApplicationSettings(env) {
-  const row = await db.getApplicationSettingsRow(env);
+  const row = await getApplicationSettingsRow(env);
   return rowToPublic(row);
 }
 
@@ -102,7 +105,7 @@ export function validateApplicationSettingsInput(input) {
 
 export async function saveApplicationSettings(env, input, now = Date.now()) {
   const settings = validateApplicationSettingsInput(input);
-  await db.upsertApplicationSettings(env, { ...settings, updatedAt: now });
+  await upsertApplicationSettings(env, { ...settings, updatedAt: now });
   return settings;
 }
 

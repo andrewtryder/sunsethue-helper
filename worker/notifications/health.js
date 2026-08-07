@@ -5,6 +5,9 @@ import { pushoverTransportSource } from "./resolve-pushover-transport.js";
 import { hasWebhookTransportAsync } from "./webhook.js";
 import { hasWebPushConfiguredAsync } from "./webpush.js";
 import * as db from "../db.js";
+import { listLocationNotificationRules } from "../repositories/notification-rules.js";
+import { listWebPushSubscriptions } from "../repositories/webpush.js";
+import { getLatestHealthCheckRun } from "../repositories/health-checks.js";
 
 const STALE_PUSH_MS = 30 * 24 * 60 * 60 * 1000;
 const PENDING_AGE_ACTION_MS = 6 * 60 * 60 * 1000;
@@ -53,7 +56,7 @@ export async function getNotificationHealth(env, deps = {}) {
   const settings = deps.settings || await getApplicationSettings(env);
   const notificationSettings = deps.notificationSettings || await db.getNotificationSettingsRow(env) || {};
   const locations = deps.locations || await db.getLocations(env);
-  const rules = deps.rules || await db.listLocationNotificationRules(env);
+  const rules = deps.rules || await listLocationNotificationRules(env);
 
   const tables = await env.DB.prepare(`SELECT name FROM sqlite_master WHERE type = 'table'`).all();
   const present = new Set((tables.results || []).map((row) => row.name));
@@ -67,7 +70,7 @@ export async function getNotificationHealth(env, deps = {}) {
   const emailEnabled = Number(notificationSettings.emailEnabled) === 1;
   const pushoverEnabled = Number(notificationSettings.pushoverEnabled) === 1;
   const webhookEnabled = Number(notificationSettings.webhookEnabled) === 1;
-  const pushSubs = await db.listWebPushSubscriptions(env);
+  const pushSubs = await listWebPushSubscriptions(env);
   const pushEnabled = pushSubs.filter((s) => Number(s.enabled) === 1);
   const pushStale = pushEnabled.filter((s) => now - Number(s.lastSeenAt || s.createdAt || 0) > STALE_PUSH_MS);
   const webpushEnabled = pushEnabled.length > 0;
@@ -112,7 +115,7 @@ export async function getNotificationHealth(env, deps = {}) {
      ORDER BY createdAt DESC LIMIT 8`
   ).all();
 
-  const latestSelfTest = await db.getLatestHealthCheckRun(env);
+  const latestSelfTest = await getLatestHealthCheckRun(env);
   const qualify = (channel) => rules.filter((r) => r.channel === channel && Number(r.enabled) === 1).length;
 
   const channels = [

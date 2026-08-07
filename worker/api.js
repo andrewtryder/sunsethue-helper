@@ -10,31 +10,9 @@ import {
   publicSettings,
   saveSettings
 } from "./notifications/settings.js";
-import {
-  getApplicationSettings,
-  saveApplicationSettings,
-  estimateForecastQuota
-} from "./notifications/application-settings.js";
-import { listRules, saveRule } from "./notifications/rules.js";
-import {
-  publicVapidConfig,
-  registerWebPushSubscription
-} from "./notifications/webpush.js";
 import { hasWebhookTransportAsync } from "./notifications/webhook.js";
-import {
-  buildWebhookTransportDocument,
-  maskWebhookHostname
-} from "./notifications/resolve-webhook-transport.js";
-import { CredentialError } from "./lib/transport-schema.js";
 import { emailTransportSource } from "./notifications/resolve-email-transport.js";
 import { pushoverTransportSource } from "./notifications/resolve-pushover-transport.js";
-import { getNotificationHealth } from "./notifications/health.js";
-import {
-  clearHistory,
-  countHistoryScopes,
-  exportHistory,
-  parseHistoryScopes
-} from "./notifications/history.js";
 import {
   createRequestId,
   jsonResponse,
@@ -60,10 +38,28 @@ import {
   CredentialAdminProxyError
 } from "./credential-admin-proxy.js";
 import { readJsonBodyLimited } from "./credential-body.js";
+import { bodyErrorResponse } from "./routes/_shared.js";
+import { tryHandle as tryApplicationSettings } from "./routes/application-settings.js";
+import { tryHandle as tryNotificationRules } from "./routes/notification-rules.js";
+import { tryHandle as tryWebPush } from "./routes/webpush.js";
+import { tryHandle as tryWebhook } from "./routes/webhook.js";
+import { tryHandle as tryNotificationHealth } from "./routes/notification-health.js";
+import { tryHandle as trySetupStatus } from "./routes/setup-status.js";
+import { tryHandle as tryHistory } from "./routes/history.js";
 
 const LOCATION_INPUT_FIELDS = new Set(["name", "latitude", "longitude"]);
 const AUTOCOMPLETE_TIMEOUT_MS = 5_000;
 const PHOTON_CONTACT_FALLBACK = "https://github.com/andrewtryder/sunsethue-helper";
+
+const ROUTE_HANDLERS = [
+  tryApplicationSettings,
+  tryNotificationRules,
+  tryWebPush,
+  tryWebhook,
+  tryNotificationHealth,
+  trySetupStatus,
+  tryHistory
+];
 
 function credentialMutationMessage(code, action) {
   if (code === "INVALID_EMAIL_CREDENTIALS") {
@@ -87,16 +83,6 @@ function credentialMutationMessage(code, action) {
   return "Unable to update email credentials.";
 }
 
-function bodyErrorResponse(error, requestId) {
-  if (error === "UNSUPPORTED_MEDIA_TYPE") {
-    return errorResponse("UNSUPPORTED_MEDIA_TYPE", "Content-Type must be application/json.", 415, requestId);
-  }
-  if (error === "PAYLOAD_TOO_LARGE") {
-    return errorResponse("PAYLOAD_TOO_LARGE", "Request body is too large.", 413, requestId);
-  }
-  return errorResponse("BAD_REQUEST", "Request body is not valid JSON.", 400, requestId);
-}
-
 function contactIdentifier(env) {
   const contact = typeof env.CONTACT_EMAIL === "string" ? env.CONTACT_EMAIL.trim() : "";
   return contact.length > 0 ? contact : PHOTON_CONTACT_FALLBACK;
@@ -116,6 +102,12 @@ export async function handleHttpRequest(request, env, authContext = null, deps =
   const path = url.pathname;
 
   try {
+    const routeCtx = { request, env, authContext, deps, requestId, path, url };
+    for (const handler of ROUTE_HANDLERS) {
+      const handled = await handler(routeCtx);
+      if (handled) return handled;
+    }
+
     if (path === "/api/notification-settings") {
       if (request.method === "GET") {
         return jsonResponse(await publicSettings(await getSettings(env), env), 200, requestId);
@@ -132,231 +124,6 @@ export async function handleHttpRequest(request, env, authContext = null, deps =
         }
         return errorResponse(error.code || "INVALID_SETTINGS", "Invalid notification settings.", 400, requestId);
       }
-    }
-
-    if (path === "/api/application-settings") {
-      if (request.method === "GET") {
-        const settings = await getApplicationSettings(env);
-        const locations = await db.getLocations(env);
-        let remainingCredits = null;
-        try {
-          const credits = await fetchApiCredits(env, fetchImpl);
-          remainingCredits = credits?.remaining ?? credits?.remainingCredits ?? null;
-        } catch { /* optional */ }
-        return jsonResponse({
-          ...settings,
-          quota: estimateForecastQuota({
-            scheduleTimes: settings.scheduleTimes,
-            activeLocations: locations.length,
-            remainingCredits
-          }),
-          quotaNotes: {
-            channelsDoNotAffectForecastQuota: true,
-            manualReportsExcluded: true,
-            retriesReuseStoredPayload: true
-          }
-        }, 200, requestId);
-      }
-      if (request.method !== "PUT") return methodNotAllowed("GET, PUT", requestId);
-      const parsed = await readJsonBody(request);
-      if ("error" in parsed) return bodyErrorResponse(parsed.error, requestId);
-      try {
-        const settings = await saveApplicationSettings(env, parsed.value, deps.now ?? Date.now());
-        return jsonResponse(settings, 200, requestId);
-      } catch (error) {
-        return errorResponse(error.code || "INVALID_SETTINGS", "Invalid application settings.", 400, requestId);
-      }
-    }
-
-    if (path === "/api/location-notification-rules") {
-      if (request.method === "GET") {
-        return jsonResponse({ rules: await listRules(env) }, 200, requestId);
-      }
-      if (request.method === "PUT") {
-        const parsed = await readJsonBody(request);
-        if ("error" in parsed) return bodyErrorResponse(parsed.error, requestId);
-        try {
-          const rule = await saveRule(env, parsed.value, deps.now ?? Date.now());
-          return jsonResponse({ rule }, 200, requestId);
-        } catch (error) {
-          return errorResponse(error.code || "INVALID_RULE", "Invalid notification rule.", 400, requestId);
-        }
-      }
-      if (request.method === "POST") {
-        const parsed = await readJsonBody(request);
-        if ("error" in parsed) return bodyErrorResponse(parsed.error, requestId);
-        const action = parsed.value?.action;
-        const now = deps.now ?? Date.now();
-        if (action === "copy-to-all") {
-          const sourceLocationId = parsed.value?.sourceLocationId;
-          if (typeof sourceLocationId !== "string") {
-            return errorResponse("INVALID_LOCATION", "sourceLocationId is required.", 400, requestId);
-          }
-          await db.copyLocationRulesToAll(env, sourceLocationId, now);
-          return jsonResponse({ rules: await listRules(env) }, 200, requestId);
-        }
-        if (action === "set-channel-enabled") {
-          const channel = parsed.value?.channel;
-          const enabled = parsed.value?.enabled;
-          if (typeof channel !== "string" || typeof enabled !== "boolean") {
-            return errorResponse("INVALID_RULE", "channel and enabled are required.", 400, requestId);
-          }
-          await db.setChannelEnabledForAllLocations(env, channel, enabled, now);
-          return jsonResponse({ rules: await listRules(env) }, 200, requestId);
-        }
-        if (action === "reset-defaults") {
-          const locations = await db.getLocations(env);
-          const settings = await getSettings(env);
-          for (const loc of locations) {
-            for (const channel of ["email", "pushover", "webpush", "webhook"]) {
-              const master = channel === "email" ? settings.emailEnabled
-                : channel === "pushover" ? settings.pushoverEnabled
-                  : channel === "webhook" ? settings.webhookEnabled
-                    : 1;
-              await db.upsertLocationNotificationRule(env, {
-                locationId: loc.id,
-                channel,
-                enabled: Number(master) === 1,
-                thresholdPercent: 50,
-                eventScope: "either",
-                updatedAt: now
-              });
-            }
-          }
-          return jsonResponse({ rules: await listRules(env) }, 200, requestId);
-        }
-        return errorResponse("INVALID_ACTION", "Unknown bulk action.", 400, requestId);
-      }
-      return methodNotAllowed("GET, PUT, POST", requestId);
-    }
-
-    if (path === "/api/web-push/vapid-public-key") {
-      if (request.method !== "GET") return methodNotAllowed("GET", requestId);
-      return jsonResponse(publicVapidConfig(env), 200, requestId);
-    }
-
-    if (path === "/api/web-push/subscriptions") {
-      if (request.method === "GET") {
-        return jsonResponse({ devices: await db.publicWebPushSubscriptions(env) }, 200, requestId);
-      }
-      if (request.method === "POST") {
-        const parsed = await readJsonBody(request);
-        if ("error" in parsed) return bodyErrorResponse(parsed.error, requestId);
-        try {
-          const device = await registerWebPushSubscription(
-            env,
-            parsed.value,
-            { userAgent: request.headers.get("user-agent") },
-            deps.now ?? Date.now()
-          );
-          return jsonResponse({ device }, 201, requestId);
-        } catch (error) {
-          return errorResponse(error.code || "INVALID_PUSH_SUBSCRIPTION", "Invalid push subscription.", 400, requestId);
-        }
-      }
-      return methodNotAllowed("GET, POST", requestId);
-    }
-
-    if (path.startsWith("/api/web-push/subscriptions/")) {
-      const id = path.slice("/api/web-push/subscriptions/".length);
-      if (!isUuid(id)) return errorResponse("NOT_FOUND", "Subscription not found.", 404, requestId);
-      const now = deps.now ?? Date.now();
-      if (request.method === "PATCH") {
-        const parsed = await readJsonBody(request);
-        if ("error" in parsed) return bodyErrorResponse(parsed.error, requestId);
-        const ok = await db.updateWebPushSubscriptionMeta(env, id, {
-          deviceName: parsed.value?.deviceName,
-          enabled: parsed.value?.enabled,
-          lastSeenAt: now
-        });
-        if (!ok) return errorResponse("NOT_FOUND", "Subscription not found.", 404, requestId);
-        return jsonResponse({ devices: await db.publicWebPushSubscriptions(env) }, 200, requestId);
-      }
-      if (request.method === "DELETE") {
-        const ok = await db.deleteWebPushSubscription(env, id);
-        if (!ok) return errorResponse("NOT_FOUND", "Subscription not found.", 404, requestId);
-        return jsonResponse({ ok: true }, 200, requestId);
-      }
-      return methodNotAllowed("PATCH, DELETE", requestId);
-    }
-
-    if (path === "/api/webhook-credentials") {
-      const guard = assertCredentialRequestGuards(request, env, { mutation: request.method !== "GET" });
-      if (!guard.ok) return errorResponse(guard.code, guard.message, guard.status, requestId);
-      if (request.method === "GET") {
-        const configured = await hasWebhookTransportAsync(env);
-        const settings = await getSettings(env);
-        return jsonResponse({
-          configured,
-          enabled: Boolean(settings.webhookEnabled),
-          maskedHostname: settings.webhookMaskedHostname || null,
-          lastSuccessAt: settings.webhookLastSuccessAt || null,
-          lastFailureCode: settings.webhookLastFailureCode || null
-        }, 200, requestId);
-      }
-      if (request.method === "PUT") {
-        const parsed = await readJsonBodyLimited(request, MAX_CREDENTIAL_BODY_BYTES);
-        if ("error" in parsed) return bodyErrorResponse(parsed.error, requestId);
-        try {
-          const { document, serialized } = buildWebhookTransportDocument(parsed.value);
-          if (!env.WEBHOOK_TRANSPORT_SECRET || typeof env.WEBHOOK_TRANSPORT_SECRET.put !== "function") {
-            // Prefer credential-admin in production; local tests may stub put().
-            if (typeof deps.putWebhookSecret === "function") {
-              await deps.putWebhookSecret(serialized);
-            } else {
-              return errorResponse("SECRETS_STORE_NOT_CONFIGURED", "Webhook Secrets Store is not configured.", 503, requestId);
-            }
-          } else {
-            await env.WEBHOOK_TRANSPORT_SECRET.put(serialized);
-          }
-          const now = deps.now ?? Date.now();
-          const settings = await getSettings(env);
-          await db.upsertNotificationSettings(env, {
-            ...settings,
-            webhookMaskedHostname: maskWebhookHostname(document.url),
-            updatedAt: now
-          });
-          await db.upsertProviderCredentialStatus(env, {
-            provider: "webhook",
-            configured: 1,
-            maskedIdentifier: maskWebhookHostname(document.url),
-            updatedAt: now,
-            lastValidatedAt: now,
-            lastValidationCode: "OK",
-            lastUpdatedBy: authContext?.email || null
-          });
-          return jsonResponse({
-            configured: true,
-            maskedHostname: maskWebhookHostname(document.url)
-          }, 200, requestId);
-        } catch (error) {
-          if (error instanceof CredentialError) {
-            return errorResponse(error.code, "Invalid webhook credentials.", 400, requestId);
-          }
-          return errorResponse("SECRETS_STORE_UPDATE_FAILED", "Unable to update webhook credentials.", 502, requestId);
-        }
-      }
-      if (request.method === "DELETE") {
-        const sentinel = JSON.stringify({ version: 1, configured: false });
-        if (typeof deps.putWebhookSecret === "function") {
-          await deps.putWebhookSecret(sentinel);
-        } else if (env.WEBHOOK_TRANSPORT_SECRET?.put) {
-          await env.WEBHOOK_TRANSPORT_SECRET.put(sentinel);
-        }
-        const now = deps.now ?? Date.now();
-        await db.disableNotificationChannel(env, "webhook", now);
-        await db.upsertProviderCredentialStatus(env, {
-          provider: "webhook",
-          configured: 0,
-          maskedIdentifier: null,
-          updatedAt: now,
-          lastValidatedAt: now,
-          lastValidationCode: null,
-          lastUpdatedBy: authContext?.email || null
-        });
-        return jsonResponse({ configured: false }, 200, requestId);
-      }
-      return methodNotAllowed("GET, PUT, DELETE", requestId);
     }
 
     if (path === "/api/provider-credentials") {
@@ -753,60 +520,6 @@ export async function handleHttpRequest(request, env, authContext = null, deps =
       status.emailTransport = await emailTransportSource(env);
       status.pushoverTransport = await pushoverTransportSource(env);
       return jsonResponse(status, 200, requestId);
-    }
-
-    if (path === "/api/notification-health") {
-      if (request.method !== "GET") return methodNotAllowed("GET", requestId);
-      const health = await getNotificationHealth(env, { now: deps.now ?? Date.now() });
-      return jsonResponse(health, 200, requestId);
-    }
-
-    if (path === "/api/setup-status") {
-      if (request.method !== "GET") return methodNotAllowed("GET", requestId);
-      const setup = await db.getSetupStatus(env);
-      setup.forecastApiKey = typeof env.SUNSETHUE_API_KEY === "string" && env.SUNSETHUE_API_KEY.trim()
-        ? "ready"
-        : "missing";
-      return jsonResponse(setup, 200, requestId);
-    }
-
-    if (path === "/api/history/export") {
-      if (request.method !== "GET") return methodNotAllowed("GET", requestId);
-      try {
-        const url = new URL(request.url);
-        const scopes = parseHistoryScopes(url.searchParams.get("scopes") || "all");
-        const payload = await exportHistory(env, scopes);
-        return jsonResponse(payload, 200, requestId);
-      } catch (error) {
-        if (error instanceof NotificationError) {
-          return errorResponse(error.code, "Invalid history export request.", 400, requestId);
-        }
-        throw error;
-      }
-    }
-
-    if (path === "/api/history/clear") {
-      if (request.method !== "POST") return methodNotAllowed("POST", requestId);
-      const parsed = await readJsonBody(request);
-      if ("error" in parsed) return bodyErrorResponse(parsed.error, requestId);
-      try {
-        if (parsed.value?.preview === true) {
-          const scopes = parseHistoryScopes(parsed.value.scopes || ["all"]);
-          const counts = await countHistoryScopes(env, scopes);
-          return jsonResponse({ scopes, counts }, 200, requestId);
-        }
-        const result = await clearHistory(env, {
-          scopes: parsed.value?.scopes,
-          confirm: parsed.value?.confirm
-        }, deps.now ?? Date.now());
-        return jsonResponse(result, 200, requestId);
-      } catch (error) {
-        if (error instanceof NotificationError) {
-          const status = error.code === "CLEAR_CONFIRM_REQUIRED" ? 400 : 400;
-          return errorResponse(error.code, "Unable to clear history.", status, requestId);
-        }
-        throw error;
-      }
     }
 
     // Obsolete public config endpoint removed; keep a generic not-found.

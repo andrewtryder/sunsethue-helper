@@ -1,4 +1,7 @@
-import * as db from "../db.js";
+import {
+  listLocationNotificationRules,
+  upsertLocationNotificationRule
+} from "../repositories/notification-rules.js";
 import { NotificationError } from "./errors.js";
 import { NOTIFICATION_CHANNELS } from "../../shared/schema-manifest.js";
 import { evaluateLocationForThreshold } from "../../shared/time-format.js";
@@ -20,7 +23,7 @@ export function publicRule(row) {
 }
 
 export async function listRules(env) {
-  const rows = await db.listLocationNotificationRules(env);
+  const rows = await listLocationNotificationRules(env);
   return rows.map(publicRule);
 }
 
@@ -59,7 +62,7 @@ export function validateRulePatch(input) {
 
 export async function saveRule(env, input, now = Date.now()) {
   const rule = validateRulePatch(input);
-  await db.upsertLocationNotificationRule(env, { ...rule, updatedAt: now });
+  await upsertLocationNotificationRule(env, { ...rule, updatedAt: now });
   return publicRule({ ...rule, updatedAt: now, enabled: rule.enabled ? 1 : 0 });
 }
 

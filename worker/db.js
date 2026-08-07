@@ -153,98 +153,18 @@ export async function upsertNotificationSettings(env, settings) {
   ).run();
 }
 
-export async function getApplicationSettingsRow(env) {
-  return env.DB.prepare("SELECT * FROM application_settings WHERE id = 1").first();
-}
+export {
+  getApplicationSettingsRow,
+  upsertApplicationSettings
+} from "./repositories/application-settings.js";
 
-export async function upsertApplicationSettings(env, settings) {
-  await env.DB.prepare(
-    `INSERT INTO application_settings (
-      id, scheduleTimezone, displayTimezoneMode, displayTimezone, scheduleTimes,
-      weeklySelfTestEnabled, weeklySelfTestMode, weeklySelfTestDay, weeklySelfTestTime, updatedAt
-    ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT(id) DO UPDATE SET
-      scheduleTimezone = excluded.scheduleTimezone,
-      displayTimezoneMode = excluded.displayTimezoneMode,
-      displayTimezone = excluded.displayTimezone,
-      scheduleTimes = excluded.scheduleTimes,
-      weeklySelfTestEnabled = excluded.weeklySelfTestEnabled,
-      weeklySelfTestMode = excluded.weeklySelfTestMode,
-      weeklySelfTestDay = excluded.weeklySelfTestDay,
-      weeklySelfTestTime = excluded.weeklySelfTestTime,
-      updatedAt = excluded.updatedAt`
-  ).bind(
-    settings.scheduleTimezone,
-    settings.displayTimezoneMode,
-    settings.displayTimezone,
-    typeof settings.scheduleTimes === "string"
-      ? settings.scheduleTimes
-      : JSON.stringify(settings.scheduleTimes),
-    settings.weeklySelfTestEnabled ? 1 : 0,
-    settings.weeklySelfTestMode,
-    settings.weeklySelfTestDay,
-    settings.weeklySelfTestTime,
-    settings.updatedAt
-  ).run();
-}
-
-export async function listLocationNotificationRules(env) {
-  const { results } = await env.DB.prepare(
-    "SELECT * FROM location_notification_rules ORDER BY locationId, channel"
-  ).all();
-  return results || [];
-}
-
-export async function getLocationNotificationRules(env, locationId) {
-  const { results } = await env.DB.prepare(
-    "SELECT * FROM location_notification_rules WHERE locationId = ? ORDER BY channel"
-  ).bind(locationId).all();
-  return results || [];
-}
-
-export async function upsertLocationNotificationRule(env, rule) {
-  await env.DB.prepare(
-    `INSERT INTO location_notification_rules
-      (locationId, channel, enabled, thresholdPercent, eventScope, updatedAt)
-     VALUES (?, ?, ?, ?, ?, ?)
-     ON CONFLICT(locationId, channel) DO UPDATE SET
-       enabled = excluded.enabled,
-       thresholdPercent = excluded.thresholdPercent,
-       eventScope = excluded.eventScope,
-       updatedAt = excluded.updatedAt`
-  ).bind(
-    rule.locationId,
-    rule.channel,
-    rule.enabled ? 1 : 0,
-    rule.thresholdPercent ?? null,
-    rule.eventScope || "either",
-    rule.updatedAt
-  ).run();
-}
-
-export async function copyLocationRulesToAll(env, sourceLocationId, now) {
-  const source = await getLocationNotificationRules(env, sourceLocationId);
-  const locations = await getLocations(env);
-  for (const loc of locations) {
-    if (loc.id === sourceLocationId) continue;
-    for (const rule of source) {
-      await upsertLocationNotificationRule(env, {
-        locationId: loc.id,
-        channel: rule.channel,
-        enabled: Number(rule.enabled) === 1,
-        thresholdPercent: rule.thresholdPercent,
-        eventScope: rule.eventScope,
-        updatedAt: now
-      });
-    }
-  }
-}
-
-export async function setChannelEnabledForAllLocations(env, channel, enabled, now) {
-  await env.DB.prepare(
-    `UPDATE location_notification_rules SET enabled = ?, updatedAt = ? WHERE channel = ?`
-  ).bind(enabled ? 1 : 0, now, channel).run();
-}
+export {
+  listLocationNotificationRules,
+  getLocationNotificationRules,
+  upsertLocationNotificationRule,
+  copyLocationRulesToAll,
+  setChannelEnabledForAllLocations
+} from "./repositories/notification-rules.js";
 
 /**
  * Claim a scheduled occurrence key. Returns true when this caller inserted the row.
@@ -266,82 +186,14 @@ export async function bindOccurrenceRun(env, occurrenceKey, runId) {
   ).bind(runId, occurrenceKey).run();
 }
 
-export async function listWebPushSubscriptions(env, { enabledOnly = false } = {}) {
-  const sql = enabledOnly
-    ? "SELECT * FROM web_push_subscriptions WHERE enabled = 1 ORDER BY createdAt ASC"
-    : "SELECT * FROM web_push_subscriptions ORDER BY createdAt ASC";
-  const { results } = await env.DB.prepare(sql).all();
-  return results || [];
-}
-
-export async function getWebPushSubscription(env, id) {
-  return env.DB.prepare("SELECT * FROM web_push_subscriptions WHERE id = ?").bind(id).first();
-}
-
-export async function upsertWebPushSubscription(env, row) {
-  await env.DB.prepare(
-    `INSERT INTO web_push_subscriptions
-      (id, endpoint, p256dh, auth, deviceName, userAgentSummary, enabled, createdAt, lastSeenAt, lastSuccessAt, lastFailureCode)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT(endpoint) DO UPDATE SET
-       p256dh = excluded.p256dh,
-       auth = excluded.auth,
-       deviceName = excluded.deviceName,
-       userAgentSummary = excluded.userAgentSummary,
-       enabled = excluded.enabled,
-       lastSeenAt = excluded.lastSeenAt,
-       lastFailureCode = NULL`
-  ).bind(
-    row.id,
-    row.endpoint,
-    row.p256dh,
-    row.auth,
-    row.deviceName,
-    row.userAgentSummary ?? null,
-    row.enabled ? 1 : 0,
-    row.createdAt,
-    row.lastSeenAt ?? row.createdAt,
-    row.lastSuccessAt ?? null,
-    row.lastFailureCode ?? null
-  ).run();
-}
-
-export async function updateWebPushSubscriptionMeta(env, id, patch) {
-  const row = await getWebPushSubscription(env, id);
-  if (!row) return false;
-  await env.DB.prepare(
-    `UPDATE web_push_subscriptions SET
-      deviceName = ?, enabled = ?, lastSeenAt = ?, lastSuccessAt = ?, lastFailureCode = ?
-     WHERE id = ?`
-  ).bind(
-    patch.deviceName ?? row.deviceName,
-    patch.enabled === undefined ? row.enabled : (patch.enabled ? 1 : 0),
-    patch.lastSeenAt ?? row.lastSeenAt,
-    patch.lastSuccessAt === undefined ? row.lastSuccessAt : patch.lastSuccessAt,
-    patch.lastFailureCode === undefined ? row.lastFailureCode : patch.lastFailureCode,
-    id
-  ).run();
-  return true;
-}
-
-export async function deleteWebPushSubscription(env, id) {
-  const result = await env.DB.prepare("DELETE FROM web_push_subscriptions WHERE id = ?").bind(id).run();
-  return result.meta?.changes === 1;
-}
-
-export async function publicWebPushSubscriptions(env) {
-  const rows = await listWebPushSubscriptions(env);
-  return rows.map((row) => ({
-    id: row.id,
-    deviceName: row.deviceName,
-    userAgentSummary: row.userAgentSummary,
-    enabled: Number(row.enabled) === 1,
-    createdAt: row.createdAt,
-    lastSeenAt: row.lastSeenAt,
-    lastSuccessAt: row.lastSuccessAt,
-    lastFailureCode: row.lastFailureCode
-  }));
-}
+export {
+  listWebPushSubscriptions,
+  getWebPushSubscription,
+  upsertWebPushSubscription,
+  updateWebPushSubscriptionMeta,
+  deleteWebPushSubscription,
+  publicWebPushSubscriptions
+} from "./repositories/webpush.js";
 
 export async function createRunAndOutbox(env, run, jobs) {
   const statements = [
@@ -689,142 +541,17 @@ export async function pruneOperationalData(env, now = Date.now(), retainMs = 90 
   ]);
 }
 
-export async function insertHealthCheckRun(env, row) {
-  await env.DB.prepare(
-    `INSERT INTO health_check_runs
-      (id, checkType, provider, status, code, startedAt, completedAt, durationMs, details)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).bind(
-    row.id,
-    row.checkType,
-    row.provider ?? null,
-    row.status,
-    row.code ?? null,
-    row.startedAt,
-    row.completedAt ?? null,
-    row.durationMs ?? null,
-    row.details ?? null
-  ).run();
-}
+export {
+  insertHealthCheckRun,
+  getLatestHealthCheckRun,
+  insertAdminAuditEvent
+} from "./repositories/health-checks.js";
 
-export async function getLatestHealthCheckRun(env) {
-  return env.DB.prepare(
-    `SELECT * FROM health_check_runs ORDER BY startedAt DESC LIMIT 1`
-  ).first();
-}
-
-export async function insertAdminAuditEvent(env, row) {
-  await env.DB.prepare(
-    `INSERT INTO admin_audit_events (id, eventType, categories, counts, createdAt)
-     VALUES (?, ?, ?, ?, ?)`
-  ).bind(row.id, row.eventType, row.categories ?? null, row.counts ?? null, row.createdAt).run();
-}
-
-export async function countHistoryScope(env, scope) {
-  if (scope === "runs") {
-    const row = await env.DB.prepare(`SELECT COUNT(*) AS c FROM runs`).first();
-    return Number(row?.c || 0);
-  }
-  if (scope === "deliveries_completed") {
-    const row = await env.DB.prepare(
-      `SELECT COUNT(*) AS c FROM notification_outbox WHERE status IN ('sent', 'skipped')`
-    ).first();
-    return Number(row?.c || 0);
-  }
-  if (scope === "deliveries_failed") {
-    const row = await env.DB.prepare(
-      `SELECT COUNT(*) AS c FROM notification_outbox WHERE status = 'failed'`
-    ).first();
-    return Number(row?.c || 0);
-  }
-  if (scope === "self_tests") {
-    const row = await env.DB.prepare(`SELECT COUNT(*) AS c FROM health_check_runs`).first();
-    return Number(row?.c || 0);
-  }
-  if (scope === "credential_audit") {
-    const row = await env.DB.prepare(
-      `SELECT COUNT(*) AS c FROM admin_audit_events WHERE eventType != 'history_cleared'`
-    ).first();
-    return Number(row?.c || 0);
-  }
-  return 0;
-}
-
-export async function exportHistoryScope(env, scope) {
-  if (scope === "runs") {
-    const { results } = await env.DB.prepare(
-      `SELECT id, timestamp, triggerType, status, locationsCount, error FROM runs ORDER BY timestamp DESC LIMIT 500`
-    ).all();
-    return results || [];
-  }
-  if (scope === "deliveries_completed") {
-    const { results } = await env.DB.prepare(
-      `SELECT id, runId, channel, status, lastErrorCode, createdAt, sentAt
-       FROM notification_outbox WHERE status IN ('sent', 'skipped')
-       ORDER BY createdAt DESC LIMIT 500`
-    ).all();
-    return results || [];
-  }
-  if (scope === "deliveries_failed") {
-    const { results } = await env.DB.prepare(
-      `SELECT id, runId, channel, status, lastErrorCode, createdAt
-       FROM notification_outbox WHERE status = 'failed'
-       ORDER BY createdAt DESC LIMIT 500`
-    ).all();
-    return results || [];
-  }
-  if (scope === "self_tests") {
-    const { results } = await env.DB.prepare(
-      `SELECT id, checkType, provider, status, code, startedAt, completedAt, durationMs
-       FROM health_check_runs ORDER BY startedAt DESC LIMIT 200`
-    ).all();
-    return results || [];
-  }
-  if (scope === "credential_audit") {
-    const { results } = await env.DB.prepare(
-      `SELECT id, eventType, categories, counts, createdAt
-       FROM admin_audit_events WHERE eventType != 'history_cleared'
-       ORDER BY createdAt DESC LIMIT 200`
-    ).all();
-    return results || [];
-  }
-  return [];
-}
-
-/**
- * Delete terminal history for the given scopes. Never touches pending/processing outbox.
- */
-export async function clearHistoryScopes(env, scopes) {
-  const statements = [];
-  for (const scope of scopes) {
-    if (scope === "deliveries_completed") {
-      statements.push(env.DB.prepare(
-        `DELETE FROM notification_outbox WHERE status IN ('sent', 'skipped')`
-      ));
-    } else if (scope === "deliveries_failed") {
-      statements.push(env.DB.prepare(
-        `DELETE FROM notification_outbox WHERE status = 'failed'`
-      ));
-    } else if (scope === "self_tests") {
-      statements.push(env.DB.prepare(`DELETE FROM health_check_runs`));
-    } else if (scope === "credential_audit") {
-      statements.push(env.DB.prepare(
-        `DELETE FROM admin_audit_events WHERE eventType != 'history_cleared'`
-      ));
-    }
-  }
-  // Delete runs after terminal outbox rows so pending/processing FK parents remain.
-  if (scopes.includes("runs")) {
-    statements.push(env.DB.prepare(
-      `DELETE FROM runs
-       WHERE id NOT IN (
-         SELECT DISTINCT runId FROM notification_outbox
-         WHERE status IN ('pending', 'processing')
-       )`
-    ));
-  }
-  if (statements.length > 0) await env.DB.batch(statements);
-}
+export {
+  countHistoryScope,
+  exportHistoryScope,
+  clearHistoryScopes
+} from "./repositories/history.js";
 
 /**
  * Non-sensitive first-run checklist aggregate.

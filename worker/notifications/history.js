@@ -1,5 +1,10 @@
 import { NotificationError } from "./errors.js";
-import * as db from "../db.js";
+import {
+  countHistoryScope,
+  exportHistoryScope,
+  clearHistoryScopes
+} from "../repositories/history.js";
+import { insertAdminAuditEvent } from "../repositories/health-checks.js";
 
 export const HISTORY_SCOPES = Object.freeze([
   "runs",
@@ -51,7 +56,7 @@ export async function countHistoryScopes(env, scopes) {
   const expanded = expandHistoryScopes(scopes);
   const counts = {};
   for (const scope of expanded) {
-    counts[scope] = await db.countHistoryScope(env, scope);
+    counts[scope] = await countHistoryScope(env, scope);
   }
   return counts;
 }
@@ -60,7 +65,7 @@ export async function exportHistory(env, scopes) {
   const expanded = expandHistoryScopes(scopes);
   const payload = { exportedAt: new Date().toISOString(), scopes: expanded, data: {} };
   for (const scope of expanded) {
-    payload.data[scope] = await db.exportHistoryScope(env, scope);
+    payload.data[scope] = await exportHistoryScope(env, scope);
   }
   return payload;
 }
@@ -76,8 +81,8 @@ export async function clearHistory(env, { scopes, confirm }, now = Date.now()) {
   }
   const expanded = expandHistoryScopes(parsed);
   const countsBefore = await countHistoryScopes(env, expanded);
-  await db.clearHistoryScopes(env, expanded);
-  await db.insertAdminAuditEvent(env, {
+  await clearHistoryScopes(env, expanded);
+  await insertAdminAuditEvent(env, {
     id: crypto.randomUUID(),
     eventType: "history_cleared",
     categories: JSON.stringify(expanded),

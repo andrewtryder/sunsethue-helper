@@ -1,5 +1,9 @@
 import { SignJWT, importPKCS8 } from "jose";
-import * as db from "../db.js";
+import {
+  getWebPushSubscription,
+  upsertWebPushSubscription,
+  updateWebPushSubscriptionMeta
+} from "../repositories/webpush.js";
 import { NotificationError } from "./errors.js";
 import { buildPushoverContent, parseNotificationPayload } from "./payload.js";
 
@@ -78,7 +82,7 @@ export async function registerWebPushSubscription(env, input, requestMeta = {}, 
     "SELECT id FROM web_push_subscriptions WHERE endpoint = ?"
   ).bind(endpoint).first();
   const id = existing?.id || crypto.randomUUID();
-  await db.upsertWebPushSubscription(env, {
+  await upsertWebPushSubscription(env, {
     id,
     endpoint,
     p256dh,
@@ -115,7 +119,7 @@ export async function sendWebPush(job, env, deps = {}) {
 
   const subId = job.deliveryTargetId;
   if (!subId) throw new NotificationError("WEB_PUSH_TARGET_MISSING", { retryable: false });
-  const sub = await db.getWebPushSubscription(env, subId);
+  const sub = await getWebPushSubscription(env, subId);
   if (!sub || Number(sub.enabled) !== 1) {
     throw new NotificationError("WEB_PUSH_SUBSCRIPTION_DISABLED", { retryable: false });
   }
@@ -138,7 +142,7 @@ export async function sendWebPush(job, env, deps = {}) {
 
   const now = deps.now ?? Date.now();
   if (response.status === 404 || response.status === 410) {
-    await db.updateWebPushSubscriptionMeta(env, subId, {
+    await updateWebPushSubscriptionMeta(env, subId, {
       enabled: false,
       lastFailureCode: "WEB_PUSH_GONE",
       lastSeenAt: now
@@ -146,7 +150,7 @@ export async function sendWebPush(job, env, deps = {}) {
     throw new NotificationError("WEB_PUSH_GONE", { retryable: false });
   }
   if (response.status === 401 || response.status === 403) {
-    await db.updateWebPushSubscriptionMeta(env, subId, {
+    await updateWebPushSubscriptionMeta(env, subId, {
       enabled: false,
       lastFailureCode: "WEB_PUSH_REVOKED",
       lastSeenAt: now
@@ -154,21 +158,21 @@ export async function sendWebPush(job, env, deps = {}) {
     throw new NotificationError("WEB_PUSH_REVOKED", { retryable: false });
   }
   if (response.status === 429 || response.status >= 500) {
-    await db.updateWebPushSubscriptionMeta(env, subId, {
+    await updateWebPushSubscriptionMeta(env, subId, {
       lastFailureCode: "WEB_PUSH_RETRYABLE",
       lastSeenAt: now
     });
     throw new NotificationError("WEB_PUSH_RETRYABLE", { retryable: true });
   }
   if (response.status < 200 || response.status >= 300) {
-    await db.updateWebPushSubscriptionMeta(env, subId, {
+    await updateWebPushSubscriptionMeta(env, subId, {
       lastFailureCode: "WEB_PUSH_TERMINAL",
       lastSeenAt: now
     });
     throw new NotificationError("WEB_PUSH_TERMINAL", { retryable: false });
   }
 
-  await db.updateWebPushSubscriptionMeta(env, subId, {
+  await updateWebPushSubscriptionMeta(env, subId, {
     lastSuccessAt: now,
     lastFailureCode: null,
     lastSeenAt: now

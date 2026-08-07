@@ -1,4 +1,4 @@
-export function initSchedule({ api, showSuccess, showError }) {
+export function initSchedule({ api, showSuccess, showError, onSettingsUpdate }) {
   const HOUR_OPTIONS = Array.from({ length: 24 }, (_, hour) => `${String(hour).padStart(2, "0")}:00`);
   const SCHEDULE_PRESETS = {
     once: ["06:00"],
@@ -62,6 +62,11 @@ export function initSchedule({ api, showSuccess, showError }) {
         ${q.remainingCredits != null ? ` Remaining credits: ${q.remainingCredits}.` : ""}
         <br><small>Channels, thresholds, and delivery retries do not add forecast quota. Manual reports are not included.</small>`;
     }
+    
+    if (typeof onSettingsUpdate === "function") {
+      onSettingsUpdate(data);
+    }
+    return data;
   }
 
   document.getElementById("application-settings-form")?.addEventListener("submit", async (event) => {

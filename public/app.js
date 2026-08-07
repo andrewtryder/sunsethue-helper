@@ -55,6 +55,21 @@ const searchAddressBtn = document.getElementById("search-address-btn");
 const useCurrentLocationBtn = document.getElementById("use-current-location-btn");
 const searchSuggestions = document.getElementById("search-suggestions");
 
+if (!capabilities.externalRequests) {
+  if (searchAddressInput) {
+    searchAddressInput.disabled = true;
+    searchAddressInput.title = "Address search is disabled in the static demo";
+    searchAddressInput.placeholder = "Address search disabled in demo";
+  }
+  if (searchAddressBtn) {
+    searchAddressBtn.disabled = true;
+    searchAddressBtn.title = "Address search is disabled in the static demo";
+  }
+  if (useCurrentLocationBtn) {
+    useCurrentLocationBtn.disabled = true;
+    useCurrentLocationBtn.title = "Geolocation is disabled in the static demo";
+  }
+}
 const logsListContainer = document.getElementById("logs-list-container");
 
 const locationsListContainer = document.getElementById("locations-list-container");
@@ -562,6 +577,10 @@ async function updateLocation(id, { name, latitude, longitude }) {
 }
 
 async function saveInlineLocationEdit(id, { name, latitude, longitude }, saveBtn) {
+  if (!capabilities.mutations) {
+    showBanner(dbErrorBanner, "Editing locations is disabled in the static demo.");
+    return;
+  }
   if (!name) {
     showBanner(dbErrorBanner, "Location Name is required.");
     return;
@@ -776,6 +795,10 @@ useCurrentLocationBtn.addEventListener("click", () => {
 // ── Address Search & Autocomplete ────────────────────────────────────
 
 async function performAddressSearch() {
+  if (!capabilities.externalRequests) {
+    showBanner(dbErrorBanner, "Address search is disabled in the static demo.");
+    return;
+  }
   const queryText = searchAddressInput.value.trim();
   if (!queryText) {
     showBanner(dbErrorBanner, "Please enter an address or city to search.");
@@ -887,6 +910,14 @@ function updateActiveSuggestion(items) {
 
 searchAddressInput.addEventListener("input", () => {
   clearTimeout(autocompleteTimeout);
+
+  if (!capabilities.externalRequests) {
+    searchSuggestions.classList.add("hidden");
+    searchSuggestions.innerHTML = "";
+    currentSuggestions = [];
+    activeSuggestionIndex = -1;
+    return;
+  }
 
   const queryText = searchAddressInput.value.trim();
   if (!shouldSearchAutocomplete(queryText)) {

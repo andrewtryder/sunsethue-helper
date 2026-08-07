@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import {
   createApiClient,
   createDemoClient,
-  patchFetchForDemo,
   API_BASE,
   CREDENTIAL_ADMIN_HEADER
 } from "../../public/lib/api-client.js";
@@ -155,54 +154,4 @@ test("createDemoClient send GET returns fixture as Response", async () => {
   assert.equal(response.status, 200);
   const data = await response.json();
   assert.deepStrictEqual(data, fixtures.locations);
-});
-
-test("patchFetchForDemo intercepts non-GET with 403", async (t) => {
-  const originalFetch = globalThis.fetch;
-  t.after(() => { globalThis.fetch = originalFetch; });
-
-  const api = createDemoClient({ locations: [] });
-  patchFetchForDemo(api);
-
-  const response = await globalThis.fetch("/api/locations", { method: "POST" });
-  assert.equal(response.status, 403);
-  const data = await response.json();
-  assert.equal(data.code, "DEMO_READ_ONLY");
-});
-
-test("patchFetchForDemo routes GET to fixtures", async (t) => {
-  const originalFetch = globalThis.fetch;
-  t.after(() => { globalThis.fetch = originalFetch; });
-
-  const fixtures = { locations: [{ id: "loc1", name: "NYC" }] };
-  const api = createDemoClient(fixtures);
-  patchFetchForDemo(api);
-
-  const response = await globalThis.fetch("/api/locations");
-  assert.equal(response.status, 200);
-  const data = await response.json();
-  assert.deepStrictEqual(data, fixtures.locations);
-});
-
-test("patchFetchForDemo falls back to real fetch when api.get throws", async (t) => {
-  const originalFetch = globalThis.fetch;
-  t.after(() => { globalThis.fetch = originalFetch; });
-
-  let fallbackCalled = false;
-  globalThis.fetch = async () => {
-    fallbackCalled = true;
-    return new Response("fallback", { status: 200 });
-  };
-
-  const throwingApi = {
-    async get() { throw new Error("not found"); },
-    async send() { throw new Error("not found"); }
-  };
-  patchFetchForDemo(throwingApi);
-
-  const response = await globalThis.fetch("/api/anything");
-  assert.equal(response.status, 200);
-  const body = await response.text();
-  assert.equal(body, "fallback");
-  assert.equal(fallbackCalled, true);
 });

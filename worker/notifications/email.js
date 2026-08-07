@@ -99,6 +99,6 @@ export async function sendEmail(job, env, deps = {}) {
     return { providerMessageId: null };
   } catch (error) {
     if (error instanceof NotificationError) throw error;
-    throw new NotificationError("SMTP_DELIVERY_FAILED", { retryable: true });
+    throw new NotificationError("SMTP_DELIVERY_FAILED", { retryable: true, cause: error });
   }
 }

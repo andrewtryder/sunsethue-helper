@@ -136,8 +136,8 @@ export async function sendWebPush(job, env, deps = {}) {
         Urgency: "normal"
       }
     });
-  } catch {
-    throw new NotificationError("WEB_PUSH_NETWORK", { retryable: true });
+  } catch (error) {
+    throw new NotificationError("WEB_PUSH_NETWORK", { retryable: true, cause: error });
   }
 
   const now = deps.now ?? Date.now();

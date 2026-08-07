@@ -6,7 +6,7 @@ import {
   patchFetchForDemo,
   API_BASE,
   CREDENTIAL_ADMIN_HEADER
-} from "../../public/api/client.js";
+} from "../../public/lib/api-client.js";
 
 test("API_BASE is empty string", () => {
   assert.equal(API_BASE, "");

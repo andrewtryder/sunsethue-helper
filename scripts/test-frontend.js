@@ -14,7 +14,7 @@ test("Frontend File Structure & Integrity Checks", () => {
   const cssPath = path.join(publicDir, "style.css");
   const jsPath = path.join(publicDir, "app.js");
   const helpersPath = path.join(publicDir, "lib", "helpers.js");
-  const apiClientPath = path.join(publicDir, "api", "client.js");
+  const apiClientPath = path.join(publicDir, "lib", "api-client.js");
   const bannersPath = path.join(publicDir, "ui", "banners.js");
   const dialogPath = path.join(publicDir, "ui", "dialog.js");
   const formsPath = path.join(publicDir, "ui", "forms.js");
@@ -31,7 +31,7 @@ test("Frontend File Structure & Integrity Checks", () => {
   assert.ok(fs.existsSync(cssPath), "style.css should exist");
   assert.ok(fs.existsSync(jsPath), "app.js should exist");
   assert.ok(fs.existsSync(helpersPath), "lib/helpers.js should exist");
-  assert.ok(fs.existsSync(apiClientPath), "api/client.js should exist");
+  assert.ok(fs.existsSync(apiClientPath), "lib/api-client.js should exist");
   assert.ok(fs.existsSync(bannersPath), "ui/banners.js should exist");
   assert.ok(fs.existsSync(dialogPath), "ui/dialog.js should exist");
   assert.ok(fs.existsSync(formsPath), "ui/forms.js should exist");

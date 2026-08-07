@@ -17,7 +17,7 @@ import {
   formatDateTimeMediumWithZone,
   formatTimeShortWithZone
 } from "./lib/time-format.js";
-import { initApi, CREDENTIAL_ADMIN_HEADER } from "./api/client.js";
+import { initApi, CREDENTIAL_ADMIN_HEADER } from "./lib/api-client.js";
 import { showBanner, hideBanner } from "./ui/banners.js";
 import { initEmailSuccessModal } from "./ui/dialog.js";
 import { initNotifications } from "./features/notifications.js";

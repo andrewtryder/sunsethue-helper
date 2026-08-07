@@ -177,23 +177,32 @@ const { fetchNotificationSettings, fetchProviderCredentials } = initNotification
   fetchDeliveries: () => fetchNotificationDeliveries()
 });
 
-const { fetchApplicationSettings } = initSchedule({ 
-  api, 
-  showSuccess, 
-  showError, 
+let globalScheduleTimes = ["06:00", "12:00", "18:00"];
+
+const { fetchApplicationSettings } = initSchedule({
+  api,
+  showSuccess,
+  showError,
   DEMO_READ_ONLY,
   capabilities,
-  onSettingsUpdate: updateDisplayTimeZone
+  onSettingsUpdate: (data) => {
+    if (Array.isArray(data?.scheduleTimes)) {
+      globalScheduleTimes = data.scheduleTimes;
+    }
+    updateDisplayTimeZone(data);
+  }
 });
 
 const { fetchLocationRules } = initThresholds({
-  api, 
-  showSuccess, 
-  showError, 
-  locationsListContainer, 
+  api,
+  showSuccess,
+  showError,
+  locationsListContainer,
   DEMO_READ_ONLY,
   capabilities,
-  getLocationsList: () => locationsList
+  getLocationsList: () => locationsList,
+  getGlobalScheduleTimes: () => globalScheduleTimes,
+  refreshLocations: () => fetchLocations()
 });
 
 initWebhook({

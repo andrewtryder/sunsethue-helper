@@ -1,5 +1,8 @@
 import { escapeHtml } from "../lib/helpers.js";
 
+const MAX_SCHEDULE_SLOTS = 8;
+const HOUR_OPTIONS = Array.from({ length: 24 }, (_, hour) => `${String(hour).padStart(2, "0")}:00`);
+
 const THRESHOLD_OPTIONS = [
   ["", "Always"],
   ["20", "20%+"],
@@ -18,6 +21,14 @@ const CHANNEL_LABELS = {
   webhook: "Webhook"
 };
 
+function formatHourLabel(slot) {
+  const labelHour = Number(String(slot).slice(0, 2));
+  if (labelHour === 0) return "12:00 AM";
+  if (labelHour < 12) return `${labelHour}:00 AM`;
+  if (labelHour === 12) return "12:00 PM";
+  return `${labelHour - 12}:00 PM`;
+}
+
 function formatCoords(lat, lng) {
   if (lat == null || lng == null || Number.isNaN(Number(lat)) || Number.isNaN(Number(lng))) {
     return "Coordinates unavailable";
@@ -31,10 +42,39 @@ function ruleValue(rule) {
   return rule?.thresholdPercent == null ? "" : String(rule.thresholdPercent);
 }
 
-export function initThresholds({ api, showSuccess, showError, getLocationsList, capabilities }) {
+function normalizeTimes(times) {
+  return [...new Set((times || []).filter((slot) => HOUR_OPTIONS.includes(slot)))]
+    .sort()
+    .slice(0, MAX_SCHEDULE_SLOTS);
+}
+
+function locationUsesCustomSchedule(loc) {
+  return Array.isArray(loc?.scheduleTimes) && loc.scheduleTimes.length > 0;
+}
+
+function scheduleStatusLabel(loc) {
+  if (locationUsesCustomSchedule(loc)) {
+    const n = loc.scheduleTimes.length;
+    return `custom schedule (${n} time${n === 1 ? "" : "s"})`;
+  }
+  return "using check times above";
+}
+
+export function initThresholds({
+  api,
+  showSuccess,
+  showError,
+  getLocationsList,
+  getGlobalScheduleTimes = () => ["06:00", "12:00", "18:00"],
+  refreshLocations = async () => {},
+  capabilities
+}) {
+  let cachedRules = [];
+
   async function fetchLocationRules() {
     const data = await api.get("/api/location-notification-rules");
-    renderLocationRules(data.rules || []);
+    cachedRules = data.rules || [];
+    renderLocationRules(cachedRules);
   }
 
   function renderSegmentedControl(locationId, channel, currentValue) {
@@ -53,6 +93,39 @@ export function initThresholds({ api, showSuccess, showError, getLocationsList, 
     return `<div class="segmented-control" role="radiogroup" aria-label="${CHANNEL_LABELS[channel] || channel} threshold for location">${buttons}</div>`;
   }
 
+  function renderLocationScheduleEditor(loc) {
+    const custom = locationUsesCustomSchedule(loc);
+    const times = custom ? normalizeTimes(loc.scheduleTimes) : [];
+    const disabled = !capabilities?.mutations;
+    const available = HOUR_OPTIONS.filter((slot) => !times.includes(slot));
+    const atMax = times.length >= MAX_SCHEDULE_SLOTS;
+    const pills = times.length
+      ? times.map((slot) => `
+          <span class="time-pill" role="listitem" data-location-schedule-slot="${slot}">
+            <span>${formatHourLabel(slot)}</span>
+            <button type="button" class="time-pill-remove" data-location-id="${loc.id}" data-remove-location-slot="${slot}" aria-label="Remove ${formatHourLabel(slot)}" ${disabled ? "disabled" : ""}>&times;</button>
+          </span>`).join("")
+      : "<p class=\"pane-subtext\">No custom times yet — add at least one, or turn custom schedule off.</p>";
+
+    return `<div class="location-schedule-block" data-location-schedule="${loc.id}">
+      <label class="settings-toggle-row">
+        <input type="checkbox" data-custom-schedule-toggle="${loc.id}" ${custom ? "checked" : ""} ${disabled ? "disabled" : ""}>
+        <span>Use custom check times</span>
+      </label>
+      <p class="pane-subtext">${custom
+        ? "This location is checked only at the times below."
+        : `Inherits global check times (${normalizeTimes(getGlobalScheduleTimes()).map(formatHourLabel).join(", ") || "none"}).`}</p>
+      <div class="location-schedule-editor" ${custom ? "" : "hidden"}>
+        <div class="time-pills" role="list">${pills}</div>
+        <label class="visually-hidden" for="add-location-time-${loc.id}">Add check time</label>
+        <select id="add-location-time-${loc.id}" class="form-input time-pill-add-select" data-add-location-time="${loc.id}" ${disabled || atMax || !available.length ? "disabled" : ""}>
+          <option value="">${atMax ? "Maximum 8 times" : "Add time…"}</option>
+          ${available.map((slot) => `<option value="${slot}">${formatHourLabel(slot)}</option>`).join("")}
+        </select>
+      </div>
+    </div>`;
+  }
+
   function renderLocationRules(rules) {
     const host = document.getElementById("location-rules-grid");
     if (!host) return;
@@ -67,6 +140,10 @@ export function initThresholds({ api, showSuccess, showError, getLocationsList, 
       return;
     }
 
+    const openIds = new Set(
+      [...host.querySelectorAll("details.location-rule-row[open]")].map((el) => el.getAttribute("data-location-id"))
+    );
+
     host.innerHTML = locationsList.map((loc) => {
       const locRules = byLocation.get(loc.id) || [];
       const channels = ["email", "pushover", "webpush", "webhook"].map((channel) => {
@@ -78,19 +155,25 @@ export function initThresholds({ api, showSuccess, showError, getLocationsList, 
         </div>`;
       }).join("");
 
-      return `<details class="location-rule-row">
+      return `<details class="location-rule-row" data-location-id="${loc.id}" ${openIds.has(loc.id) ? "open" : ""}>
         <summary class="location-rule-summary">
           <span class="location-rule-name">${escapeHtml(loc.name)}</span>
           <span class="location-rule-meta">${escapeHtml(formatCoords(loc.latitude, loc.longitude))}</span>
-          <span class="location-rule-status">using check times above</span>
+          <span class="location-rule-status">${escapeHtml(scheduleStatusLabel(loc))}</span>
         </summary>
         <div class="location-rule-customize">
-          <p class="pane-subtext">Customize notification thresholds for this location.</p>
+          <p class="pane-subtext">Customize check times and notification thresholds for this location.</p>
+          ${renderLocationScheduleEditor(loc)}
           ${channels}
         </div>
       </details>`;
     }).join("");
 
+    bindThresholdHandlers(host);
+    bindScheduleHandlers(host);
+  }
+
+  function bindThresholdHandlers(host) {
     host.querySelectorAll("[data-threshold-value]").forEach((btn) => {
       btn.addEventListener("click", async () => {
         if (!capabilities?.mutations || btn.disabled) return;
@@ -116,6 +199,80 @@ export function initThresholds({ api, showSuccess, showError, getLocationsList, 
         } catch (error) {
           showError(error.message);
           await fetchLocationRules();
+        }
+      });
+    });
+  }
+
+  async function saveLocationSchedule(locationId, scheduleTimes) {
+    if (!capabilities?.mutations) {
+      throw new Error("Saving location schedules is disabled in the static demo.");
+    }
+    const response = await api.send(`/api/locations/${locationId}/schedule`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ scheduleTimes })
+    });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null);
+      throw new Error(payload?.error?.message || "Unable to save location schedule.");
+    }
+    await refreshLocations();
+    renderLocationRules(cachedRules);
+    showSuccess(scheduleTimes == null ? "Location now uses global check times." : "Custom check times saved.");
+  }
+
+  function bindScheduleHandlers(host) {
+    host.querySelectorAll("[data-custom-schedule-toggle]").forEach((toggle) => {
+      toggle.addEventListener("change", async () => {
+        const locationId = toggle.getAttribute("data-custom-schedule-toggle");
+        try {
+          if (!toggle.checked) {
+            await saveLocationSchedule(locationId, null);
+            return;
+          }
+          const globalTimes = normalizeTimes(getGlobalScheduleTimes());
+          const seed = globalTimes.length ? globalTimes : ["06:00"];
+          await saveLocationSchedule(locationId, seed);
+        } catch (error) {
+          showError(error.message);
+          await refreshLocations();
+          renderLocationRules(cachedRules);
+        }
+      });
+    });
+
+    host.querySelectorAll("[data-add-location-time]").forEach((select) => {
+      select.addEventListener("change", async () => {
+        const locationId = select.getAttribute("data-add-location-time");
+        const value = select.value;
+        select.value = "";
+        if (!value) return;
+        const loc = getLocationsList().find((item) => item.id === locationId);
+        const next = normalizeTimes([...(loc?.scheduleTimes || []), value]);
+        if (!next.length) return;
+        try {
+          await saveLocationSchedule(locationId, next);
+        } catch (error) {
+          showError(error.message);
+        }
+      });
+    });
+
+    host.querySelectorAll("[data-remove-location-slot]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const locationId = btn.getAttribute("data-location-id");
+        const slot = btn.getAttribute("data-remove-location-slot");
+        const loc = getLocationsList().find((item) => item.id === locationId);
+        const next = normalizeTimes((loc?.scheduleTimes || []).filter((item) => item !== slot));
+        try {
+          if (!next.length) {
+            await saveLocationSchedule(locationId, null);
+            return;
+          }
+          await saveLocationSchedule(locationId, next);
+        } catch (error) {
+          showError(error.message);
         }
       });
     });
@@ -161,5 +318,5 @@ export function initThresholds({ api, showSuccess, showError, getLocationsList, 
     showSuccess("Rules reset to 50% defaults.");
   });
 
-  return { fetchLocationRules };
+  return { fetchLocationRules, renderLocationRules: () => renderLocationRules(cachedRules) };
 }

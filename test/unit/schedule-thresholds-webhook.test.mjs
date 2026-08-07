@@ -2,10 +2,13 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   buildOccurrenceKey,
+  effectiveLocationScheduleTimes,
   evaluateLocationForThreshold,
   getZonedParts,
+  parseOptionalLocationScheduleTimes,
   parseScheduleTimes,
   qualityMeetsThreshold,
+  validateLocationScheduleTimesInput,
   validateScheduleTimes
 } from "../../shared/time-format.js";
 import { estimateForecastQuota } from "../../worker/notifications/application-settings.js";
@@ -49,6 +52,34 @@ test("quota estimator multiplies runs by locations", () => {
   assert.equal(estimate.estimatedRequestsPerDay, 30);
   assert.equal(estimate.estimatedRequestsPer30Days, 900);
   assert.equal(estimate.estimatedDaysUntilExhaustion, 30);
+});
+
+test("location schedule override parsing and effective times", () => {
+  assert.equal(parseOptionalLocationScheduleTimes(null), null);
+  assert.deepEqual(parseOptionalLocationScheduleTimes('["09:00","06:00"]'), ["06:00", "09:00"]);
+  assert.equal(validateLocationScheduleTimesInput(null).ok, true);
+  assert.equal(validateLocationScheduleTimesInput(["06:30"]).ok, false);
+  assert.deepEqual(
+    effectiveLocationScheduleTimes({ scheduleTimes: null }, ["06:00", "18:00"]),
+    ["06:00", "18:00"]
+  );
+  assert.deepEqual(
+    effectiveLocationScheduleTimes({ scheduleTimes: ["09:00"] }, ["06:00", "18:00"]),
+    ["09:00"]
+  );
+});
+
+test("quota estimator sums per-location effective schedules", () => {
+  const estimate = estimateForecastQuota({
+    scheduleTimes: ["06:00", "12:00", "18:00"],
+    locations: [
+      { scheduleTimes: null },
+      { scheduleTimes: ["09:00"] },
+      { scheduleTimes: ["06:00", "18:00"] }
+    ]
+  });
+  assert.equal(estimate.estimatedRequestsPerDay, 3 + 1 + 2);
+  assert.equal(estimate.activeLocations, 3);
 });
 
 test("webhook URL SSRF guards", () => {

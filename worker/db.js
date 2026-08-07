@@ -1,11 +1,20 @@
 import { REQUIRED_D1_TABLES } from "../shared/schema-manifest.js";
+import { parseOptionalLocationScheduleTimes } from "../shared/time-format.js";
 
 const MANUAL_RETRY_COOLDOWN_MS = 60_000;
 const MAX_MANUAL_RETRIES = 10;
 
+function serializeLocationRow(row) {
+  if (!row) return row;
+  return {
+    ...row,
+    scheduleTimes: parseOptionalLocationScheduleTimes(row.scheduleTimes)
+  };
+}
+
 export async function getLocations(env) {
   const { results } = await env.DB.prepare("SELECT * FROM locations ORDER BY createdAt ASC").all();
-  return results;
+  return (results || []).map(serializeLocationRow);
 }
 
 /**
@@ -49,6 +58,19 @@ export async function updateLocation(env, id, loc) {
   const result = await env.DB.prepare(
     "UPDATE locations SET name = ?, latitude = ?, longitude = ? WHERE id = ?"
   ).bind(loc.name, loc.latitude, loc.longitude, id).run();
+  return result.meta?.changes === 1;
+}
+
+/**
+ * Set or clear a location's custom check-time schedule.
+ * Pass `scheduleTimes: null` to inherit the global application schedule.
+ * @returns {Promise<boolean>} true when the addressed row was updated
+ */
+export async function updateLocationSchedule(env, id, scheduleTimes) {
+  const stored = scheduleTimes == null ? null : JSON.stringify(scheduleTimes);
+  const result = await env.DB.prepare(
+    "UPDATE locations SET scheduleTimes = ? WHERE id = ?"
+  ).bind(stored, id).run();
   return result.meta?.changes === 1;
 }
 

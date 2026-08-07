@@ -24,17 +24,23 @@ const CASES = [
   { label: "midnight ET is skipped by default schedule", utc: "2026-07-15T04:00:00Z", expected: null }
 ];
 
-function recordingDeps(now) {
+function recordingDeps(now, {
+  locations = [{ id: "loc-1", scheduleTimes: null }],
+  scheduleTimes = ["06:00", "12:00", "18:00"]
+} = {}) {
   const dispatched = [];
+  const reportArgs = [];
   const claimed = new Set();
   return {
     dispatched,
+    reportArgs,
     deps: {
       now,
       getApplicationSettings: async () => ({
         scheduleTimezone: "America/New_York",
-        scheduleTimes: ["06:00", "12:00", "18:00"]
+        scheduleTimes
       }),
+      getLocations: async () => locations,
       claimScheduledOccurrence: async (_env, key) => {
         if (claimed.has(key)) return false;
         claimed.add(key);
@@ -42,8 +48,9 @@ function recordingDeps(now) {
       },
       bindOccurrenceRun: async () => {},
       dispatchPendingNotifications: async () => [],
-      runAndSendReport: async (triggerType) => {
+      runAndSendReport: async (triggerType, _env, deps) => {
         dispatched.push(triggerType);
+        reportArgs.push({ triggerType, locationIds: (deps?.locations || []).map((loc) => loc.id) });
         return { runId: "run-1" };
       }
     }
@@ -105,4 +112,30 @@ test("scheduled execution never inspects an Access token", async () => {
     base.deps
   );
   assert.equal(sawRequest, false);
+});
+
+test("cron includes only locations due for the slot", async () => {
+  // 09:00 America/New_York in summer = 13:00 UTC
+  const { deps, dispatched, reportArgs } = recordingDeps("2026-07-15T13:00:00Z", {
+    scheduleTimes: ["06:00", "12:00", "18:00"],
+    locations: [
+      { id: "inherit", scheduleTimes: null },
+      { id: "custom-due", scheduleTimes: ["09:00"] },
+      { id: "custom-skip", scheduleTimes: ["15:00"] }
+    ]
+  });
+  assert.equal(await handleScheduledReport({}, {}, deps), "SCHEDULED:09:00");
+  assert.deepEqual(dispatched, ["SCHEDULED:09:00"]);
+  assert.deepEqual(reportArgs[0].locationIds, ["custom-due"]);
+});
+
+test("cron skips when no location is due even if global schedule matches", async () => {
+  const { deps, dispatched } = recordingDeps("2026-07-15T10:00:00Z", {
+    scheduleTimes: ["06:00", "12:00", "18:00"],
+    locations: [
+      { id: "custom-only", scheduleTimes: ["09:00"] }
+    ]
+  });
+  assert.equal(await handleScheduledReport({}, {}, deps), null);
+  assert.deepEqual(dispatched, []);
 });

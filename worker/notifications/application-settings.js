@@ -5,6 +5,7 @@ import {
 import { NotificationError } from "./errors.js";
 import {
   defaultApplicationSettings,
+  effectiveLocationScheduleTimes,
   isValidIanaTimeZone,
   parseScheduleTimes,
   validateScheduleTimes
@@ -110,20 +111,40 @@ export async function saveApplicationSettings(env, input, now = Date.now()) {
 }
 
 /**
- * Quota estimate: scheduled runs/day × active locations (cap 10).
+ * Quota estimate for forecast fetches.
+ *
+ * When `locations` is provided, sums each location's effective schedule length
+ * (custom override or global default). Otherwise falls back to
+ * globalRuns × activeLocations.
  */
-export function estimateForecastQuota({ scheduleTimes, activeLocations, remainingCredits = null }) {
-  const runsPerDay = Array.isArray(scheduleTimes) ? scheduleTimes.length : 0;
-  const locations = Math.max(0, Math.min(10, Number(activeLocations) || 0));
-  const perDay = runsPerDay * locations;
+export function estimateForecastQuota({
+  scheduleTimes,
+  activeLocations,
+  locations = null,
+  remainingCredits = null
+} = {}) {
+  const globalTimes = parseScheduleTimes(scheduleTimes);
+  let locationCount;
+  let perDay;
+  if (Array.isArray(locations)) {
+    const capped = locations.slice(0, 10);
+    locationCount = capped.length;
+    perDay = capped.reduce(
+      (sum, loc) => sum + effectiveLocationScheduleTimes(loc, globalTimes).length,
+      0
+    );
+  } else {
+    locationCount = Math.max(0, Math.min(10, Number(activeLocations) || 0));
+    perDay = globalTimes.length * locationCount;
+  }
   const per30 = perDay * 30;
   let estimatedDaysRemaining = null;
   if (remainingCredits !== null && remainingCredits !== undefined && perDay > 0) {
     estimatedDaysRemaining = Math.floor(Number(remainingCredits) / perDay);
   }
   return {
-    scheduledRunsPerDay: runsPerDay,
-    activeLocations: locations,
+    scheduledRunsPerDay: globalTimes.length,
+    activeLocations: locationCount,
     estimatedRequestsPerDay: perDay,
     estimatedRequestsPer30Days: per30,
     remainingCredits: remainingCredits ?? null,

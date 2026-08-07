@@ -165,7 +165,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           packageManager: npm
-          wranglerVersion: "4.118.0"
+          wranglerVersion: "4.120.0"
           command: deploy --minify --keep-vars --config wrangler.credential-admin.toml
 
       # The main Worker deploys after credential-admin so the service binding resolves.
@@ -175,7 +175,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           packageManager: npm
-          wranglerVersion: "4.118.0"
+          wranglerVersion: "4.120.0"
           command: deploy --minify --keep-vars --config wrangler.worker.toml
 
       - name: Record the deployed Worker version
@@ -241,7 +241,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           packageManager: npm
-          wranglerVersion: "4.118.0"
+          wranglerVersion: "4.120.0"
           command: pages deploy --project-name=${{ vars.PAGES_PROJECT_NAME }} --branch=main
 
       - name: Report the Pages deployment result

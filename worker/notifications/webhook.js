@@ -60,9 +60,12 @@ export function buildWebhookPayload(job, deliveryId, generatedAtIso) {
 function classifyWebhookStatus(status) {
   if (status >= 200 && status < 300) return { ok: true };
   if (status === 408 || status === 425 || status === 429 || status >= 500) {
-    return { ok: false, retryable: true, code: "WEBHOOK_RETRYABLE" };
+    let code = "WEBHOOK_RETRYABLE";
+    if (status === 429) code = "WEBHOOK_HTTP_429";
+    else if (status >= 500) code = "WEBHOOK_HTTP_500";
+    return { ok: false, retryable: true, code, providerStatus: status };
   }
-  return { ok: false, retryable: false, code: "WEBHOOK_TERMINAL" };
+  return { ok: false, retryable: false, code: "WEBHOOK_TERMINAL", providerStatus: status };
 }
 
 export async function sendWebhook(job, env, deps = {}) {
@@ -97,13 +100,14 @@ export async function sendWebhook(job, env, deps = {}) {
       body: rawBody
     });
   } catch (error) {
-    throw new NotificationError("WEBHOOK_NETWORK", { retryable: true, cause: error });
+    if (error?.name === "AbortError") throw new NotificationError("WEBHOOK_TIMEOUT", { retryable: true });
+    throw new NotificationError("WEBHOOK_NETWORK", { retryable: true });
   } finally {
     clearTimeout(timer);
   }
 
   if (response.status >= 300 && response.status < 400) {
-    throw new NotificationError("WEBHOOK_REDIRECT", { retryable: false });
+    throw new NotificationError("WEBHOOK_REDIRECT", { retryable: false, metadata: { providerStatus: response.status } });
   }
 
   try {
@@ -142,9 +146,7 @@ export async function sendWebhook(job, env, deps = {}) {
   }
 
   if (!classification.ok) {
-    const error = new NotificationError(classification.code, { retryable: classification.retryable });
-    error.detail = `HTTP ${response.status}`;
-    throw error;
+    throw new NotificationError(classification.code, { retryable: classification.retryable, metadata: { providerStatus: classification.providerStatus } });
   }
   return { providerMessageId: deliveryId };
 }

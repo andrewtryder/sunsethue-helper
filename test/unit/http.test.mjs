@@ -8,7 +8,8 @@ import {
   jsonResponse,
   logSafe,
   methodNotAllowed,
-  securityHeaders
+  securityHeaders,
+  registerSecretForRedaction
 } from "../../worker/http.js";
 
 test("security headers are applied to every JSON response", () => {
@@ -143,4 +144,63 @@ test("log level selects the matching console channel", () => {
   }
 
   assert.deepEqual(seen, ["log", "warn", "error"]);
+});
+
+test("logSafe redacts explicitly registered secrets as defense in depth", () => {
+  const lines = [];
+  const originalWarn = console.warn;
+  console.warn = (line) => lines.push(line);
+
+  try {
+    registerSecretForRedaction("super-secret-exact");
+    registerSecretForRedaction("vapid-private-key-123");
+    registerSecretForRedaction("webhook-sig-xyz");
+    registerSecretForRedaction("pushover-key-abc");
+
+    logSafe("warn", "A failed request", {
+      code: "API_ERROR",
+      reason: "Failed due to super-secret-exact error",
+      channel: "pushover",
+      outboxId: "https://example.com/?token=webhook-sig-xyz&key=pushover-key-abc"
+    });
+  } finally {
+    console.warn = originalWarn;
+  }
+
+  assert.equal(lines.length, 1);
+  const logged = JSON.parse(lines[0]);
+  
+  assert.equal(logged.reason, "Failed due to *** error");
+  assert.equal(logged.outboxId, "https://example.com/?token=***&key=***");
+});
+
+test("logSafe drops un-allowlisted fields preventing PII and credentials from being logged", () => {
+  const lines = [];
+  const originalWarn = console.warn;
+  console.warn = (line) => lines.push(line);
+
+  try {
+    logSafe("warn", "Delivery failed", {
+      code: "SMTP_AUTH_REJECTED",
+      channel: "email",
+      gmailAddress: "owner@example.com",
+      pushEndpoint: "https://fcm.googleapis.com/fcm/send/xyz",
+      coordinates: "40.7128,-74.0060",
+      authorizationHeader: "Bearer 123456",
+      webhookUrl: "https://example.com/webhook"
+    });
+  } finally {
+    console.warn = originalWarn;
+  }
+
+  assert.equal(lines.length, 1);
+  const logged = JSON.parse(lines[0]);
+  
+  assert.equal(logged.code, "SMTP_AUTH_REJECTED");
+  assert.equal(logged.channel, "email");
+  assert.equal(logged.gmailAddress, undefined);
+  assert.equal(logged.pushEndpoint, undefined);
+  assert.equal(logged.coordinates, undefined);
+  assert.equal(logged.authorizationHeader, undefined);
+  assert.equal(logged.webhookUrl, undefined);
 });

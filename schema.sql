@@ -1,9 +1,5 @@
 -- Local and production D1 schema.
 -- Safe to re-run for new installs: all statements use IF NOT EXISTS.
--- Existing production databases that predate R1–R3 must use the reviewed
--- upgrade scripts (scripts/db-upgrade-r1.mjs, scripts/db-upgrade-r2-outbox.mjs,
--- scripts/db-upgrade-r3.mjs) instead of relying on IF NOT EXISTS alone —
--- SQLite cannot alter CHECK constraints or add columns via this bootstrap file.
 -- Apply locally with: npm run db:schema:local
 -- Apply to production D1 with: npm run db:schema:remote
 --   (creates missing tables/indexes; never mutates existing rows).

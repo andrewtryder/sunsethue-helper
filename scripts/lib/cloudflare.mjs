@@ -197,9 +197,10 @@ export function verifyD1TablesSync({
   configPath = "wrangler.worker.toml",
   cwd = process.cwd(),
   required = PROJECT.requiredD1Tables,
-  spawn = spawnSync
+  spawn = spawnSync,
+  environment = "remote"
 } = {}) {
-  if (!process.env.CLOUDFLARE_API_TOKEN || !process.env.CLOUDFLARE_ACCOUNT_ID) {
+  if (environment === "remote" && (!process.env.CLOUDFLARE_API_TOKEN || !process.env.CLOUDFLARE_ACCOUNT_ID)) {
     return { missing: [], skipped: true, reason: "CLOUDFLARE_API_TOKEN or CLOUDFLARE_ACCOUNT_ID is not set" };
   }
 
@@ -213,7 +214,7 @@ export function verifyD1TablesSync({
       PROJECT.d1Name,
       "--config",
       configPath,
-      "--remote",
+      environment === "remote" ? "--remote" : "--local",
       "--json",
       "--command",
       "SELECT name FROM sqlite_master WHERE type='table'"

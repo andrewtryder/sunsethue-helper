@@ -1,6 +1,6 @@
 import { escapeHtml } from "../lib/helpers.js";
 
-export function initHealth({ api }) {
+export function initHealth({ api, formatDateTime = (v) => v }) {
   async function fetchOperationalStatus() {
     const summary = document.getElementById("notification-health-summary")
       || document.getElementById("ops-status-summary");
@@ -18,7 +18,8 @@ export function initHealth({ api }) {
         action_required: "Action required",
         disabled: "Disabled"
       }[health.state] || health.state;
-      summary.textContent = `${stateLabel} · last report ${health.lastReportAt || "never"}`;
+      const lastReportText = health.lastReportAt ? formatDateTime(health.lastReportAt) : "never";
+      summary.textContent = `${stateLabel} · last report ${lastReportText}`;
       if (channelsHost) {
         channelsHost.innerHTML = (health.channels || []).map((ch) => `
           <article class="health-channel-card">
@@ -26,7 +27,7 @@ export function initHealth({ api }) {
             <p>${ch.enabled ? "Enabled" : "Off"} · ${ch.configured ? "Configured" : "Not configured"}</p>
             <p>Qualifying locations: ${ch.qualifyingLocationCount}</p>
             <p>Pending ${ch.pending} · Failed ${ch.failed}</p>
-            <p>Last success: ${ch.lastSuccessAt || "—"}</p>
+            <p>Last success: ${ch.lastSuccessAt ? formatDateTime(ch.lastSuccessAt) : "—"}</p>
             <p>Last failure: ${ch.lastFailureCode || "—"}</p>
             ${ch.devicesEnabled != null ? `<p>Devices: ${ch.devicesEnabled} enabled · ${ch.devicesStale || 0} stale · ${ch.devicesRevoked || 0} revoked</p>` : ""}
             ${ch.maskedHostname ? `<p>Host: ${escapeHtml(ch.maskedHostname)} · signing ${ch.signingEnabled ? "on" : "off"}</p>` : ""}
@@ -40,7 +41,7 @@ export function initHealth({ api }) {
       if (skipsHost) {
         const skips = health.skips || [];
         skipsHost.innerHTML = skips.length
-          ? `<strong>Recent threshold skips</strong><ul>${skips.map((s) => `<li>${escapeHtml(s.channel)} · ${escapeHtml(s.code)} · ${escapeHtml(s.createdAt)}</li>`).join("")}</ul>`
+          ? `<strong>Recent threshold skips</strong><ul>${skips.map((s) => `<li>${escapeHtml(s.channel)} · ${escapeHtml(s.code)} · ${escapeHtml(s.createdAt ? formatDateTime(s.createdAt) : s.createdAt)}</li>`).join("")}</ul>`
           : "<p class=\"pane-subtext\">No recent threshold skips.</p>";
       }
       if (selfTestHost) {

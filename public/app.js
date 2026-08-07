@@ -10,6 +10,13 @@ import {
   shouldSearchAutocomplete,
   mapGeolocationError
 } from "./lib/helpers.js";
+import {
+  resolveDisplayTimeZone,
+  formatTimeWithZone,
+  formatDateWithZone,
+  formatDateTimeMediumWithZone,
+  formatTimeShortWithZone
+} from "./lib/time-format.js";
 import { initApi, CREDENTIAL_ADMIN_HEADER } from "./api/client.js";
 import { showBanner, hideBanner } from "./ui/banners.js";
 import { initEmailSuccessModal } from "./ui/dialog.js";
@@ -21,28 +28,6 @@ import { initWebhook } from "./features/webhook.js";
 import { initHealth } from "./features/health.js";
 import { initHistory } from "./features/history.js";
 import { initSetupStatus } from "./features/setup-status.js";
-
-const timeFormatter = new Intl.DateTimeFormat("en-US", {
-  timeZone: "America/New_York",
-  hour: "numeric",
-  minute: "2-digit"
-});
-const dateFormatter = new Intl.DateTimeFormat("en-US", {
-  timeZone: "America/New_York",
-  weekday: "short",
-  month: "short",
-  day: "numeric"
-});
-const dateTimeFormatterMedium = new Intl.DateTimeFormat("en-US", {
-  timeZone: "America/New_York",
-  dateStyle: "medium",
-  timeStyle: "short"
-});
-const timeFormatterShort = new Intl.DateTimeFormat("en-US", {
-  timeZone: "America/New_York",
-  timeStyle: "short"
-});
-
 // API
 const { api, DEMO_MODE, DEMO_READ_ONLY } = initApi();
 
@@ -91,6 +76,20 @@ let cachedRuns = [];
 let cachedDeliveries = [];
 let editingLocationId = null;
 let expandedActivityIds = new Set();
+let currentApplicationSettings = null;
+let currentDisplayTimeZone = "America/New_York";
+
+function updateDisplayTimeZone(settings) {
+  currentApplicationSettings = settings;
+  if (!settings) return;
+  let deviceZone = undefined;
+  try { deviceZone = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch { /* ignore */ }
+  currentDisplayTimeZone = resolveDisplayTimeZone(settings, deviceZone);
+  renderForecastDashboard();
+  if (activityFilter === "runs" || activityFilter === "deliveries") {
+    renderActivityList();
+  }
+}
 
 // Banner helpers bound to the shared banner elements
 const showSuccess = (msg, duration) => showBanner(dbSuccessBanner, msg, duration);
@@ -150,7 +149,12 @@ const { fetchNotificationSettings, fetchProviderCredentials } = initNotification
   fetchDeliveries: () => fetchNotificationDeliveries()
 });
 
-const { fetchApplicationSettings } = initSchedule({ api, showSuccess, showError });
+const { fetchApplicationSettings } = initSchedule({ 
+  api, 
+  showSuccess, 
+  showError,
+  onSettingsUpdate: updateDisplayTimeZone
+});
 
 const { fetchLocationRules } = initThresholds({
   api, showSuccess, showError,
@@ -166,7 +170,10 @@ initWebhook({
   fetchNotificationSettings
 });
 
-const { fetchOperationalStatus } = initHealth({ api });
+const { fetchOperationalStatus } = initHealth({ 
+  api, 
+  formatDateTime: (iso) => formatDateTimeMediumWithZone(iso, currentDisplayTimeZone) 
+});
 
 const { refreshHistoryCounts } = initHistory({
   api, DEMO_READ_ONLY, showSuccess, showError,
@@ -365,7 +372,7 @@ function renderLocations() {
 
 function formatForecastColumnDate(isoTime) {
   if (!isoTime) return "";
-  const formatted = dateFormatter.format(Date.parse(isoTime));
+  const formatted = formatDateWithZone(Date.parse(isoTime), currentDisplayTimeZone);
   return `(${formatted})`;
 }
 
@@ -442,11 +449,11 @@ function renderForecastDashboard() {
       const sunsetBadge = getForecastBadgeHtml(location.latestSunsetQuality, location.latestSunsetText);
 
       const sunriseTimeText = location.latestSunriseTime
-        ? timeFormatter.format(Date.parse(location.latestSunriseTime))
-        : null;
+        ? formatTimeWithZone(Date.parse(location.latestSunriseTime), currentDisplayTimeZone)
+        : "—";
       const sunsetTimeText = location.latestSunsetTime
-        ? timeFormatter.format(Date.parse(location.latestSunsetTime))
-        : null;
+        ? formatTimeWithZone(Date.parse(location.latestSunsetTime), currentDisplayTimeZone)
+        : "—";
 
       let sunriseColHtml;
       let sunsetColHtml;
@@ -487,8 +494,8 @@ function renderForecastDashboard() {
 
     if (dashboardLastUpdated) {
       if (maxTimestamp > 0) {
-        const timeStr = dateTimeFormatterMedium.format(maxTimestamp);
-        dashboardLastUpdated.textContent = `Last Run: ${timeStr} ET`;
+        const timeStr = formatDateTimeMediumWithZone(maxTimestamp, currentDisplayTimeZone);
+        dashboardLastUpdated.textContent = `Last Run: ${timeStr}`;
       } else {
         dashboardLastUpdated.textContent = "Last Run: Never";
       }
@@ -927,18 +934,6 @@ document.addEventListener("click", (e) => {
 
 // ── API Credits ──────────────────────────────────────────────────────
 
-function formatApiCreditsLabel(credits) {
-  const limitPart = credits.limit != null ? ` / ${credits.limit}` : "";
-  let label = `Requests remaining: ${credits.remaining}${limitPart}`;
-
-  if (credits.resetAt) {
-    const resetText = timeFormatterShort.format(credits.resetAt);
-    label += ` · resets ${resetText} ET`;
-  }
-
-  return label;
-}
-
 async function fetchApiCreditsStatus() {
   if (!apiCreditsStatus) return;
 
@@ -951,7 +946,15 @@ async function fetchApiCreditsStatus() {
     if (!response.ok) {
       throw new Error(result.error || "Failed to load API credits.");
     }
-    apiCreditsStatus.textContent = formatApiCreditsLabel(result);
+    
+    if (result && typeof result.remaining === "number") {
+      let label = `${result.remaining} / ${result.limit}`;
+      if (result.resetAt) {
+        const resetText = formatTimeShortWithZone(result.resetAt, currentDisplayTimeZone);
+        label += ` · resets ${resetText}`;
+      }
+      apiCreditsStatus.textContent = label;
+    }
   } catch (error) {
     console.error(error);
     apiCreditsStatus.classList.add("error");
@@ -1040,7 +1043,7 @@ function renderActivityList() {
           ? "warning"
           : "success";
       const timeText = delivery.updatedAt || delivery.createdAt
-        ? dateTimeFormatterMedium.format(Date.parse(delivery.updatedAt || delivery.createdAt))
+        ? formatDateTimeMediumWithZone(Date.parse(delivery.updatedAt || delivery.createdAt), currentDisplayTimeZone)
         : "—";
       const itemKey = `delivery:${delivery.id || index}`;
       const hasDetails = Boolean(delivery.lastErrorCode);
@@ -1066,7 +1069,7 @@ function renderActivityList() {
 
   const fragment = document.createDocumentFragment();
   cachedRuns.forEach((log, index) => {
-    const dateText = dateTimeFormatterMedium.format(log.timestamp);
+    const dateText = formatDateTimeMediumWithZone(log.timestamp, currentDisplayTimeZone);
     const statusClass = getLogStatusClass(log.status);
     const statusText = log.status.toUpperCase();
     const itemKey = `run:${log.id || index}`;

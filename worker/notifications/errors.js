@@ -1,8 +1,9 @@
 export class NotificationError extends Error {
-  constructor(code, { retryable = false, cause } = {}) {
+  constructor(code, { retryable = false, cause, metadata = {} } = {}) {
     super(code, { cause });
     this.code = code;
     this.retryable = retryable;
+    this.metadata = metadata;
   }
 }
 

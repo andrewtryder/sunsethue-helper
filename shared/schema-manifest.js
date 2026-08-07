@@ -17,13 +17,6 @@ export const REQUIRED_D1_TABLES = Object.freeze([
   "admin_audit_events"
 ]);
 
-/** Reviewed operator upgrade scripts still pending when a table is missing. */
-export const SCHEMA_UPGRADE_SCRIPTS = Object.freeze([
-  { id: "r1", script: "db:upgrade:r1", requiredTables: ["application_settings", "location_notification_rules", "scheduled_occurrences"] },
-  { id: "r2", script: "db:upgrade:r2", requiredTables: ["web_push_subscriptions"] },
-  { id: "r3", script: "db:upgrade:r3", requiredTables: ["health_check_runs", "admin_audit_events"] }
-]);
-
 /** Channels validated in application code (not a DB CHECK enum). */
 export const NOTIFICATION_CHANNELS = Object.freeze([
   "email",

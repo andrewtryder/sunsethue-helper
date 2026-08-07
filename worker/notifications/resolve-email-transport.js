@@ -11,6 +11,7 @@
 
 import { CredentialError, parseEmailTransport } from "../lib/transport-schema.js";
 import { NotificationError } from "./errors.js";
+import { registerSecretForRedaction } from "../http.js";
 
 async function readStoreBinding(binding) {
   if (!binding || typeof binding.get !== "function") return null;
@@ -30,6 +31,7 @@ export async function resolveEmailTransport(env) {
     try {
       const parsed = parseEmailTransport(raw);
       if (parsed.configured) {
+        registerSecretForRedaction(parsed.gmailAppPassword);
         return {
           source: "secrets_store",
           gmailUser: parsed.gmailUser,

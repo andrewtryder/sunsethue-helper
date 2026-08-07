@@ -1,4 +1,5 @@
 import { CredentialError, parseTransportJson, TRANSPORT_VERSION } from "../lib/transport-schema.js";
+import { registerSecretForRedaction } from "../http.js";
 
 export const WEBHOOK_FIELDS = new Set(["version", "configured", "url", "signingSecret"]);
 
@@ -17,6 +18,7 @@ export function parseWebhookTransport(raw) {
   if (typeof parsed.signingSecret !== "string" || parsed.signingSecret.length < 16 || parsed.signingSecret.length > 256) {
     throw new CredentialError("INVALID_WEBHOOK_CREDENTIALS");
   }
+  registerSecretForRedaction(parsed.signingSecret);
   return {
     version: TRANSPORT_VERSION,
     configured: true,

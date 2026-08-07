@@ -11,6 +11,7 @@
 
 import { CredentialError, parsePushoverTransport } from "../lib/transport-schema.js";
 import { NotificationError } from "./errors.js";
+import { registerSecretForRedaction } from "../http.js";
 
 async function readStoreBinding(binding) {
   if (!binding || typeof binding.get !== "function") return null;
@@ -30,6 +31,8 @@ export async function resolvePushoverTransport(env) {
     try {
       const parsed = parsePushoverTransport(raw);
       if (parsed.configured) {
+        registerSecretForRedaction(parsed.appToken);
+        registerSecretForRedaction(parsed.userKey);
         return {
           source: "secrets_store",
           appToken: parsed.appToken,

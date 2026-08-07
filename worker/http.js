@@ -52,6 +52,14 @@ export function methodNotAllowed(allow, requestId = createRequestId()) {
   );
 }
 
+const REDACT_SECRETS = new Set();
+
+export function registerSecretForRedaction(secret) {
+  if (typeof secret === "string" && secret.length > 5) {
+    REDACT_SECRETS.add(secret);
+  }
+}
+
 /**
  * Structured logging that never records JWTs, cookies, emails, or auth headers.
  * @param {string} level
@@ -71,7 +79,10 @@ export function logSafe(level, message, meta = {}) {
   for (const key of ["outboxId", "channel", "attempt", "duration", "reason"]) {
     if (meta[key] !== undefined && meta[key] !== null) safe[key] = meta[key];
   }
-  const line = JSON.stringify(safe);
+  let line = JSON.stringify(safe);
+  for (const secret of REDACT_SECRETS) {
+    line = line.replaceAll(secret, "***");
+  }
   if (level === "error") {
     console.error(line);
   } else if (level === "warn") {

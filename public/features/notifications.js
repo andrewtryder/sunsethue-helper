@@ -18,7 +18,10 @@ export function initNotifications({ api, showBanner, showSuccess, showError, CRE
   const pushoverCredentialsStatus = document.getElementById("pushover-credentials-status");
   const pushoverAppTokenInput = document.getElementById("pushover-app-token");
   const pushoverUserKeyInput = document.getElementById("pushover-user-key");
-  const notificationSettingsForm = document.getElementById("notification-settings-form");
+
+  function syncSwitchAria(el) {
+    if (el) el.setAttribute("aria-checked", el.checked ? "true" : "false");
+  }
 
   function applyProviderCredentialStatus(status, { merge = false } = {}) {
     if (gmailCredentialsStatus && (!merge || status?.email !== undefined)) {
@@ -50,18 +53,53 @@ export function initNotifications({ api, showBanner, showSuccess, showError, CRE
     if (pushoverUserKeyInput) pushoverUserKeyInput.value = "";
   }
 
+  function readNotificationSettingsBody() {
+    return {
+      emailEnabled: Boolean(notificationEmailEnabled?.checked),
+      emailTo: notificationEmailTo?.value || null,
+      pushoverEnabled: Boolean(notificationPushoverEnabled?.checked),
+      pushoverDevice: notificationDevice?.value || null,
+      pushoverPriority: Number(notificationPriority?.value ?? 0),
+      pushoverSound: notificationSound?.value || null,
+      webhookEnabled: Boolean(document.getElementById("notification-webhook-enabled")?.checked)
+    };
+  }
+
+  async function saveNotificationSettings({ successMessage = "Notification settings saved." } = {}) {
+    if (!capabilities?.mutations) {
+      throw new Error("Saving notification settings is disabled in the static demo.");
+    }
+    const response = await api.send("/api/notification-settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(readNotificationSettingsBody())
+    });
+    if (!response.ok) throw new Error("Notification settings were not accepted.");
+    if (successMessage) showSuccess(successMessage);
+    await fetchNotificationSettings();
+  }
+
   async function fetchNotificationSettings() {
     const response = await api.send("/api/notification-settings");
     if (!response.ok) throw new Error("Failed to load notification settings.");
     const settings = await response.json();
-    notificationEmailEnabled.checked = settings.emailEnabled;
-    notificationEmailTo.value = settings.emailTo || "";
-    notificationPushoverEnabled.checked = settings.pushoverEnabled;
-    notificationDevice.value = settings.pushoverDevice || "";
-    notificationPriority.value = String(settings.pushoverPriority);
-    notificationSound.value = settings.pushoverSound || "";
+    if (notificationEmailEnabled) {
+      notificationEmailEnabled.checked = settings.emailEnabled;
+      syncSwitchAria(notificationEmailEnabled);
+    }
+    if (notificationEmailTo) notificationEmailTo.value = settings.emailTo || "";
+    if (notificationPushoverEnabled) {
+      notificationPushoverEnabled.checked = settings.pushoverEnabled;
+      syncSwitchAria(notificationPushoverEnabled);
+    }
+    if (notificationDevice) notificationDevice.value = settings.pushoverDevice || "";
+    if (notificationPriority) notificationPriority.value = String(settings.pushoverPriority);
+    if (notificationSound) notificationSound.value = settings.pushoverSound || "";
     const webhookEnabledEl = document.getElementById("notification-webhook-enabled");
-    if (webhookEnabledEl) webhookEnabledEl.checked = Boolean(settings.webhookEnabled);
+    if (webhookEnabledEl) {
+      webhookEnabledEl.checked = Boolean(settings.webhookEnabled);
+      syncSwitchAria(webhookEnabledEl);
+    }
     const webhookStatus = document.getElementById("webhook-credentials-status");
     if (webhookStatus) {
       webhookStatus.textContent = settings.webhookConfigured
@@ -70,12 +108,16 @@ export function initNotifications({ api, showBanner, showSuccess, showError, CRE
       webhookStatus.classList.toggle("success", settings.webhookConfigured);
       webhookStatus.classList.toggle("muted", !settings.webhookConfigured);
     }
-    notificationEmailStatus.textContent = settings.emailConfigured ? "Configured" : "Not configured";
-    notificationEmailStatus.classList.toggle("success", settings.emailConfigured);
-    notificationEmailStatus.classList.toggle("muted", !settings.emailConfigured);
-    notificationPushoverStatus.textContent = settings.pushoverConfigured ? "Configured" : "Not configured";
-    notificationPushoverStatus.classList.toggle("success", settings.pushoverConfigured);
-    notificationPushoverStatus.classList.toggle("muted", !settings.pushoverConfigured);
+    if (notificationEmailStatus) {
+      notificationEmailStatus.textContent = settings.emailConfigured ? "Configured" : "Not configured";
+      notificationEmailStatus.classList.toggle("success", settings.emailConfigured);
+      notificationEmailStatus.classList.toggle("muted", !settings.emailConfigured);
+    }
+    if (notificationPushoverStatus) {
+      notificationPushoverStatus.textContent = settings.pushoverConfigured ? "Configured" : "Not configured";
+      notificationPushoverStatus.classList.toggle("success", settings.pushoverConfigured);
+      notificationPushoverStatus.classList.toggle("muted", !settings.pushoverConfigured);
+    }
   }
 
   async function fetchProviderCredentials() {
@@ -137,31 +179,48 @@ export function initNotifications({ api, showBanner, showSuccess, showError, CRE
     await fetchDeliveries();
   }
 
-  notificationSettingsForm?.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    if (!capabilities?.mutations) {
-      showError("Saving notification settings is disabled in the static demo.");
-      return;
-    }
-    const body = {
-      emailEnabled: notificationEmailEnabled.checked,
-      emailTo: notificationEmailTo.value || null,
-      pushoverEnabled: notificationPushoverEnabled.checked,
-      pushoverDevice: notificationDevice.value || null,
-      pushoverPriority: Number(notificationPriority.value),
-      pushoverSound: notificationSound.value || null,
-      webhookEnabled: Boolean(document.getElementById("notification-webhook-enabled")?.checked)
-    };
+  async function onEnableToggle(event) {
+    const el = event.currentTarget;
+    syncSwitchAria(el);
     try {
-      const response = await api.send("/api/notification-settings", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body)
+      await saveNotificationSettings({
+        successMessage: el.checked ? "Channel enabled." : "Channel disabled."
       });
-      if (!response.ok) throw new Error("Notification settings were not accepted.");
-      showSuccess("Notification settings saved.");
-      await fetchNotificationSettings();
-    } catch (error) { showError(error.message); }
+    } catch (error) {
+      showError(error.message);
+      try {
+        await fetchNotificationSettings();
+      } catch {
+        /* ignore reload errors after failed save */
+      }
+    }
+  }
+
+  const webhookEnabledInput = document.getElementById("notification-webhook-enabled");
+  for (const el of [notificationEmailEnabled, notificationPushoverEnabled, webhookEnabledInput]) {
+    if (!el) continue;
+    if (!capabilities?.mutations) {
+      el.disabled = true;
+      el.title = "Channel toggles are disabled in the static demo.";
+    }
+    el.addEventListener("change", onEnableToggle);
+    syncSwitchAria(el);
+  }
+
+  document.getElementById("save-email-settings-btn")?.addEventListener("click", async () => {
+    try {
+      await saveNotificationSettings({ successMessage: "Email settings saved." });
+    } catch (error) {
+      showError(error.message);
+    }
+  });
+
+  document.getElementById("save-pushover-settings-btn")?.addEventListener("click", async () => {
+    try {
+      await saveNotificationSettings({ successMessage: "Pushover settings saved." });
+    } catch (error) {
+      showError(error.message);
+    }
   });
 
   gmailCredentialsForm?.addEventListener("submit", async (event) => {
@@ -317,5 +376,5 @@ export function initNotifications({ api, showBanner, showSuccess, showError, CRE
   document.getElementById("test-pushover-btn")?.addEventListener("click", () =>
     testNotification("pushover").catch((error) => showError(error.message)));
 
-  return { fetchNotificationSettings, fetchProviderCredentials };
+  return { fetchNotificationSettings, fetchProviderCredentials, saveNotificationSettings };
 }

@@ -45,7 +45,11 @@ test.describe("Horizon app smoke", () => {
     await expect(page.locator("#pane-activity")).toBeVisible();
     await page.locator("#nav-settings").click();
     await expect(page.locator("#pane-settings")).toBeVisible();
-    await expect(page.locator("#ops-status-title")).toBeVisible();
+    await expect(page.locator("#channel-card-email")).toBeVisible();
+    await expect(page.locator("#notification-email-enabled")).toBeAttached();
+    await expect(page.locator("#channel-card-pushover")).toBeVisible();
+    await expect(page.locator("#channel-card-webpush")).toBeVisible();
+    await expect(page.locator("#channel-card-webhook")).toBeVisible();
   });
 
   test("location drawer opens and closes with focus restore", async ({ page }) => {

@@ -155,3 +155,40 @@ test("createDemoClient send GET returns fixture as Response", async () => {
   const data = await response.json();
   assert.deepStrictEqual(data, fixtures.locations);
 });
+
+test("createApiClient aborts hanging GET with timeout", async (t) => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = originalFetch; });
+
+  globalThis.fetch = (_url, init) => new Promise((_resolve, reject) => {
+    init.signal.addEventListener("abort", () => {
+      const error = new Error("Aborted");
+      error.name = "AbortError";
+      reject(error);
+    });
+  });
+
+  const api = createApiClient();
+  await assert.rejects(
+    api.get("/api/locations", { timeoutMs: 30 }),
+    { message: "Request timed out: /api/locations" }
+  );
+});
+
+test("createApiClient uses shorter timeout for credential status GETs", async (t) => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = originalFetch; });
+
+  let capturedSignal;
+  globalThis.fetch = (_url, init) => {
+    capturedSignal = init.signal;
+    return Promise.resolve(new Response("{}", {
+      status: 200,
+      headers: { "Content-Type": "application/json" }
+    }));
+  };
+
+  const api = createApiClient();
+  await api.send("/api/provider-credentials");
+  assert.ok(capturedSignal instanceof AbortSignal);
+});

@@ -1,19 +1,52 @@
 export const API_BASE = "";
 export const CREDENTIAL_ADMIN_HEADER = { "X-Sunsethue-Admin": "credentials" };
 
+export const DEFAULT_GET_TIMEOUT_MS = 8_000;
+export const DEFAULT_MUTATION_TIMEOUT_MS = 15_000;
+export const CREDENTIAL_STATUS_TIMEOUT_MS = 5_000;
+
+function resolveTimeoutMs(path, init = {}) {
+  if (typeof init.timeoutMs === "number") return init.timeoutMs;
+  const method = (init.method || "GET").toUpperCase();
+  if (path.startsWith("/api/provider-credentials") && method === "GET") {
+    return CREDENTIAL_STATUS_TIMEOUT_MS;
+  }
+  return method === "GET" || method === "HEAD" ? DEFAULT_GET_TIMEOUT_MS : DEFAULT_MUTATION_TIMEOUT_MS;
+}
+
+async function fetchWithTimeout(path, init = {}) {
+  const { timeoutMs: _ignored, ...fetchInit } = init;
+  const timeoutMs = resolveTimeoutMs(path, init);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(`${API_BASE}${path}`, {
+      ...fetchInit,
+      signal: controller.signal
+    });
+    return response;
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      throw new Error(`Request timed out: ${path}`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export function createApiClient({ readOnly = false } = {}) {
   return {
-    async get(path) {
-      const response = await fetch(`${API_BASE}${path}`);
+    async get(path, init) {
+      const response = await fetchWithTimeout(path, { ...init, method: "GET" });
       if (!response.ok) throw new Error(`Request failed: ${path}`);
       return response.json();
     },
-    async send(path, init) {
+    async send(path, init = {}) {
       if (readOnly && init?.method && init.method !== "GET") {
         throw new Error("DEMO_READ_ONLY");
       }
-      const response = await fetch(`${API_BASE}${path}`, init);
-      return response;
+      return fetchWithTimeout(path, init);
     }
   };
 }

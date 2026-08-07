@@ -3,6 +3,7 @@
  */
 
 import { CredentialError } from "./lib/transport-schema.js";
+import { CREDENTIAL_ADMIN_RPC_TIMEOUT_MS, withTimeout } from "./lib/timeout.js";
 
 export class CredentialAdminProxyError extends Error {
   constructor(code, status = 502) {
@@ -70,42 +71,30 @@ export function getCredentialAdmin(env) {
   return env.CREDENTIAL_ADMIN;
 }
 
-export async function adminGetStatus(env, meta) {
+async function callAdmin(env, invoke, timeoutMs = CREDENTIAL_ADMIN_RPC_TIMEOUT_MS) {
   try {
-    return await getCredentialAdmin(env).getStatus(meta);
+    return await withTimeout(invoke(getCredentialAdmin(env)), timeoutMs, "CREDENTIAL_ADMIN_UNAVAILABLE");
   } catch (error) {
     throw mapAdminError(error);
   }
+}
+
+export async function adminGetStatus(env, meta, options = {}) {
+  return callAdmin(env, (admin) => admin.getStatus(meta), options.timeoutMs);
 }
 
 export async function adminUpdateEmail(env, input, context) {
-  try {
-    return await getCredentialAdmin(env).updateEmail(input, context);
-  } catch (error) {
-    throw mapAdminError(error);
-  }
+  return callAdmin(env, (admin) => admin.updateEmail(input, context), 15_000);
 }
 
 export async function adminRemoveEmail(env, context) {
-  try {
-    return await getCredentialAdmin(env).removeEmail(context);
-  } catch (error) {
-    throw mapAdminError(error);
-  }
+  return callAdmin(env, (admin) => admin.removeEmail(context), 15_000);
 }
 
 export async function adminUpdatePushover(env, input, context) {
-  try {
-    return await getCredentialAdmin(env).updatePushover(input, context);
-  } catch (error) {
-    throw mapAdminError(error);
-  }
+  return callAdmin(env, (admin) => admin.updatePushover(input, context), 15_000);
 }
 
 export async function adminRemovePushover(env, context) {
-  try {
-    return await getCredentialAdmin(env).removePushover(context);
-  } catch (error) {
-    throw mapAdminError(error);
-  }
+  return callAdmin(env, (admin) => admin.removePushover(context), 15_000);
 }

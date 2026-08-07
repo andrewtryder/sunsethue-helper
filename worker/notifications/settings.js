@@ -68,9 +68,12 @@ export async function getSettings(env) {
 }
 
 export async function publicSettings(settings, env) {
-  const emailConfigured = await hasEmailTransportAsync(env);
-  const pushoverConfigured = await hasPushoverTransportAsync(env);
-  const webhookConfigured = await hasWebhookTransportAsync(env);
+  const rows = await db.listProviderCredentialStatus(env);
+  const byProvider = Object.fromEntries(rows.map((row) => [row.provider, row]));
+  const emailConfigured = Number(byProvider.email?.configured) === 1;
+  const pushoverConfigured = Number(byProvider.pushover?.configured) === 1;
+  const webhookConfigured = Number(byProvider.webhook?.configured) === 1
+    || Boolean(settings.webhookMaskedHostname);
   return {
     emailEnabled: Boolean(settings.emailEnabled),
     emailTo: settings.emailTo || null,

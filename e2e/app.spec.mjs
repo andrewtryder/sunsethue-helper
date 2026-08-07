@@ -37,6 +37,7 @@ test.describe("Horizon app smoke", () => {
 
   test("initializes and switches tabs", async ({ page }) => {
     await page.goto("/");
+    await expect(page.locator("#loading-overlay")).toHaveClass(/fade-out/, { timeout: 30_000 });
     await expect(page.locator("#app-container")).toBeVisible({ timeout: 30_000 });
     await page.locator("#nav-locations").click();
     await expect(page.locator("#pane-locations")).toBeVisible();

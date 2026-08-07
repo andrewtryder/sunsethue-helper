@@ -138,11 +138,34 @@ test("credential routes reject oversized bodies", async () => {
   });
 });
 
-test("missing CREDENTIAL_ADMIN binding returns controlled unavailability", async () => {
+test("GET provider-credentials serves D1 metadata without CREDENTIAL_ADMIN", async () => {
   await withCredentialsApi(
     async ({ call }) => {
       const response = await call("/api/provider-credentials", {
         headers: credentialHeaders()
+      });
+      assert.equal(response.status, 200);
+      const body = await response.json();
+      assert.equal(body.email.configured, false);
+      assert.equal(body.pushover.configured, false);
+      assert.doesNotMatch(JSON.stringify(body), new RegExp(SECRET_NEEDLE));
+      assert.doesNotMatch(JSON.stringify(body), /CLOUDFLARE_API_TOKEN/);
+    },
+    { admin: null }
+  );
+});
+
+test("missing CREDENTIAL_ADMIN binding returns controlled unavailability on mutation", async () => {
+  await withCredentialsApi(
+    async ({ call }) => {
+      const response = await call("/api/provider-credentials/email", {
+        method: "PUT",
+        headers: credentialHeaders({ mutation: true }),
+        body: {
+          gmailUser: "owner@example.com",
+          gmailAppPassword: "abcdefghijklmnop",
+          emailFrom: "owner@example.com"
+        }
       });
       assert.equal(response.status, 503);
       const body = await response.json();

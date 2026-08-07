@@ -1,8 +1,5 @@
 import { REQUIRED_D1_TABLES } from "../../shared/schema-manifest.js";
 import { estimateForecastQuota, getApplicationSettings } from "./application-settings.js";
-import { emailTransportSource } from "./resolve-email-transport.js";
-import { pushoverTransportSource } from "./resolve-pushover-transport.js";
-import { hasWebhookTransportAsync } from "./webhook.js";
 import { hasWebPushConfiguredAsync } from "./webpush.js";
 import * as db from "../db.js";
 import { listLocationNotificationRules } from "../repositories/notification-rules.js";
@@ -62,11 +59,17 @@ export async function getNotificationHealth(env, deps = {}) {
   const present = new Set((tables.results || []).map((row) => row.name));
   const requiredTablesPresent = REQUIRED_D1_TABLES.every((name) => present.has(name));
 
-  const emailTransport = deps.emailTransport ?? await emailTransportSource(env);
-  const pushoverTransport = deps.pushoverTransport ?? await pushoverTransportSource(env);
-  const webhookConfigured = deps.webhookConfigured ?? await hasWebhookTransportAsync(env);
+  const credentialRows = deps.credentialRows || await db.listProviderCredentialStatus(env);
+  const byProvider = Object.fromEntries(credentialRows.map((row) => [row.provider, row]));
+  const emailTransport = deps.emailTransport
+    ?? (Number(byProvider.email?.configured) === 1 ? "secrets_store" : "not_configured");
+  const pushoverTransport = deps.pushoverTransport
+    ?? (Number(byProvider.pushover?.configured) === 1 ? "secrets_store" : "not_configured");
+  const emailConfigured = deps.emailConfigured ?? emailTransport !== "not_configured";
+  const pushoverConfigured = deps.pushoverConfigured ?? pushoverTransport !== "not_configured";
+  const webhookConfigured = deps.webhookConfigured
+    ?? (Number(byProvider.webhook?.configured) === 1 || Boolean(notificationSettings.webhookMaskedHostname));
   const webpushConfigured = deps.webpushConfigured ?? await hasWebPushConfiguredAsync(env);
-
   const emailEnabled = Number(notificationSettings.emailEnabled) === 1;
   const pushoverEnabled = Number(notificationSettings.pushoverEnabled) === 1;
   const webhookEnabled = Number(notificationSettings.webhookEnabled) === 1;
@@ -87,8 +90,8 @@ export async function getNotificationHealth(env, deps = {}) {
   const failedDeliveries = Number(failedAgg && failedAgg.c ? failedAgg.c : 0);
 
   const anyChannelEnabled = emailEnabled || pushoverEnabled || webhookEnabled || webpushEnabled;
-  const missingTransport = (emailEnabled && emailTransport === "not_configured")
-    || (pushoverEnabled && pushoverTransport === "not_configured")
+  const missingTransport = (emailEnabled && !emailConfigured)
+    || (pushoverEnabled && !pushoverConfigured)
     || (webhookEnabled && !webhookConfigured)
     || (webpushEnabled && !webpushConfigured);
 
@@ -122,7 +125,7 @@ export async function getNotificationHealth(env, deps = {}) {
     {
       channel: "email",
       enabled: emailEnabled,
-      configured: emailTransport !== "not_configured",
+      configured: emailConfigured,
       transport: emailTransport,
       qualifyingLocationCount: qualify("email") || locations.length,
       pending: 0,
@@ -131,7 +134,7 @@ export async function getNotificationHealth(env, deps = {}) {
     {
       channel: "pushover",
       enabled: pushoverEnabled,
-      configured: pushoverTransport !== "not_configured",
+      configured: pushoverConfigured,
       transport: pushoverTransport,
       qualifyingLocationCount: qualify("pushover") || locations.length,
       pending: 0,

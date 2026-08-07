@@ -43,16 +43,38 @@ function model(runId = crypto.randomUUID()) {
   };
 }
 
-test("default notification settings ship disabled and publicSettings never leaks stored secrets", async () => {
+test("default notification settings ship disabled and publicSettings uses D1 credential metadata", async () => {
   await withEnv(async (env) => {
     const settings = await getSettings(env);
     // Ship-safe defaults: the owner must opt in through the Notifications UI.
     assert.equal(settings.emailEnabled, 0);
     assert.equal(settings.emailTo, null);
     assert.equal(settings.pushoverEnabled, 0);
+
+    // Without D1 provider_credential_status rows, UI readiness is not configured
+    // even when Secrets Store bindings exist (store is not probed on GET).
+    const unconfigured = await publicSettings(settings, env);
+    assert.equal(unconfigured.emailConfigured, false);
+    assert.equal(unconfigured.pushoverConfigured, false);
+
+    await db.upsertProviderCredentialStatus(env, {
+      provider: "email",
+      configured: 1,
+      maskedIdentifier: "ow***@example.com",
+      updatedAt: NOW,
+      lastValidatedAt: NOW,
+      lastValidationCode: "OK"
+    });
+    await db.upsertProviderCredentialStatus(env, {
+      provider: "pushover",
+      configured: 1,
+      maskedIdentifier: "configured",
+      updatedAt: NOW,
+      lastValidatedAt: NOW,
+      lastValidationCode: "OK"
+    });
+
     const visible = await publicSettings(settings, env);
-    // With Secrets Store bindings configured, publicSettings still reports
-    // both channels as ready to enable.
     assert.equal(visible.emailConfigured, true);
     assert.equal(visible.pushoverConfigured, true);
     // Never surface the actual Gmail/Pushover secrets.

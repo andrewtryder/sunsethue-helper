@@ -242,38 +242,82 @@ const { fetchSetupChecklist } = initSetupStatus({ api, capabilities });
 
 // ── Init ─────────────────────────────────────────────────────────────
 
-async function initApp() {
-  const loader = document.getElementById("loading-overlay");
-  try {
-    appContainer.classList.remove("hidden");
-    document.body.classList.add("app-visible");
+let settingsStatePromise = null;
+let activityStatePromise = null;
 
-    await Promise.all([fetchLocations(), fetchRuns()]);
-    const notificationOutcomes = await Promise.allSettled([
+async function loadSettingsState() {
+  if (settingsStatePromise) return settingsStatePromise;
+  settingsStatePromise = (async () => {
+    const outcomes = await Promise.allSettled([
       fetchNotificationSettings(),
-      fetchNotificationDeliveries(),
       fetchProviderCredentials(),
       fetchOperationalStatus(),
       fetchSetupChecklist(),
       refreshHistoryCounts(),
-      fetchApplicationSettings(),
       fetchLocationRules(),
       fetchWebPushDevices()
     ]);
-    for (const outcome of notificationOutcomes) {
+    for (const outcome of outcomes) {
       if (outcome.status === "rejected") {
-        console.warn("Notification panel failed to load:", outcome.reason);
-        showBanner(dbErrorBanner, "Notification panel temporarily unavailable.", 6000);
+        console.warn("Settings panel failed to load:", outcome.reason);
+        showBanner(dbErrorBanner, "Settings panel temporarily unavailable.", 6000);
         break;
       }
     }
+  })();
+  try {
+    await settingsStatePromise;
+  } catch (error) {
+    settingsStatePromise = null;
+    throw error;
+  }
+  return settingsStatePromise;
+}
+
+async function loadActivityState() {
+  if (activityStatePromise) return activityStatePromise;
+  activityStatePromise = (async () => {
+    const outcomes = await Promise.allSettled([
+      fetchNotificationDeliveries(),
+      fetchApiCreditsStatus()
+    ]);
+    for (const outcome of outcomes) {
+      if (outcome.status === "rejected") {
+        console.warn("Activity panel failed to load:", outcome.reason);
+      }
+    }
+    renderActivityList();
+  })();
+  try {
+    await activityStatePromise;
+  } catch (error) {
+    activityStatePromise = null;
+    throw error;
+  }
+  return activityStatePromise;
+}
+
+function hideLoader() {
+  const loader = document.getElementById("loading-overlay");
+  if (loader) loader.classList.add("fade-out");
+}
+
+async function initApp() {
+  try {
+    appContainer.classList.remove("hidden");
+    document.body.classList.add("app-visible");
+
+    // Forecast-critical only — never block first paint on Secrets Store / credentials.
+    await Promise.allSettled([
+      fetchLocations(),
+      fetchRuns(),
+      fetchApplicationSettings()
+    ]);
   } catch (error) {
     console.error("Initialization failed: ", error);
     showBanner(dbErrorBanner, `Initialization Error: ${error.message}`, 0);
   } finally {
-    if (loader) {
-      loader.classList.add("fade-out");
-    }
+    hideLoader();
   }
 }
 
@@ -1234,8 +1278,10 @@ function switchTab(targetTab) {
   if (activePane) activePane.classList.add("active");
 
   if (targetTab === "activity") {
-    fetchApiCreditsStatus();
-    renderActivityList();
+    void loadActivityState();
+  }
+  if (targetTab === "settings") {
+    void loadSettingsState();
   }
 }
 

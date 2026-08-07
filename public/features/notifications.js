@@ -79,14 +79,28 @@ export function initNotifications({ api, showBanner, showSuccess, showError, CRE
   }
 
   async function fetchProviderCredentials() {
-    const response = await api.send("/api/provider-credentials");
-    if (!response.ok) {
-      const payload = await response.json().catch(() => null);
-      const message = payload?.error?.message || "Failed to load provider credentials.";
-      const code = payload?.error?.code;
-      throw new Error(code ? `${message} (${code})` : message);
+    try {
+      const response = await api.send("/api/provider-credentials", { timeoutMs: 5_000 });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        const message = payload?.error?.message || "Credential status temporarily unavailable.";
+        const code = payload?.error?.code;
+        throw new Error(code ? `${message} (${code})` : message);
+      }
+      applyProviderCredentialStatus(await response.json());
+    } catch (error) {
+      if (gmailCredentialsStatus) {
+        gmailCredentialsStatus.textContent = "Credential status temporarily unavailable";
+        gmailCredentialsStatus.classList.remove("success");
+        gmailCredentialsStatus.classList.add("muted");
+      }
+      if (pushoverCredentialsStatus) {
+        pushoverCredentialsStatus.textContent = "Credential status temporarily unavailable";
+        pushoverCredentialsStatus.classList.remove("success");
+        pushoverCredentialsStatus.classList.add("muted");
+      }
+      throw error;
     }
-    applyProviderCredentialStatus(await response.json());
   }
 
   async function refreshProviderCredentialsAfterMutation(partialStatus) {

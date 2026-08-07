@@ -23,7 +23,6 @@ import { initEmailSuccessModal } from "./ui/dialog.js";
 import { initNotifications } from "./features/notifications.js";
 import { initSchedule } from "./features/schedule.js";
 import { initThresholds } from "./features/thresholds.js";
-import { initWebPush } from "./features/webpush.js";
 import { initWebhook } from "./features/webhook.js";
 import { initHealth } from "./features/health.js";
 import { initHistory } from "./features/history.js";
@@ -197,14 +196,6 @@ const { fetchLocationRules } = initThresholds({
   getLocationsList: () => locationsList
 });
 
-const { fetchWebPushDevices } = initWebPush({
-  api, 
-  showSuccess, 
-  showError, 
-  DEMO_READ_ONLY,
-  capabilities
-});
-
 initWebhook({
   api, 
   showSuccess, 
@@ -245,9 +236,35 @@ const { fetchSetupChecklist } = initSetupStatus({ api, capabilities });
 let settingsStatePromise = null;
 let activityStatePromise = null;
 
+async function loadBrowserNotifications() {
+  try {
+    const { initBrowserNotifications } = await import("./features/browser-notifications.js");
+    return initBrowserNotifications({
+      api,
+      showSuccess,
+      showError,
+      DEMO_READ_ONLY,
+      capabilities
+    });
+  } catch (error) {
+    console.warn("Browser notifications are unavailable.", error);
+    const host = document.getElementById("web-push-devices");
+    if (host) {
+      host.textContent = "Browser notifications unavailable in this browser.";
+    }
+    const btn = document.getElementById("enable-web-push-btn");
+    if (btn) {
+      btn.disabled = true;
+      btn.title = "Browser notifications unavailable in this browser";
+    }
+    return { fetchWebPushDevices: async () => {} };
+  }
+}
+
 async function loadSettingsState() {
   if (settingsStatePromise) return settingsStatePromise;
   settingsStatePromise = (async () => {
+    const browserNotifications = await loadBrowserNotifications();
     const outcomes = await Promise.allSettled([
       fetchNotificationSettings(),
       fetchProviderCredentials(),
@@ -255,7 +272,7 @@ async function loadSettingsState() {
       fetchSetupChecklist(),
       refreshHistoryCounts(),
       fetchLocationRules(),
-      fetchWebPushDevices()
+      browserNotifications.fetchWebPushDevices()
     ]);
     for (const outcome of outcomes) {
       if (outcome.status === "rejected") {

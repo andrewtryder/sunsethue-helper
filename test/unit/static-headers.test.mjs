@@ -10,6 +10,7 @@ test("public/_headers sets CSP and framing defenses", () => {
   const headers = readFileSync(resolve(ROOT, "public/_headers"), "utf8");
   assert.match(headers, /Content-Security-Policy:/);
   assert.match(headers, /frame-ancestors 'none'/);
+  assert.match(headers, /manifest-src 'self'/);
   assert.match(headers, /X-Frame-Options: DENY/);
   assert.match(headers, /X-Content-Type-Options: nosniff/);
   assert.match(headers, /Referrer-Policy:/);

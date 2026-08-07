@@ -21,7 +21,7 @@ test("Frontend File Structure & Integrity Checks", () => {
   const schedulePath = path.join(publicDir, "features", "schedule.js");
   const thresholdsPath = path.join(publicDir, "features", "thresholds.js");
   const notificationsPath = path.join(publicDir, "features", "notifications.js");
-  const webpushPath = path.join(publicDir, "features", "webpush.js");
+  const browserNotificationsPath = path.join(publicDir, "features", "browser-notifications.js");
   const webhookPath = path.join(publicDir, "features", "webhook.js");
   const healthPath = path.join(publicDir, "features", "health.js");
   const historyPath = path.join(publicDir, "features", "history.js");
@@ -38,7 +38,7 @@ test("Frontend File Structure & Integrity Checks", () => {
   assert.ok(fs.existsSync(schedulePath), "features/schedule.js should exist");
   assert.ok(fs.existsSync(thresholdsPath), "features/thresholds.js should exist");
   assert.ok(fs.existsSync(notificationsPath), "features/notifications.js should exist");
-  assert.ok(fs.existsSync(webpushPath), "features/webpush.js should exist");
+  assert.ok(fs.existsSync(browserNotificationsPath), "features/browser-notifications.js should exist");
   assert.ok(fs.existsSync(webhookPath), "features/webhook.js should exist");
   assert.ok(fs.existsSync(healthPath), "features/health.js should exist");
   assert.ok(fs.existsSync(historyPath), "features/history.js should exist");

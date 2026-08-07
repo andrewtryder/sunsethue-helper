@@ -103,4 +103,78 @@ test.describe("Bootstrap does not wait on optional APIs", () => {
     await expect(page.locator("#pane-main")).toBeVisible();
     await expect(page.getByText("Forecast Harbor").first()).toBeAttached();
   });
+
+  test("blocked browser-notifications module does not prevent Forecast init", async ({ page }) => {
+    const coreApiHits = { locations: 0, runs: 0, applicationSettings: 0 };
+
+    await page.route("**/features/browser-notifications.js", (route) => route.abort("blockedbyclient"));
+    await page.route("**/api/locations", async (route) => {
+      coreApiHits.locations += 1;
+      await fulfillJson(route, CORE_FIXTURES.locations);
+    });
+    await page.route("**/api/runs", async (route) => {
+      coreApiHits.runs += 1;
+      await fulfillJson(route, CORE_FIXTURES.runs);
+    });
+    await page.route("**/api/application-settings**", async (route) => {
+      if (route.request().method() === "GET") {
+        coreApiHits.applicationSettings += 1;
+        await fulfillJson(route, CORE_FIXTURES.applicationSettings);
+        return;
+      }
+      await fulfillJson(route, {});
+    });
+    await page.route("**/api/provider-credentials", (route) => fulfillJson(route, {
+      email: { configured: false },
+      pushover: { configured: false }
+    }));
+    await page.route("**/api/notification-settings", (route) => fulfillJson(route, {
+      emailEnabled: false,
+      emailTo: null,
+      pushoverEnabled: false,
+      pushoverDevice: null,
+      pushoverPriority: 0,
+      pushoverSound: null,
+      webhookEnabled: false,
+      emailConfigured: false,
+      pushoverConfigured: false,
+      webhookConfigured: false
+    }));
+    await page.route("**/api/notification-health", (route) => fulfillJson(route, { state: "disabled", channels: [] }));
+    await page.route("**/api/setup-status", (route) => fulfillJson(route, { databaseTables: "ready" }));
+    await page.route("**/api/location-notification-rules**", (route) => fulfillJson(route, { rules: [] }));
+    await page.route("**/api/history/**", (route) => fulfillJson(route, { count: 0 }));
+
+    await page.goto("/");
+    await expect(page.locator("#loading-overlay")).toHaveClass(/fade-out/, { timeout: 8_000 });
+    await expect(page.locator("#pane-main")).toBeVisible();
+    await expect(page.getByText("Forecast Harbor").first()).toBeAttached();
+    await expect(page.locator("#bootstrap-fatal-banner")).toHaveCount(0);
+
+    expect(coreApiHits.locations).toBeGreaterThan(0);
+    expect(coreApiHits.runs).toBeGreaterThan(0);
+    expect(coreApiHits.applicationSettings).toBeGreaterThan(0);
+
+    await page.locator("#nav-settings").click();
+    await expect(page.locator("#pane-settings")).toBeVisible();
+    await expect(
+      page.getByText(/Browser notifications unavailable in this browser/i).first()
+    ).toBeVisible({ timeout: 8_000 });
+    await expect(page.locator("#enable-web-push-btn")).toBeDisabled();
+  });
+
+  test("manifest.webmanifest is requested successfully", async ({ page }) => {
+    await stubCoreApis(page);
+    const manifestResponses = [];
+    page.on("response", (response) => {
+      if (response.url().includes("manifest.webmanifest")) {
+        manifestResponses.push(response.status());
+      }
+    });
+
+    await page.goto("/");
+    await expect(page.locator("#loading-overlay")).toHaveClass(/fade-out/, { timeout: 8_000 });
+    await expect.poll(() => manifestResponses.length, { timeout: 5_000 }).toBeGreaterThan(0);
+    expect(manifestResponses.every((status) => status >= 200 && status < 400)).toBe(true);
+  });
 });

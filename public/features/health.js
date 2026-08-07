@@ -1,5 +1,35 @@
 import { escapeHtml } from "../lib/helpers.js";
 
+const CHANNEL_SUBTITLE_IDS = {
+  email: "email-channel-subtitle",
+  pushover: "pushover-channel-subtitle",
+  web_push: "webpush-channel-subtitle",
+  webpush: "webpush-channel-subtitle",
+  browser_push: "webpush-channel-subtitle",
+  webhook: "webhook-channel-subtitle"
+};
+
+function channelKey(name) {
+  return String(name || "").toLowerCase().replace(/[\s-]+/g, "_");
+}
+
+function formatChannelSubtitle(ch, formatDateTime) {
+  const configured = ch.configured ? "Configured" : "Not configured";
+  const enabled = ch.enabled == null ? null : (ch.enabled ? "On" : "Off");
+  const lastOk = ch.lastSuccessAt ? `Last success ${formatDateTime(ch.lastSuccessAt)}` : "No success yet";
+  const lastFail = ch.lastFailureCode
+    ? `Last failure ${ch.lastFailureCode}${ch.lastFailureAt ? ` · ${formatDateTime(ch.lastFailureAt)}` : ""}`
+    : "No failures";
+  const parts = [configured];
+  if (enabled) parts.push(enabled);
+  if (ch.devicesEnabled != null) {
+    parts.push(`${ch.devicesEnabled} device${ch.devicesEnabled === 1 ? "" : "s"} enabled`);
+  }
+  if (ch.maskedHostname) parts.push(ch.maskedHostname);
+  parts.push(lastOk, lastFail);
+  return parts.join(" · ");
+}
+
 export function initHealth({ api, formatDateTime = (v) => v, capabilities }) {
   async function fetchOperationalStatus() {
     const summary = document.getElementById("notification-health-summary")
@@ -20,6 +50,14 @@ export function initHealth({ api, formatDateTime = (v) => v, capabilities }) {
       }[health.state] || health.state;
       const lastReportText = health.lastReportAt ? formatDateTime(health.lastReportAt) : "never";
       summary.textContent = `${stateLabel} · last report ${lastReportText}`;
+
+      for (const ch of health.channels || []) {
+        const key = channelKey(ch.channel);
+        const subtitleId = CHANNEL_SUBTITLE_IDS[key] || CHANNEL_SUBTITLE_IDS[key.replace(/_/g, "")];
+        const el = subtitleId ? document.getElementById(subtitleId) : null;
+        if (el) el.textContent = formatChannelSubtitle(ch, formatDateTime);
+      }
+
       if (channelsHost) {
         channelsHost.innerHTML = (health.channels || []).map((ch) => `
           <article class="health-channel-card">

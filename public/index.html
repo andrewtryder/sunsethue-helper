@@ -181,6 +181,171 @@
         <div class="pane-header"><h2>Settings</h2></div>
         <p class="pane-subtext">Schedule, display timezone, notification channels, and provider credentials.</p>
 
+<section class="form-card settings-card channel-card" id="channel-card-email" aria-labelledby="channel-email-title">
+          <div class="channel-card-header">
+            <div>
+              <h3 id="channel-email-title">Email</h3>
+              <p id="email-channel-subtitle" class="channel-card-subtitle pane-subtext" role="status">Loading…</p>
+            </div>
+            <label class="switch">
+              <input id="notification-email-enabled" type="checkbox" role="switch">
+              <span class="switch-ui" aria-hidden="true"></span>
+              <span class="visually-hidden">Enable email</span>
+            </label>
+          </div>
+          <div class="channel-card-body">
+            <span id="notification-email-status" class="status-badge muted" role="status"></span>
+            <span id="gmail-credentials-status" class="status-badge muted" role="status">Loading…</span>
+            <div class="form-group">
+              <label for="notification-email-to">Email destination</label>
+              <input id="notification-email-to" class="form-input" type="email" autocomplete="email" aria-describedby="notification-email-help">
+              <small id="notification-email-help">Forecast email recipient</small>
+            </div>
+            <form id="gmail-credentials-form" novalidate>
+              <div class="settings-field-grid">
+                <div class="form-group">
+                  <label for="gmail-user">Gmail account</label>
+                  <input id="gmail-user" class="form-input" type="email" autocomplete="username" aria-describedby="gmail-user-help">
+                  <small id="gmail-user-help">SMTP login account</small>
+                </div>
+                <div class="form-group">
+                  <label for="gmail-app-password">Gmail App Password</label>
+                  <input id="gmail-app-password" class="form-input" type="password" autocomplete="new-password" aria-describedby="gmail-password-help">
+                  <small id="gmail-password-help">16-char App Password. Leave blank to keep current.</small>
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="gmail-email-from">Sender mailbox</label>
+                <input id="gmail-email-from" class="form-input" type="text" autocomplete="off" aria-describedby="gmail-from-help" placeholder="Sunsethue Helper &lt;you@example.com&gt;">
+                <small id="gmail-from-help">From display name and mailbox</small>
+              </div>
+              <div class="form-actions form-actions-compact">
+                <button type="button" id="save-email-settings-btn" class="btn btn-secondary">Save email settings</button>
+                <button type="submit" id="save-gmail-credentials-btn" class="btn btn-primary">Save Gmail credentials</button>
+                <button type="button" id="remove-gmail-credentials-btn" class="btn btn-secondary">Remove credentials</button>
+                <button type="button" id="test-email-btn" class="btn btn-secondary">Send test email</button>
+              </div>
+            </form>
+          </div>
+          <!-- Legacy structural ids -->
+          <h3 id="gmail-credentials-title" class="visually-hidden">Gmail credentials</h3>
+        </section>
+
+        <section class="form-card settings-card channel-card" id="channel-card-pushover" aria-labelledby="channel-pushover-title">
+          <div class="channel-card-header">
+            <div>
+              <h3 id="channel-pushover-title">Pushover</h3>
+              <p id="pushover-channel-subtitle" class="channel-card-subtitle pane-subtext" role="status">Loading…</p>
+            </div>
+            <label class="switch">
+              <input id="notification-pushover-enabled" type="checkbox" role="switch">
+              <span class="switch-ui" aria-hidden="true"></span>
+              <span class="visually-hidden">Enable Pushover</span>
+            </label>
+          </div>
+          <div class="channel-card-body">
+            <span id="notification-pushover-status" class="status-badge muted" role="status"></span>
+            <span id="pushover-credentials-status" class="status-badge muted" role="status">Loading…</span>
+            <div class="settings-field-grid">
+              <div class="form-group">
+                <label for="notification-device">Pushover device (optional)</label>
+                <input id="notification-device" class="form-input" maxlength="64">
+              </div>
+              <div class="form-group">
+                <label for="notification-priority">Pushover priority</label>
+                <select id="notification-priority" class="form-input"><option value="-2">Lowest</option><option value="-1">Low</option><option value="0">Normal</option><option value="1">High</option></select>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="notification-sound">Pushover sound (optional)</label>
+              <input id="notification-sound" class="form-input" maxlength="64">
+            </div>
+            <form id="pushover-credentials-form" novalidate>
+              <div class="settings-field-grid">
+                <div class="form-group">
+                  <label for="pushover-app-token">Application API token</label>
+                  <input id="pushover-app-token" class="form-input" type="password" autocomplete="new-password" aria-describedby="pushover-token-help">
+                  <small id="pushover-token-help">App token. Leave blank to keep current.</small>
+                </div>
+                <div class="form-group">
+                  <label for="pushover-user-key">User / group key</label>
+                  <input id="pushover-user-key" class="form-input" type="password" autocomplete="new-password" aria-describedby="pushover-key-help">
+                  <small id="pushover-key-help">Recipient user or group key</small>
+                </div>
+              </div>
+              <div class="form-actions form-actions-compact">
+                <button type="button" id="save-pushover-settings-btn" class="btn btn-secondary">Save Pushover settings</button>
+                <button type="submit" id="save-pushover-credentials-btn" class="btn btn-primary">Save Pushover credentials</button>
+                <button type="button" id="remove-pushover-credentials-btn" class="btn btn-secondary">Remove credentials</button>
+                <button type="button" id="test-pushover-btn" class="btn btn-secondary">Send test Pushover</button>
+              </div>
+            </form>
+          </div>
+          <h3 id="pushover-credentials-title" class="visually-hidden">Pushover credentials</h3>
+        </section>
+
+        <section class="form-card settings-card channel-card" id="channel-card-webpush" aria-labelledby="channel-webpush-title">
+          <div class="channel-card-header">
+            <div>
+              <h3 id="channel-webpush-title">Browser push</h3>
+              <p id="webpush-channel-subtitle" class="channel-card-subtitle pane-subtext" role="status">Loading…</p>
+            </div>
+          </div>
+          <div class="channel-card-body">
+            <p class="pane-subtext">On iPhone/iPad, install this site to the Home Screen first. Permission is only requested when you click Enable.</p>
+            <button type="button" id="enable-web-push-btn" class="btn btn-primary">Enable browser notifications on this device</button>
+            <div id="web-push-devices" class="form-group"></div>
+          </div>
+          <h3 id="web-push-title" class="visually-hidden">Browser notifications</h3>
+        </section>
+
+        <section class="form-card settings-card channel-card" id="channel-card-webhook" aria-labelledby="channel-webhook-title">
+          <div class="channel-card-header">
+            <div>
+              <h3 id="channel-webhook-title">Webhook</h3>
+              <p id="webhook-channel-subtitle" class="channel-card-subtitle pane-subtext" role="status">Loading…</p>
+            </div>
+            <label class="switch">
+              <input id="notification-webhook-enabled" type="checkbox" role="switch">
+              <span class="switch-ui" aria-hidden="true"></span>
+              <span class="visually-hidden">Enable webhook</span>
+            </label>
+          </div>
+          <div class="channel-card-body">
+            <span id="webhook-credentials-status" class="status-badge muted" role="status">Loading…</span>
+            <p class="pane-subtext">One HTTPS destination. Requests are HMAC-signed. Never paste secrets into issues or commits.</p>
+            <form id="webhook-credentials-form" novalidate>
+              <div class="form-group">
+                <label for="webhook-url">Webhook URL</label>
+                <input id="webhook-url" class="form-input" type="url" autocomplete="off" placeholder="https://example.com/hooks/sunsethue">
+              </div>
+              <div class="form-group">
+                <label for="webhook-signing-secret">Signing secret</label>
+                <input id="webhook-signing-secret" class="form-input" type="password" autocomplete="new-password">
+              </div>
+              <div class="form-actions form-actions-compact">
+                <button type="submit" class="btn btn-primary">Save webhook</button>
+                <button type="button" id="test-webhook-btn" class="btn btn-secondary">Send test webhook</button>
+                <button type="button" id="remove-webhook-btn" class="btn btn-secondary">Remove webhook</button>
+              </div>
+            </form>
+          </div>
+          <h3 id="webhook-title" class="visually-hidden">Webhook</h3>
+        </section>
+
+        <!-- Compact health summary (details live on channel cards) -->
+        <section class="form-card settings-card" aria-labelledby="notification-health-title" id="notification-health-section">
+          <h3 id="notification-health-title">Notification overview</h3>
+          <p id="notification-health-summary" class="action-status" role="status">Loading…</p>
+          <div id="notification-health-schedule" class="form-group"></div>
+          <div id="notification-health-skips" class="form-group"></div>
+          <p id="notification-health-selftest" class="pane-subtext"></p>
+          <div id="notification-health-channels" class="visually-hidden"></div>
+          <h3 id="ops-status-title" class="visually-hidden">Operational status</h3>
+          <p id="ops-status-summary" class="visually-hidden"></p>
+          <dl id="ops-status-list" class="visually-hidden"></dl>
+        </section>
+
         <section class="form-card settings-card" aria-labelledby="general-settings-title">
           <h3 id="general-settings-title">General</h3>
           <form id="application-settings-form" novalidate>
@@ -241,19 +406,6 @@
           <ul id="setup-checklist" class="setup-checklist"></ul>
         </section>
 
-        <section class="form-card" aria-labelledby="notification-health-title" id="notification-health-section">
-          <h3 id="notification-health-title">Notification health</h3>
-          <p id="notification-health-summary" class="action-status" role="status">Loading…</p>
-          <div id="notification-health-channels" class="health-channel-grid"></div>
-          <div id="notification-health-schedule" class="form-group"></div>
-          <div id="notification-health-skips" class="form-group"></div>
-          <p id="notification-health-selftest" class="pane-subtext"></p>
-          <!-- Keep legacy ids for structural tests / backward compatibility -->
-          <h3 id="ops-status-title" class="visually-hidden">Operational status</h3>
-          <p id="ops-status-summary" class="visually-hidden"></p>
-          <dl id="ops-status-list" class="visually-hidden"></dl>
-        </section>
-
         <section class="form-card" aria-labelledby="clear-history-title" id="clear-history-section">
           <h3 id="clear-history-title">Clear history</h3>
           <p class="pane-subtext">Removes terminal report and delivery records only. Locations, settings, credentials, and pending jobs are never deleted.</p>
@@ -286,128 +438,6 @@
             <button type="button" id="rules-reset-btn" class="btn btn-secondary">Reset to defaults (50%)</button>
           </div>
         </section>
-
-        <section class="form-card settings-card" aria-labelledby="web-push-title">
-          <h3 id="web-push-title">Browser notifications</h3>
-          <p class="pane-subtext">On iPhone/iPad, install this site to the Home Screen first. Permission is only requested when you click Enable.</p>
-          <button type="button" id="enable-web-push-btn" class="btn btn-primary">Enable browser notifications on this device</button>
-          <div id="web-push-devices" class="form-group"></div>
-        </section>
-
-        <section class="form-card settings-card" aria-labelledby="webhook-title">
-          <h3 id="webhook-title">Webhook</h3>
-          <p class="pane-subtext">One HTTPS destination. Requests are HMAC-signed. Never paste secrets into issues or commits.</p>
-          <form id="webhook-credentials-form" novalidate>
-            <div class="form-group settings-toggle-row">
-              <label><input id="notification-webhook-enabled" type="checkbox"> Enable webhook</label>
-              <span id="webhook-credentials-status" class="status-badge muted" role="status">Loading…</span>
-            </div>
-            <div class="form-group">
-              <label for="webhook-url">Webhook URL</label>
-              <input id="webhook-url" class="form-input" type="url" autocomplete="off" placeholder="https://example.com/hooks/sunsethue">
-            </div>
-            <div class="form-group">
-              <label for="webhook-signing-secret">Signing secret</label>
-              <input id="webhook-signing-secret" class="form-input" type="password" autocomplete="new-password">
-            </div>
-            <div class="form-actions form-actions-compact">
-              <button type="submit" class="btn btn-primary">Save webhook</button>
-              <button type="button" id="test-webhook-btn" class="btn btn-secondary">Send test webhook</button>
-              <button type="button" id="remove-webhook-btn" class="btn btn-secondary">Remove webhook</button>
-            </div>
-          </form>
-        </section>
-
-        <section class="form-card settings-card" aria-labelledby="gmail-credentials-title">
-          <div class="settings-section-title">
-            <h3 id="gmail-credentials-title">Gmail credentials</h3>
-            <span id="gmail-credentials-status" class="status-badge muted" role="status">Loading…</span>
-          </div>
-          <form id="gmail-credentials-form" novalidate>
-            <div class="settings-field-grid">
-              <div class="form-group">
-                <label for="gmail-user">Gmail account</label>
-                <input id="gmail-user" class="form-input" type="email" autocomplete="username" aria-describedby="gmail-user-help">
-                <small id="gmail-user-help">SMTP login account</small>
-              </div>
-              <div class="form-group">
-                <label for="gmail-app-password">Gmail App Password</label>
-                <input id="gmail-app-password" class="form-input" type="password" autocomplete="new-password" aria-describedby="gmail-password-help">
-                <small id="gmail-password-help">16-char App Password. Leave blank to keep current.</small>
-              </div>
-            </div>
-            <div class="form-group">
-              <label for="gmail-email-from">Sender mailbox</label>
-              <input id="gmail-email-from" class="form-input" type="text" autocomplete="off" aria-describedby="gmail-from-help" placeholder="Sunsethue Helper &lt;you@example.com&gt;">
-              <small id="gmail-from-help">From display name and mailbox</small>
-            </div>
-            <div class="form-actions form-actions-compact">
-              <button type="submit" id="save-gmail-credentials-btn" class="btn btn-primary">Save Gmail credentials</button>
-              <button type="button" id="remove-gmail-credentials-btn" class="btn btn-secondary">Remove Gmail credentials</button>
-              <button type="button" id="test-email-btn" class="btn btn-secondary">Send test email</button>
-            </div>
-          </form>
-        </section>
-
-        <section class="form-card settings-card" aria-labelledby="pushover-credentials-title">
-          <div class="settings-section-title">
-            <h3 id="pushover-credentials-title">Pushover credentials</h3>
-            <span id="pushover-credentials-status" class="status-badge muted" role="status">Loading…</span>
-          </div>
-          <form id="pushover-credentials-form" novalidate>
-            <div class="settings-field-grid">
-              <div class="form-group">
-                <label for="pushover-app-token">Application API token</label>
-                <input id="pushover-app-token" class="form-input" type="password" autocomplete="new-password" aria-describedby="pushover-token-help">
-                <small id="pushover-token-help">App token. Leave blank to keep current.</small>
-              </div>
-              <div class="form-group">
-                <label for="pushover-user-key">User / group key</label>
-                <input id="pushover-user-key" class="form-input" type="password" autocomplete="new-password" aria-describedby="pushover-key-help">
-                <small id="pushover-key-help">Recipient user or group key</small>
-              </div>
-            </div>
-            <div class="form-actions form-actions-compact">
-              <button type="submit" id="save-pushover-credentials-btn" class="btn btn-primary">Save Pushover credentials</button>
-              <button type="button" id="remove-pushover-credentials-btn" class="btn btn-secondary">Remove Pushover credentials</button>
-              <button type="button" id="test-pushover-btn" class="btn btn-secondary">Send test Pushover notification</button>
-            </div>
-          </form>
-        </section>
-
-        <form id="notification-settings-form" class="form-card settings-card" novalidate>
-          <div class="settings-section-title">
-            <h3>Delivery preferences</h3>
-          </div>
-          <div class="form-group settings-toggle-row">
-            <label><input id="notification-email-enabled" type="checkbox"> Enable email</label>
-            <span id="notification-email-status" class="status-badge muted" role="status"></span>
-          </div>
-          <div class="form-group">
-            <label for="notification-email-to">Email destination</label>
-            <input id="notification-email-to" class="form-input" type="email" autocomplete="email" aria-describedby="notification-email-help">
-            <small id="notification-email-help">Forecast email recipient</small>
-          </div>
-          <div class="form-group settings-toggle-row">
-            <label><input id="notification-pushover-enabled" type="checkbox"> Enable Pushover</label>
-            <span id="notification-pushover-status" class="status-badge muted" role="status"></span>
-          </div>
-          <div class="settings-field-grid">
-            <div class="form-group">
-              <label for="notification-device">Pushover device (optional)</label>
-              <input id="notification-device" class="form-input" maxlength="64">
-            </div>
-            <div class="form-group">
-              <label for="notification-priority">Pushover priority</label>
-              <select id="notification-priority" class="form-input"><option value="-2">Lowest</option><option value="-1">Low</option><option value="0">Normal</option><option value="1">High</option></select>
-            </div>
-          </div>
-          <div class="form-group">
-            <label for="notification-sound">Pushover sound (optional)</label>
-            <input id="notification-sound" class="form-input" maxlength="64">
-          </div>
-          <div class="form-actions form-actions-compact"><button type="submit" class="btn btn-primary">Save notifications</button></div>
-        </form>
       </div>
     </main>
 

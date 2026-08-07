@@ -10,7 +10,7 @@ export function initWebhook({ api, showSuccess, showError, CREDENTIAL_ADMIN_HEAD
       }
       return;
     }
-    if (statusEl) statusEl.className = "pane-subtext";
+    if (statusEl) statusEl.className = "status-badge muted";
     try {
       const putRes = await api.send("/api/webhook-credentials", {
         method: "PUT",
@@ -21,6 +21,7 @@ export function initWebhook({ api, showSuccess, showError, CREDENTIAL_ADMIN_HEAD
         })
       });
       if (!putRes.ok) throw new Error("Unable to save webhook credentials.");
+      // Persist current enable switch alongside credentials (switch also auto-saves on change).
       const enabled = Boolean(document.getElementById("notification-webhook-enabled")?.checked);
       const settingsRes = await api.send("/api/notification-settings");
       const settings = await settingsRes.json();

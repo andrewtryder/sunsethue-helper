@@ -109,7 +109,13 @@ test("Frontend File Structure & Integrity Checks", () => {
     // Settings
     "gmail-credentials-status",
     "pushover-credentials-status",
-    "notification-settings-form",
+    "channel-card-email",
+    "channel-card-pushover",
+    "channel-card-webpush",
+    "channel-card-webhook",
+    "notification-email-enabled",
+    "notification-pushover-enabled",
+    "notification-webhook-enabled",
     "application-settings-form",
     "location-rules-grid",
     "enable-web-push-btn",
@@ -138,6 +144,8 @@ test("Frontend File Structure & Integrity Checks", () => {
     ".log-detail-chips",
     ".settings-field-grid",
     ".status-badge",
+    ".channel-card-header",
+    ".switch-ui",
     ".quality-indicator",
     ".quality-meter",
   ];

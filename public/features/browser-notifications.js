@@ -20,6 +20,13 @@ export function initBrowserNotifications({ api, showSuccess, showError, DEMO_REA
     const host = document.getElementById("web-push-devices");
     if (!host) return;
     const devices = data.devices || [];
+    const subtitle = document.getElementById("webpush-channel-subtitle");
+    if (subtitle) {
+      const enabledCount = devices.filter((d) => d.enabled).length;
+      subtitle.textContent = devices.length
+        ? `${enabledCount} device${enabledCount === 1 ? "" : "s"} enabled · ${devices.length} registered`
+        : "No devices registered yet";
+    }
     if (!devices.length) {
       host.innerHTML = "<p class=\"pane-subtext\">No devices registered yet.</p>";
       return;

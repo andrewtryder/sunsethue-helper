@@ -11,8 +11,6 @@ import {
   saveSettings
 } from "./notifications/settings.js";
 import { hasWebhookTransportAsync } from "./notifications/webhook.js";
-import { emailTransportSource } from "./notifications/resolve-email-transport.js";
-import { pushoverTransportSource } from "./notifications/resolve-pushover-transport.js";
 import {
   createRequestId,
   jsonResponse,
@@ -30,7 +28,6 @@ import {
 } from "./validation.js";
 import { assertCredentialRequestGuards, MAX_CREDENTIAL_BODY_BYTES } from "./credential-guards.js";
 import {
-  adminGetStatus,
   adminRemoveEmail,
   adminRemovePushover,
   adminUpdateEmail,
@@ -133,22 +130,27 @@ export async function handleHttpRequest(request, env, authContext = null, deps =
       try {
         const rows = await db.listProviderCredentialStatus(env);
         const byProvider = Object.fromEntries(rows.map((row) => [row.provider, row]));
-        const status = await adminGetStatus(env, {
+        const emailRow = byProvider.email;
+        const pushoverRow = byProvider.pushover;
+        // Serve UI readiness from D1 metadata — do not probe Secrets Store / credential-admin on every page load.
+        return jsonResponse({
           email: {
-            updatedAt: byProvider.email?.updatedAt ?? null,
-            lastValidationCode: byProvider.email?.lastValidationCode ?? null
+            configured: Number(emailRow?.configured) === 1,
+            gmailUserMasked: emailRow?.maskedIdentifier || null,
+            emailFromMasked: null,
+            updatedAt: emailRow?.updatedAt ?? null,
+            lastValidationCode: emailRow?.lastValidationCode ?? null
           },
           pushover: {
-            updatedAt: byProvider.pushover?.updatedAt ?? null,
-            lastValidationCode: byProvider.pushover?.lastValidationCode ?? null
+            configured: Number(pushoverRow?.configured) === 1,
+            appTokenPresent: Number(pushoverRow?.configured) === 1,
+            userKeyPresent: Number(pushoverRow?.configured) === 1,
+            updatedAt: pushoverRow?.updatedAt ?? null,
+            lastValidationCode: pushoverRow?.lastValidationCode ?? null
           }
-        });
-        return jsonResponse(status, 200, requestId);
-      } catch (error) {
-        if (error instanceof CredentialAdminProxyError) {
-          return errorResponse(error.code, "Credential administration is unavailable.", error.status, requestId);
-        }
-        return errorResponse("CREDENTIAL_ADMIN_UNAVAILABLE", "Credential administration is unavailable.", 503, requestId);
+        }, 200, requestId);
+      } catch {
+        return errorResponse("CREDENTIAL_STATUS_UNAVAILABLE", "Credential status temporarily unavailable.", 503, requestId);
       }
     }
 
@@ -517,8 +519,10 @@ export async function handleHttpRequest(request, env, authContext = null, deps =
     if (path === "/api/operational-status") {
       if (request.method !== "GET") return methodNotAllowed("GET", requestId);
       const status = await db.getOperationalStatus(env, deps.now ?? Date.now());
-      status.emailTransport = await emailTransportSource(env);
-      status.pushoverTransport = await pushoverTransportSource(env);
+      const rows = await db.listProviderCredentialStatus(env);
+      const byProvider = Object.fromEntries(rows.map((row) => [row.provider, row]));
+      status.emailTransport = Number(byProvider.email?.configured) === 1 ? "secrets_store" : "not_configured";
+      status.pushoverTransport = Number(byProvider.pushover?.configured) === 1 ? "secrets_store" : "not_configured";
       return jsonResponse(status, 200, requestId);
     }
 

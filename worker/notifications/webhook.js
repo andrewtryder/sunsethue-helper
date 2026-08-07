@@ -6,6 +6,7 @@ import {
   signWebhookBody
 } from "./resolve-webhook-transport.js";
 import * as db from "../db.js";
+import { SECRETS_STORE_GET_TIMEOUT_MS, withTimeout } from "../lib/timeout.js";
 
 const WEBHOOK_TIMEOUT_MS = 10_000;
 const MAX_RESPONSE_BYTES = 2048;
@@ -23,8 +24,16 @@ async function resolveWebhookTransport(env) {
   if (!env.WEBHOOK_TRANSPORT_SECRET || typeof env.WEBHOOK_TRANSPORT_SECRET.get !== "function") {
     return { version: 1, configured: false };
   }
-  const raw = await env.WEBHOOK_TRANSPORT_SECRET.get();
-  return parseWebhookTransport(raw);
+  try {
+    const raw = await withTimeout(
+      env.WEBHOOK_TRANSPORT_SECRET.get(),
+      SECRETS_STORE_GET_TIMEOUT_MS,
+      "SECRETS_STORE_GET_TIMEOUT"
+    );
+    return parseWebhookTransport(raw);
+  } catch {
+    return { version: 1, configured: false };
+  }
 }
 
 /**

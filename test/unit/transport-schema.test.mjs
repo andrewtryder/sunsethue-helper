@@ -300,6 +300,16 @@ test("credential-admin proxy maps errors and invokes RPC methods", async () => {
   await assert.rejects(() => adminUpdatePushover(failing, {}, {}), (e) => e.code === "SECRETS_STORE_SECRET_MISSING" && e.status === 409);
   await assert.rejects(() => adminGetStatus(failing, {}), (e) => e.code === "CREDENTIAL_ADMIN_UNAVAILABLE" && e.status === 503);
 
+  const hanging = {
+    CREDENTIAL_ADMIN: {
+      getStatus: () => new Promise(() => {})
+    }
+  };
+  await assert.rejects(
+    () => adminGetStatus(hanging, {}, { timeoutMs: 20 }),
+    (e) => e.code === "CREDENTIAL_ADMIN_UNAVAILABLE" && e.status === 503
+  );
+
   // Service-binding RPC typically loses instanceof and custom fields; message carries the code.
   const rpcShaped = mapAdminError({ message: "INVALID_EMAIL_CREDENTIALS", name: "Error" });
   assert.equal(rpcShaped.code, "INVALID_EMAIL_CREDENTIALS");

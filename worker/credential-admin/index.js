@@ -16,6 +16,7 @@ import {
   parsePushoverTransport,
   unconfiguredSentinel
 } from "../lib/transport-schema.js";
+import { SECRETS_STORE_GET_TIMEOUT_MS, withTimeout } from "../lib/timeout.js";
 
 const EMAIL_SECRET_NAME = "SUNSETHUE_EMAIL_TRANSPORT";
 const PUSHOVER_SECRET_NAME = "SUNSETHUE_PUSHOVER_TRANSPORT";
@@ -39,7 +40,7 @@ async function readBoundSecret(binding) {
     return null;
   }
   try {
-    return await binding.get();
+    return await withTimeout(binding.get(), SECRETS_STORE_GET_TIMEOUT_MS, "SECRETS_STORE_GET_TIMEOUT");
   } catch {
     return null;
   }

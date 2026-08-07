@@ -12,11 +12,12 @@
 import { CredentialError, parseEmailTransport } from "../lib/transport-schema.js";
 import { NotificationError } from "./errors.js";
 import { registerSecretForRedaction } from "../http.js";
+import { SECRETS_STORE_GET_TIMEOUT_MS, withTimeout } from "../lib/timeout.js";
 
 async function readStoreBinding(binding) {
   if (!binding || typeof binding.get !== "function") return null;
   try {
-    return await binding.get();
+    return await withTimeout(binding.get(), SECRETS_STORE_GET_TIMEOUT_MS, "SECRETS_STORE_GET_TIMEOUT");
   } catch {
     return null;
   }

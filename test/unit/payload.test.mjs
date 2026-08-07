@@ -84,14 +84,57 @@ test("buildPushoverContent honors UTF-8 byte limits for the message", () => {
   assert.ok(content.title.length <= 250);
 });
 
-test("buildPushoverContent joins location entries and handles missing times", () => {
+test("buildPushoverContent joins location entries and formats times with quality and triggers", () => {
   const content = buildPushoverContent({
     triggerType: "PM",
+    displayTimezone: "America/New_York",
     locations: [
       { name: "A", sunrise: null, sunset: null, errorCode: null },
-      { name: "B", sunrise: { time: "2026-07-15T09:00:00Z" }, sunset: { time: null } }
+      { 
+        name: "B", 
+        sunrise: { time: "2026-07-15T09:00:00Z", quality: 0.8, text: "Great" }, 
+        sunset: { time: null },
+        triggeredEvents: ["sunrise"]
+      },
+      {
+        name: "C",
+        sunrise: { time: "2026-07-15T09:00:00Z", quality: 0.8, text: "80%" },
+        sunset: { time: "2026-07-15T23:00:00Z", quality: 0, text: "Poor" },
+        triggeredEvents: ["sunrise", "sunset"]
+      }
     ]
   });
-  assert.match(content.message, /A: sunrise N\/A, sunset N\/A/);
-  assert.match(content.message, /B: sunrise/);
+  // A: ↑ N/A | ↓ N/A
+  // B: ★ ↑ 5:00 AM EDT · 80% Great | ↓ N/A
+  // C: ★ ↑ 5:00 AM EDT · 80% | ★ ↓ 7:00 PM EDT · 0% Poor
+  assert.match(content.message, /A: ↑ N\/A \| ↓ N\/A/);
+  assert.match(content.message, /B: ★ ↑ 5:00 AM EDT · 80% Great \| ↓ N\/A/);
+  assert.match(content.message, /C: ★ ↑ 5:00 AM EDT · 80% \| ★ ↓ 7:00 PM EDT · 0% Poor/);
+});
+
+test("buildPushoverContent intelligently truncates locations and appends a footer", () => {
+  const longName = "Very Long Location Name ".repeat(10); // ~240 bytes each
+  const locations = new Array(8).fill({
+    name: longName,
+    sunrise: { time: "2026-07-15T09:00:00Z", quality: 0.5, text: "Ok" },
+    sunset: { time: "2026-07-15T23:00:00Z", quality: 0.5, text: "Ok" }
+  });
+  const content = buildPushoverContent({
+    triggerType: "AM",
+    displayTimezone: "UTC",
+    locations
+  });
+  const bodyBytes = new TextEncoder().encode(content.message).byteLength;
+  assert.ok(bodyBytes <= 1024);
+  assert.match(content.message, /…and \d+ more\. Open Sunsethue Helper for details\./);
+  // It shouldn't end halfway through a location name
+  assert.ok(!content.message.endsWith("Very Long Loc"));
+});
+
+test("buildPushoverContent shows forecast unavailable for errors", () => {
+  const content = buildPushoverContent({
+    triggerType: "AM",
+    locations: [{ name: "Beach", errorCode: "FORECAST_UNAVAILABLE" }]
+  });
+  assert.equal(content.message, "Beach: forecast unavailable");
 });

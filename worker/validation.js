@@ -159,3 +159,13 @@ export function collapseWhitespace(value) {
   if (typeof value !== "string") return "";
   return value.replace(/\r?\n/g, " ").trim();
 }
+
+/**
+ * Return the UTF-8 byte length of a string.
+ * @param {string} value
+ * @returns {number}
+ */
+export function utf8Length(value) {
+  if (typeof value !== "string") return 0;
+  return new TextEncoder().encode(value).byteLength;
+}

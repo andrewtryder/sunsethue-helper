@@ -1,5 +1,6 @@
-import { formatTimeOnlyET } from "../helpers.js";
-import { collapseWhitespace, truncateUtf8 } from "../validation.js";
+import { formatTimeOnlyWithZone } from "../../shared/time-format.js";
+import { qualityToPercent } from "../helpers.js";
+import { collapseWhitespace, truncateUtf8, utf8Length } from "../validation.js";
 
 const ALLOWED_TRIGGER_TYPES = new Set(["AM", "PM", "NOON", "Manual Test", "TEST", "WEEKLY_SELF_TEST"]);
 
@@ -36,6 +37,7 @@ export function buildNotificationPayload(model) {
     version: 1,
     triggerType: model.triggerType,
     generatedAt: model.generatedAt,
+    displayTimezone: model.displayTimezone || null,
     dashboardUrl: model.dashboardUrl || null,
     locations: model.results.map((result) => ({
       id: result.locationId || result.id || null,
@@ -110,6 +112,7 @@ export function parseNotificationPayload(payload) {
   if (parsed.version !== 1) invalid();
   if (typeof parsed.triggerType !== "string" || !isAllowedTriggerType(parsed.triggerType)) invalid();
   if (!isFiniteNumber(parsed.generatedAt)) invalid();
+  const displayTimezone = typeof parsed.displayTimezone === "string" ? parsed.displayTimezone : null;
   const dashboardUrl = validateDashboardUrl(parsed.dashboardUrl ?? null);
   if (!Array.isArray(parsed.locations)) invalid();
   if (parsed.locations.length > MAX_LOCATIONS) invalid();
@@ -118,22 +121,69 @@ export function parseNotificationPayload(payload) {
     version: 1,
     triggerType: parsed.triggerType,
     generatedAt: parsed.generatedAt,
+    displayTimezone,
     dashboardUrl,
     locations
   };
 }
 
+function formatPushQuality(event) {
+  const percent = qualityToPercent(event?.quality);
+  if (percent === null) {
+    return "quality N/A";
+  }
+  const text = collapseWhitespace(event?.text || "");
+  if (!text || text === `${percent}%` || text === String(percent)) {
+    return `${percent}%`;
+  }
+  return `${percent}% ${text}`;
+}
+
 export function buildPushoverContent(payload) {
   const rawTitle = `Sunsethue ${payload.triggerType} forecast`;
   const title = truncateUtf8(rawTitle, PUSHOVER_TITLE_MAX);
-  const items = payload.locations.slice(0, MAX_LOCATIONS).map((location) => {
+  
+  const displayTimezone = payload.displayTimezone || "America/New_York";
+  const lines = [];
+
+  for (const location of payload.locations.slice(0, MAX_LOCATIONS)) {
     const safeName = collapseWhitespace(location.name);
-    if (location.errorCode) return `${safeName}: forecast unavailable`;
-    const sunrise = location.sunrise?.time ? `sunrise ${formatTimeOnlyET(location.sunrise.time)}` : "sunrise N/A";
-    const sunset = location.sunset?.time ? `sunset ${formatTimeOnlyET(location.sunset.time)}` : "sunset N/A";
-    return `${safeName}: ${sunrise}, ${sunset}`;
-  });
-  const joined = items.join("\n");
+    if (location.errorCode) {
+      const line = `${safeName}: forecast unavailable`;
+      if (utf8Length([...lines, line].join("\n")) <= PUSHOVER_MESSAGE_MAX) {
+        lines.push(line);
+      } else {
+        break;
+      }
+      continue;
+    }
+
+    const sunrisePrefix = location.triggeredEvents?.includes("sunrise") ? "★ ↑" : "↑";
+    const sunrise = location.sunrise?.time
+      ? `${sunrisePrefix} ${formatTimeOnlyWithZone(location.sunrise.time, displayTimezone)} · ${formatPushQuality(location.sunrise)}`
+      : `${sunrisePrefix} N/A`;
+
+    const sunsetPrefix = location.triggeredEvents?.includes("sunset") ? "★ ↓" : "↓";
+    const sunset = location.sunset?.time
+      ? `${sunsetPrefix} ${formatTimeOnlyWithZone(location.sunset.time, displayTimezone)} · ${formatPushQuality(location.sunset)}`
+      : `${sunsetPrefix} N/A`;
+
+    const line = `${safeName}: ${sunrise} | ${sunset}`;
+    
+    if (utf8Length([...lines, line].join("\n")) <= PUSHOVER_MESSAGE_MAX) {
+      lines.push(line);
+      continue;
+    }
+
+    const remaining = payload.locations.length - lines.length;
+    const footer = `…and ${remaining} more. Open Sunsethue Helper for details.`;
+    if (utf8Length([...lines, footer].join("\n")) <= PUSHOVER_MESSAGE_MAX) {
+      lines.push(footer);
+    }
+    break;
+  }
+
+  const joined = lines.join("\n");
   const message = truncateUtf8(joined || "Forecast report generated.", PUSHOVER_MESSAGE_MAX);
   return { title, message };
 }

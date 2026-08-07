@@ -11,6 +11,7 @@ import { NotificationError } from "../notifications/errors.js";
 import { getSettings } from "../notifications/settings.js";
 import { filterResultsForChannel } from "../notifications/rules.js";
 import { hasWebhookTransportAsync } from "../notifications/webhook.js";
+import { resolveDisplayTimeZone } from "../../shared/time-format.js";
 
 export { buildHtmlEmail } from "../notifications/email.js";
 
@@ -89,6 +90,7 @@ function channelJobsForTargets({
 }) {
   const payloadModel = {
     ...model,
+    displayTimezone: resolveDisplayTimeZone(settings, null),
     results: filtered.locations.map((loc) => ({
       name: loc.name,
       sunrise: loc.sunrise,

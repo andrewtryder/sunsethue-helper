@@ -4,6 +4,13 @@ All notable changes to this project are documented in this file.
 
 This changelog follows [Conventional Commits](https://www.conventionalcommits.org/) and is maintained by [release-please](https://github.com/googleapis/release-please). Release sections group changes by commit type (`feat`, `fix`, etc.). Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.23.1](https://github.com/andrewtryder/sunsethue-helper/compare/v1.23.0...v1.23.1) (2026-08-08)
+
+
+### Bug Fixes
+
+* **frontend:** move granular notification controls into locations ([#102](https://github.com/andrewtryder/sunsethue-helper/issues/102)) ([f6f9801](https://github.com/andrewtryder/sunsethue-helper/commit/f6f9801f561b5295d0b5e136275847d5526ee8c6))
+
 ## [1.23.0](https://github.com/andrewtryder/sunsethue-helper/compare/v1.22.1...v1.23.0) (2026-08-08)
 
 

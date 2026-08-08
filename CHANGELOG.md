@@ -4,6 +4,23 @@ All notable changes to this project are documented in this file.
 
 This changelog follows [Conventional Commits](https://www.conventionalcommits.org/) and is maintained by [release-please](https://github.com/googleapis/release-please). Release sections group changes by commit type (`feat`, `fix`, etc.). Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.23.0](https://github.com/andrewtryder/sunsethue-helper/compare/v1.22.1...v1.23.0) (2026-08-08)
+
+
+### Features
+
+* **scheduler:** add per-location custom check times ([#99](https://github.com/andrewtryder/sunsethue-helper/issues/99)) ([0670e0a](https://github.com/andrewtryder/sunsethue-helper/commit/0670e0a2c6b53f8e588611b2099c3ddec9e615fc))
+
+
+### Bug Fixes
+
+* **ci:** remove observability from Pages wrangler template ([#94](https://github.com/andrewtryder/sunsethue-helper/issues/94)) ([ef44f8a](https://github.com/andrewtryder/sunsethue-helper/commit/ef44f8a6843b90d60ec4d8bcd47aab6a7c428cd9))
+* **demo:** static GitHub Pages demo under subpath ([#92](https://github.com/andrewtryder/sunsethue-helper/issues/92)) ([9283118](https://github.com/andrewtryder/sunsethue-helper/commit/9283118130f76fd0582a6505b4b4960422bbb7e7))
+* **frontend:** consolidate settings notification channels ([#97](https://github.com/andrewtryder/sunsethue-helper/issues/97)) ([461ac9e](https://github.com/andrewtryder/sunsethue-helper/commit/461ac9edd767af37f226c084f169601370ec6208))
+* **frontend:** decouple app startup from optional notification services ([#93](https://github.com/andrewtryder/sunsethue-helper/issues/93)) ([efbb81c](https://github.com/andrewtryder/sunsethue-helper/commit/efbb81c52160db1e072328ae3b01c93f5b71f84f))
+* **frontend:** isolate optional browser notification module failures ([#96](https://github.com/andrewtryder/sunsethue-helper/issues/96)) ([6805548](https://github.com/andrewtryder/sunsethue-helper/commit/680554854611863eb72e2d0e7e8a4f46fcf2b9f9))
+* **frontend:** unify schedule times with location thresholds ([#98](https://github.com/andrewtryder/sunsethue-helper/issues/98)) ([32ecde3](https://github.com/andrewtryder/sunsethue-helper/commit/32ecde3d3db6807f15862a9a4566f171047b7900))
+
 ## [1.22.1](https://github.com/andrewtryder/sunsethue-helper/compare/v1.22.0...v1.22.1) (2026-08-07)
 
 

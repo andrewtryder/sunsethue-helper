@@ -333,16 +333,6 @@
           <h3 id="webhook-title" class="visually-hidden">Webhook</h3>
         </section>
 
-        <!-- Compact health summary (details live on channel cards) -->
-        <section class="form-card settings-card" aria-labelledby="notification-health-title" id="notification-health-section">
-          <h3 id="notification-health-title">Notification overview</h3>
-          <p id="notification-health-summary" class="action-status" role="status">Loading…</p>
-          <div id="notification-health-schedule" class="form-group"></div>
-          <div id="notification-health-skips" class="form-group"></div>
-          <p id="notification-health-selftest" class="pane-subtext"></p>
-          <div id="notification-health-channels" class="visually-hidden"></div>
-        </section>
-
         <section class="form-card settings-card" aria-labelledby="general-settings-title">
           <h3 id="general-settings-title">General</h3>
           <form id="application-settings-form" novalidate>
@@ -378,6 +368,7 @@
               </select>
               <label for="weekly-self-test-time">Time (whole hour)</label>
               <input id="weekly-self-test-time" class="form-input" type="text" value="10:00" pattern="([01]\d|2[0-3]):00" placeholder="10:00">
+              <p id="notification-health-selftest" class="pane-subtext" role="status"></p>
             </fieldset>
             <div class="form-actions">
               <button type="submit" class="btn btn-primary" id="save-application-settings-btn">Save schedule settings</button>
@@ -440,6 +431,8 @@
               <button type="button" class="btn btn-primary" id="save-check-times-btn">Save check times</button>
             </div>
             <div id="quota-estimator" class="form-group" aria-live="polite"></div>
+            <p id="notification-health-summary" class="pane-subtext" role="status"></p>
+            <div id="notification-health-skips" class="form-group"></div>
           </div>
 
           <div class="form-group" id="location-thresholds-block">

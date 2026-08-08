@@ -57,8 +57,11 @@
       </nav>
 
       <div id="pane-main" class="tab-pane active" role="tabpanel" aria-labelledby="nav-main">
-        <div class="pane-header">
-          <h2>Forecast</h2>
+        <div class="pane-header forecast-page-header">
+          <div class="forecast-page-header-copy">
+            <h2>Forecast</h2>
+            <p class="pane-subtext">Sunrise and sunset quality for your locations.</p>
+          </div>
           <div class="pane-header-actions">
             <span class="last-updated-badge" id="dashboard-last-updated">Last Run: N/A</span>
             <button type="button" id="trigger-test-btn" class="icon-btn" title="Run report now" aria-label="Run report now">
@@ -70,7 +73,18 @@
             </span>
           </div>
         </div>
-        <p class="pane-subtext">Sunrise &amp; sunset quality forecasts cached from the last automated or manual run.</p>
+
+        <section id="forecast-best-opportunity" class="forecast-best-card hidden" aria-label="Best opportunity today" hidden>
+          <p class="forecast-best-label">Best opportunity today</p>
+          <p class="forecast-best-title">
+            Best tonight: <span id="forecast-best-name" class="forecast-best-name"></span>
+          </p>
+          <p id="forecast-best-subline" class="forecast-best-subline"></p>
+          <div id="forecast-best-meter" class="forecast-best-meter" aria-hidden="true"></div>
+          <a id="forecast-best-details" class="forecast-best-details" href="#forecast-cards-container">View details ›</a>
+        </section>
+
+        <h3 id="forecast-locations-heading" class="forecast-locations-heading hidden" hidden>Your Locations</h3>
 
         <div id="forecast-cards-container">
           <div class="empty-state" id="forecast-empty-state">
@@ -78,6 +92,10 @@
             <p>No locations added yet.<br>Go to <strong>Locations</strong> to add your first spot.</p>
           </div>
         </div>
+
+        <p id="forecast-quality-tip" class="forecast-quality-tip hidden" hidden>
+          Quality is influenced by cloud cover, haze, and light pollution near the horizon.
+        </p>
       </div>
 
       <div id="pane-locations" class="tab-pane" role="tabpanel" aria-labelledby="nav-locations">

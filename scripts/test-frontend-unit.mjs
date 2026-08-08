@@ -18,11 +18,14 @@ import {
 test("frontend helpers escape and render forecast badges", () => {
   assert.match(getForecastBadgeHtml(0.85, "Great"), /quality-meter/);
   assert.match(getForecastBadgeHtml(0.85, "Great"), /quality-badge/);
+  assert.match(getForecastBadgeHtml(0.85, "Great"), /quality-good/);
   assert.match(getForecastBadgeHtml(0.85, "Great"), /85%/);
   assert.match(getForecastBadgeHtml(0.85, "Great"), /Great/);
   assert.match(getForecastBadgeHtml(0.45, "Fair"), /quality-meter-fill/);
+  assert.match(getForecastBadgeHtml(0.45, "Fair"), /quality-fair/);
   assert.match(getForecastBadgeHtml(0.45, "Fair"), /width:45%/);
   assert.match(getForecastBadgeHtml(0.1, "Low"), /Low/);
+  assert.match(getForecastBadgeHtml(0.1, "Low"), /quality-poor/);
   assert.match(getForecastBadgeHtml(0.35, "Fair"), /35%/);
   assert.match(getForecastBadgeHtml(35, "Fair"), /35%/);
   assert.match(getForecastBadgeHtml(0.35, "35%"), /Fair/);

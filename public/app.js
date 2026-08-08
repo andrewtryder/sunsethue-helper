@@ -1,9 +1,6 @@
 import {
   escapeHtml,
   getForecastBadgeHtml,
-  getQualityTierClass,
-  getOverallForecastStatusLabel,
-  qualityToPercent,
   canAddLocation,
   validateCoordinates,
   formatCoordinateDisplay,
@@ -513,109 +510,11 @@ function buildForecastEventColumnHtml({ timeText, badgeHtml, mobileLabel, errorH
 
   return `
     <div class="forecast-event-col">
-      <span class="forecast-event-mobile-label">${mobileLabel}</span>
+      <span class="forecast-event-mobile-label">${mobileLabel}:</span>
       <span class="forecast-event-time">${timeText}</span>
       ${badgeHtml}
     </div>
   `;
-}
-
-function setForecastChromeVisible(hasLocations) {
-  const hero = document.getElementById("forecast-best-opportunity");
-  const heading = document.getElementById("forecast-locations-heading");
-  const tip = document.getElementById("forecast-quality-tip");
-  for (const el of [heading, tip]) {
-    if (!el) continue;
-    el.classList.toggle("hidden", !hasLocations);
-    el.hidden = !hasLocations;
-  }
-  if (hero && !hasLocations) {
-    hero.classList.add("hidden");
-    hero.hidden = true;
-  }
-}
-
-function collectForecastOpportunities(locations) {
-  const now = Date.now();
-  const opportunities = [];
-  for (const location of locations) {
-    if (location.forecastError) continue;
-    const events = [
-      {
-        kind: "sunrise",
-        time: location.latestSunriseTime,
-        quality: location.latestSunriseQuality,
-        text: location.latestSunriseText
-      },
-      {
-        kind: "sunset",
-        time: location.latestSunsetTime,
-        quality: location.latestSunsetQuality,
-        text: location.latestSunsetText
-      }
-    ];
-    for (const event of events) {
-      if (!event.time) continue;
-      const ts = Date.parse(event.time);
-      if (Number.isNaN(ts)) continue;
-      const percentage = qualityToPercent(event.quality);
-      opportunities.push({
-        location,
-        kind: event.kind,
-        time: event.time,
-        ts,
-        percentage,
-        text: event.text
-      });
-    }
-  }
-  if (!opportunities.length) return null;
-
-  const upcoming = opportunities.filter((item) => item.ts >= now);
-  const pool = upcoming.length ? upcoming : opportunities;
-  pool.sort((a, b) => {
-    const qualityDiff = (b.percentage ?? -1) - (a.percentage ?? -1);
-    if (qualityDiff !== 0) return qualityDiff;
-    return a.ts - b.ts;
-  });
-  return pool[0];
-}
-
-function renderBestOpportunity(locations) {
-  const hero = document.getElementById("forecast-best-opportunity");
-  const sublineEl = document.getElementById("forecast-best-subline");
-  const meterEl = document.getElementById("forecast-best-meter");
-  const detailsEl = document.getElementById("forecast-best-details");
-  if (!hero || !sublineEl || !meterEl || !detailsEl) return;
-
-  const best = collectForecastOpportunities(locations);
-  if (!best || best.percentage == null) {
-    hero.classList.add("hidden");
-    hero.hidden = true;
-    return;
-  }
-
-  const timeText = formatTimeWithZone(best.ts, currentDisplayTimeZone);
-  const eventLabel = best.kind === "sunset" ? "sunset" : "sunrise";
-  const titlePrefix = best.kind === "sunset" ? "Best tonight" : "Best at sunrise";
-  const tier = getQualityTierClass(best.percentage);
-
-  const titleEl = hero.querySelector(".forecast-best-title");
-  if (titleEl) {
-    titleEl.innerHTML = `${titlePrefix}: <span id="forecast-best-name" class="forecast-best-name">${escapeHtml(best.location.name)}</span>`;
-  }
-  sublineEl.textContent = `${timeText} · ${best.percentage}% ${eventLabel} quality`;
-  meterEl.className = `forecast-best-meter ${tier}`;
-  meterEl.innerHTML = `<span class="quality-meter" role="meter" aria-valuenow="${best.percentage}" aria-valuemin="0" aria-valuemax="100" aria-label="Quality ${best.percentage}%"><span class="quality-meter-fill" style="width:${best.percentage}%"></span></span>`;
-  detailsEl.href = `#forecast-row-${best.location.id}`;
-  detailsEl.onclick = (event) => {
-    event.preventDefault();
-    const row = document.getElementById(`forecast-row-${best.location.id}`);
-    row?.scrollIntoView({ behavior: "smooth", block: "center" });
-  };
-
-  hero.classList.remove("hidden");
-  hero.hidden = false;
 }
 
 function renderForecastDashboard() {
@@ -629,12 +528,10 @@ function renderForecastDashboard() {
     if (locationsList.length === 0) {
       if (forecastEmptyState) forecastEmptyState.classList.remove("hidden");
       if (dashboardLastUpdated) dashboardLastUpdated.textContent = "Last Run: N/A";
-      setForecastChromeVisible(false);
       return;
     }
 
     if (forecastEmptyState) forecastEmptyState.classList.add("hidden");
-    setForecastChromeVisible(true);
 
     let maxTimestamp = 0;
     let headerSunriseTime = null;
@@ -655,19 +552,18 @@ function renderForecastDashboard() {
     const isSunsetFirst = headerSunriseTime && headerSunsetTime && Date.parse(headerSunsetTime) < Date.parse(headerSunriseTime);
 
     const table = document.createElement("div");
-    table.className = "forecast-table forecast-list";
+    table.className = "forecast-table";
 
     const header = document.createElement("div");
     header.className = "forecast-table-header";
     header.innerHTML = `
       <div class="forecast-table-header-location">Location</div>
       ${isSunsetFirst
-        ? `<div class="forecast-table-header-col">Sunset ${formatForecastColumnDate(headerSunsetTime)}</div>
-           <div class="forecast-table-header-col">Sunrise ${formatForecastColumnDate(headerSunriseTime)}</div>`
-        : `<div class="forecast-table-header-col">Sunrise ${formatForecastColumnDate(headerSunriseTime)}</div>
-           <div class="forecast-table-header-col">Sunset ${formatForecastColumnDate(headerSunsetTime)}</div>`
+        ? `<div class="forecast-table-header-col">Next Sunset ${formatForecastColumnDate(headerSunsetTime)}</div>
+           <div class="forecast-table-header-col">Next Sunrise ${formatForecastColumnDate(headerSunriseTime)}</div>`
+        : `<div class="forecast-table-header-col">Next Sunrise ${formatForecastColumnDate(headerSunriseTime)}</div>
+           <div class="forecast-table-header-col">Next Sunset ${formatForecastColumnDate(headerSunsetTime)}</div>`
       }
-      <div class="forecast-table-header-col forecast-table-header-status">Status</div>
     `;
     table.appendChild(header);
 
@@ -707,41 +603,18 @@ function renderForecastDashboard() {
         });
       }
 
-      const sunrisePct = qualityToPercent(location.latestSunriseQuality);
-      const sunsetPct = qualityToPercent(location.latestSunsetQuality);
-      const overallPct = [sunrisePct, sunsetPct].filter((value) => value != null).reduce(
-        (best, value) => (best == null || value > best ? value : best),
-        null
-      );
-      const statusLabel = getOverallForecastStatusLabel(overallPct);
-      const statusTier = getQualityTierClass(overallPct);
-      const coords = formatCoordinateDisplay(location.latitude, location.longitude);
-
       const row = document.createElement("div");
       row.className = "forecast-table-row";
       row.id = `forecast-row-${location.id}`;
       row.innerHTML = `
-        <div class="forecast-table-location">
-          <span class="material-symbols-outlined forecast-location-pin" aria-hidden="true">location_on</span>
-          <span class="forecast-location-copy">
-            <span class="forecast-location-name">${escapeHtml(location.name)}</span>
-            <span class="forecast-location-coords">${escapeHtml(coords)}</span>
-          </span>
-        </div>
-        <div class="forecast-events">
-          ${isSunsetFirst ? sunsetColHtml : sunriseColHtml}
-          ${isSunsetFirst ? sunriseColHtml : sunsetColHtml}
-        </div>
-        <div class="forecast-row-status">
-          <span class="forecast-status-pill ${statusTier}">${escapeHtml(statusLabel)}</span>
-          <span class="material-symbols-outlined forecast-row-chevron" aria-hidden="true">chevron_right</span>
-        </div>
+        <div class="forecast-table-location">${escapeHtml(location.name)}</div>
+        ${isSunsetFirst ? sunsetColHtml : sunriseColHtml}
+        ${isSunsetFirst ? sunriseColHtml : sunsetColHtml}
       `;
       table.appendChild(row);
     });
 
     forecastCardsContainer.appendChild(table);
-    renderBestOpportunity(locationsList);
 
     if (dashboardLastUpdated) {
       if (maxTimestamp > 0) {
@@ -753,7 +626,6 @@ function renderForecastDashboard() {
     }
   } catch (error) {
     console.error("Error in renderForecastDashboard:", error);
-    setForecastChromeVisible(false);
     if (forecastCardsContainer) {
       forecastCardsContainer.innerHTML = `<div class="empty-state"><p>⚠️ Render Error: ${escapeHtml(error.message)}</p></div>`;
     }

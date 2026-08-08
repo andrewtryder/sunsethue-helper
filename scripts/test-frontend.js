@@ -99,10 +99,6 @@ test("Frontend File Structure & Integrity Checks", () => {
     // Dashboard
     "forecast-cards-container",
     "dashboard-last-updated",
-    "forecast-best-opportunity",
-    "forecast-locations-heading",
-    "forecast-quality-tip",
-    "forecast-empty-state",
     // Locations configuration
     "locations-list-container",
     "empty-state-view",

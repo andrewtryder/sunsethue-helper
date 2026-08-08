@@ -49,32 +49,6 @@ function getForecastFallbackLabel(percentage) {
   return "Low";
 }
 
-export function getQualityTierClass(percentage) {
-  if (percentage == null || Number.isNaN(Number(percentage))) {
-    return "quality-na";
-  }
-  if (percentage >= 60) {
-    return "quality-good";
-  }
-  if (percentage >= 30) {
-    return "quality-fair";
-  }
-  return "quality-poor";
-}
-
-export function getOverallForecastStatusLabel(percentage) {
-  if (percentage == null || Number.isNaN(Number(percentage))) {
-    return "N/A";
-  }
-  if (percentage >= 60) {
-    return "Good";
-  }
-  if (percentage >= 30) {
-    return "Fair";
-  }
-  return "Poor";
-}
-
 function formatForecastLabel(text, percentage) {
   if (!text) {
     return getForecastFallbackLabel(percentage);
@@ -96,9 +70,8 @@ export function getForecastBadgeHtml(quality, text) {
 
   const label = escapeHtml(formatForecastLabel(text, percentage));
   const clamped = Math.max(0, Math.min(100, percentage));
-  const tier = getQualityTierClass(clamped);
 
-  return `<span class="quality-indicator ${tier}"><span class="quality-meter-row"><span class="quality-percent">${percentage}%</span><span class="quality-meter" role="meter" aria-valuenow="${clamped}" aria-valuemin="0" aria-valuemax="100" aria-label="Quality ${percentage}%"><span class="quality-meter-fill" style="width:${clamped}%"></span></span></span><span class="quality-badge">${label}</span></span>`;
+  return `<span class="quality-indicator"><span class="quality-meter-row"><span class="quality-percent">${percentage}%</span><span class="quality-meter" role="meter" aria-valuenow="${clamped}" aria-valuemin="0" aria-valuemax="100" aria-label="Quality ${percentage}%"><span class="quality-meter-fill" style="width:${clamped}%"></span></span></span><span class="quality-badge">${label}</span></span>`;
 }
 
 export function canAddLocation(currentCount, maxLocations = MAX_LOCATIONS) {

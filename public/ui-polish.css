@@ -1,0 +1,467 @@
+/* Focused UI polish for the Locations configuration surface and compact Settings cards. */
+
+.locations-page-header {
+  align-items: flex-start;
+  margin-bottom: var(--space-md);
+}
+
+.locations-page-header h2 {
+  margin-bottom: 2px;
+}
+
+.locations-config-section {
+  min-width: 0;
+}
+
+.location-default-card {
+  padding: var(--space-md) var(--space-lg);
+}
+
+.location-default-card-header,
+.location-default-footer,
+.location-rules-heading,
+.location-customize-heading,
+.location-card-actions,
+.channel-card-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+
+.location-default-card-header {
+  align-items: flex-start;
+  margin-bottom: var(--space-sm);
+}
+
+.location-default-card-header h3,
+.location-rules-heading h3,
+.settings-section-heading h3 {
+  margin: 0;
+}
+
+.location-default-hint {
+  color: var(--text-secondary);
+  font-size: 12px;
+  text-align: right;
+}
+
+.location-default-footer {
+  margin-top: var(--space-sm);
+  align-items: center;
+}
+
+.location-default-footer .pane-subtext {
+  margin: 0;
+}
+
+.quota-estimator {
+  color: var(--text-secondary);
+  font-size: 13px;
+  margin-top: var(--space-sm);
+}
+
+.location-rules-heading {
+  align-items: flex-end;
+  margin: var(--space-lg) 0 var(--space-sm);
+}
+
+.location-rules-heading .pane-subtext,
+.settings-section-heading .pane-subtext {
+  margin: 2px 0 0;
+}
+
+.location-rules-bulk-actions {
+  margin-top: 0;
+  flex-shrink: 0;
+}
+
+#pane-locations .location-rules-list {
+  gap: var(--space-md);
+  margin: 0;
+}
+
+#pane-locations .location-rule-row {
+  overflow: hidden;
+  border-radius: var(--radius-card);
+  background: var(--surface-raised);
+  border-color: rgba(245, 241, 234, 0.1);
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+#pane-locations .location-rule-row[open] {
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+#pane-locations .location-rule-summary {
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: var(--space-md) var(--space-lg);
+  min-height: 82px;
+}
+
+.location-rule-summary-main {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+#pane-locations .location-rule-name {
+  font-size: 18px;
+  line-height: 1.25;
+}
+
+#pane-locations .location-rule-meta {
+  font-size: 13px;
+}
+
+.location-rule-toggle-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px 7px 12px;
+  border: 1px solid rgba(245, 241, 234, 0.16);
+  border-radius: var(--radius-pill);
+  color: var(--text-primary);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.location-rule-toggle-label .material-symbols-outlined {
+  font-size: 18px;
+  transition: transform 0.15s ease;
+}
+
+.location-rule-row[open] .location-rule-toggle-label .material-symbols-outlined {
+  transform: rotate(180deg);
+}
+
+.location-rule-toggle-label .open-label {
+  display: none;
+}
+
+.location-rule-row[open] .location-rule-toggle-label .closed-label {
+  display: none;
+}
+
+.location-rule-row[open] .location-rule-toggle-label .open-label {
+  display: inline;
+}
+
+#pane-locations .location-rule-customize {
+  padding: var(--space-md) var(--space-lg) var(--space-lg);
+  gap: var(--space-md);
+  background: color-mix(in srgb, var(--surface-raised) 88%, var(--bg));
+}
+
+#pane-locations .location-schedule-block {
+  margin: 0;
+  padding-bottom: var(--space-md);
+}
+
+.location-customize-heading {
+  align-items: flex-start;
+}
+
+.location-customize-heading strong {
+  font-size: 14px;
+}
+
+.location-schedule-switch {
+  margin-top: 2px;
+}
+
+.location-schedule-editor .time-pills {
+  margin-bottom: var(--space-xs);
+}
+
+.location-time-pill,
+#pane-locations #schedule-times-pills .time-pill {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  background: var(--accent-muted);
+}
+
+.location-rule-channel-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-md);
+}
+
+#pane-locations .location-rule-channel {
+  gap: 6px;
+}
+
+#pane-locations .location-rule-channel-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+#pane-locations .location-rule-channel-label .material-symbols-outlined {
+  color: var(--text-secondary);
+  font-size: 18px;
+}
+
+.rule-control {
+  display: grid;
+  grid-template-columns: minmax(70px, 1fr) minmax(84px, 1fr) minmax(56px, 0.7fr);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.rule-choice,
+.rule-threshold-select {
+  min-height: 34px;
+  border: 0;
+  border-right: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+}
+
+.rule-choice {
+  cursor: pointer;
+  padding: 6px 10px;
+}
+
+.rule-choice:last-child {
+  border-right: 0;
+}
+
+.rule-threshold-select {
+  display: flex;
+  align-items: stretch;
+}
+
+.rule-threshold-select select {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: center;
+  text-align-last: center;
+  cursor: pointer;
+  padding: 4px 20px 4px 8px;
+}
+
+.rule-choice.is-selected,
+.rule-threshold-select.is-selected {
+  background: var(--accent-muted);
+  color: var(--accent-soft);
+}
+
+.rule-choice:focus-visible,
+.rule-threshold-select:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.location-card-actions {
+  justify-content: flex-end;
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--border);
+}
+
+.location-delete-action {
+  color: var(--error);
+}
+
+.location-config-empty {
+  padding: var(--space-xl) var(--space-md);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-card);
+}
+
+.settings-section-heading {
+  margin: var(--space-lg) 0 var(--space-sm);
+}
+
+.channel-card-compact {
+  padding: var(--space-md) var(--space-lg);
+}
+
+.channel-card-title-row {
+  justify-content: flex-start;
+  align-items: flex-start;
+  gap: var(--space-sm);
+}
+
+.channel-card-icon {
+  color: var(--text-secondary);
+  margin-top: 1px;
+}
+
+.channel-card-compact .channel-card-header {
+  margin-bottom: var(--space-sm);
+}
+
+.channel-card-compact .channel-card-subtitle {
+  font-size: 13px;
+}
+
+.compact-channel-body {
+  padding-top: var(--space-md);
+}
+
+.channel-summary-grid {
+  align-items: start;
+}
+
+.summary-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: var(--space-sm);
+}
+
+.summary-field-label {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.compact-credential-status {
+  margin-bottom: var(--space-sm);
+}
+
+.compact-optional-field {
+  max-width: calc(50% - var(--space-sm));
+}
+
+.channel-primary-actions {
+  margin-top: var(--space-xs);
+}
+
+.credential-editor,
+.settings-details,
+.maintenance-details {
+  margin-top: var(--space-sm);
+}
+
+.credential-editor > summary,
+.settings-details > summary,
+.maintenance-details > summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.credential-editor > summary::-webkit-details-marker,
+.settings-details > summary::-webkit-details-marker,
+.maintenance-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.credential-editor[open] > summary {
+  margin-bottom: var(--space-md);
+}
+
+.credential-editor form {
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--border);
+}
+
+.settings-details {
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--border);
+}
+
+.settings-details > summary,
+.maintenance-details > summary {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.settings-details[open] > summary,
+.maintenance-details[open] > summary {
+  margin-bottom: var(--space-sm);
+}
+
+.maintenance-details {
+  padding: var(--space-md) var(--space-lg);
+}
+
+.maintenance-details .setup-checklist,
+.maintenance-details #clear-history-scopes {
+  margin-top: var(--space-sm);
+}
+
+.compact-fieldset label {
+  display: block;
+  margin-bottom: 4px;
+}
+
+@media (max-width: 760px) {
+  .location-default-card-header,
+  .location-default-footer,
+  .location-rules-heading,
+  .location-customize-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .location-default-hint {
+    text-align: left;
+  }
+
+  .location-rules-bulk-actions {
+    justify-content: flex-start;
+  }
+
+  #pane-locations .location-rule-summary {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--space-sm);
+    padding: var(--space-md);
+  }
+
+  #pane-locations .location-rule-customize {
+    padding: var(--space-md);
+  }
+
+  .location-rule-channel-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .location-rule-toggle-label {
+    padding: 6px 8px;
+  }
+
+  .location-rule-toggle-label .closed-label,
+  .location-rule-toggle-label .open-label {
+    display: none !important;
+  }
+
+  .compact-optional-field {
+    max-width: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .locations-page-header .section-header-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .schedule-presets {
+    width: 100%;
+  }
+
+  .schedule-presets .btn {
+    flex: 1 1 calc(50% - var(--space-xs));
+  }
+
+  .rule-control {
+    grid-template-columns: 1fr 1fr 0.8fr;
+  }
+
+  .channel-card-compact {
+    padding: var(--space-md);
+  }
+}

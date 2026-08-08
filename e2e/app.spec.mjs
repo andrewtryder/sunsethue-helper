@@ -23,10 +23,16 @@ test.describe("Horizon app smoke", () => {
     await page.goto("/");
     await expect(page.locator("#loading-overlay")).toHaveClass(/fade-out/, { timeout: 30_000 });
     await expect(page.locator("#app-container")).toBeVisible({ timeout: 30_000 });
+
     await page.locator("#nav-locations").click();
     await expect(page.locator("#pane-locations")).toBeVisible();
+    await expect(page.locator("#check-times-locations-section")).toBeVisible();
+    await expect(page.locator("#schedule-times-pills")).toBeVisible();
+    await expect(page.locator("#location-rules-grid")).toBeVisible();
+
     await page.locator("#nav-activity").click();
     await expect(page.locator("#pane-activity")).toBeVisible();
+
     await page.locator("#nav-settings").click();
     await expect(page.locator("#pane-settings")).toBeVisible();
     await expect(page.locator("#channel-card-email")).toBeVisible();
@@ -34,8 +40,7 @@ test.describe("Horizon app smoke", () => {
     await expect(page.locator("#channel-card-pushover")).toBeVisible();
     await expect(page.locator("#channel-card-webpush")).toBeVisible();
     await expect(page.locator("#channel-card-webhook")).toBeVisible();
-    await expect(page.locator("#check-times-locations-section")).toBeVisible();
-    await expect(page.locator("#schedule-times-pills")).toBeVisible();
+    await expect(page.locator("#check-times-locations-section")).toBeHidden();
   });
 
   test("location drawer opens and closes with focus restore", async ({ page }) => {
@@ -47,6 +52,18 @@ test.describe("Horizon app smoke", () => {
     await expect(page.locator("#location-drawer")).toBeVisible();
     await page.locator("#close-location-drawer-btn").click();
     await expect(page.locator("#location-drawer")).toBeHidden();
+  });
+
+  test("settings keeps provider credentials collapsed by default", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.locator("#app-container")).toBeVisible({ timeout: 30_000 });
+    await page.locator("#nav-settings").click();
+    const gmailEditor = page.locator("#gmail-credentials-form").locator("xpath=..");
+    const pushoverEditor = page.locator("#pushover-credentials-form").locator("xpath=..");
+    await expect(gmailEditor).not.toHaveAttribute("open", "");
+    await expect(pushoverEditor).not.toHaveAttribute("open", "");
+    await expect(page.locator("#test-email-btn")).toBeVisible();
+    await expect(page.locator("#test-pushover-btn")).toBeVisible();
   });
 
   test("axe has no serious violations on Forecast", async ({ page }) => {

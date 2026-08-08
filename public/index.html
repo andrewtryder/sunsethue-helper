@@ -14,6 +14,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <meta name="theme-color" content="#1a1a1a">
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="ui-polish.css">
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌅</text></svg>">
 </head>
 <body>
@@ -69,9 +70,7 @@
             </span>
           </div>
         </div>
-        <p class="pane-subtext">
-          Sunrise &amp; sunset quality forecasts cached from the last automated or manual run.
-        </p>
+        <p class="pane-subtext">Sunrise &amp; sunset quality forecasts cached from the last automated or manual run.</p>
 
         <div id="forecast-cards-container">
           <div class="empty-state" id="forecast-empty-state">
@@ -83,16 +82,64 @@
 
       <div id="pane-locations" class="tab-pane" role="tabpanel" aria-labelledby="nav-locations">
         <div class="locations-layout">
-          <section>
-            <div class="section-header">
-              <h2>Monitored Locations</h2>
+          <section class="locations-config-section">
+            <div class="section-header locations-page-header">
+              <div>
+                <h2>Locations</h2>
+                <p class="pane-subtext">Choose when each place is checked and which channels should notify you.</p>
+              </div>
               <div class="section-header-actions">
-                <span class="location-counter" id="locations-count-badge">0 / 10</span>
+                <span class="location-counter" id="locations-count-badge">0 of 10</span>
                 <button type="button" id="open-location-drawer-btn" class="btn btn-primary">Add location</button>
               </div>
             </div>
 
-            <div class="locations-list-container" id="locations-list-container">
+            <section class="form-card location-default-card" aria-labelledby="check-times-locations-title" id="check-times-locations-section">
+              <div class="location-default-card-header">
+                <div>
+                  <h3 id="check-times-locations-title">Default check times</h3>
+                  <p class="pane-subtext" id="schedule-timezone-label">Timezone: America/New_York</p>
+                </div>
+                <span class="location-default-hint">Used unless a location has a custom schedule</span>
+              </div>
+              <div class="form-group" id="check-times-block">
+                <span class="visually-hidden" id="check-times-heading">Check times</span>
+                <div id="schedule-times-pills" class="time-pills" role="list" aria-labelledby="check-times-heading"></div>
+                <div id="schedule-times-checkboxes" class="visually-hidden" aria-hidden="true"></div>
+                <div class="time-pills-actions">
+                  <label class="visually-hidden" for="add-schedule-time-select">Add check time</label>
+                  <select id="add-schedule-time-select" class="form-input time-pill-add-select" aria-label="Add check time">
+                    <option value="">Add time…</option>
+                  </select>
+                  <div class="form-actions form-actions-compact schedule-presets">
+                    <button type="button" class="btn btn-secondary" data-schedule-preset="once">Once daily</button>
+                    <button type="button" class="btn btn-secondary" data-schedule-preset="twice">Twice daily</button>
+                    <button type="button" class="btn btn-secondary" data-schedule-preset="three">Three times</button>
+                    <button type="button" class="btn btn-secondary" data-schedule-preset="four">Four times</button>
+                  </div>
+                </div>
+                <div class="location-default-footer">
+                  <p class="pane-subtext">Whole-hour slots only, maximum 8. Manual reports are not included in the estimate.</p>
+                  <button type="button" class="btn btn-primary" id="save-check-times-btn">Save default times</button>
+                </div>
+                <div id="quota-estimator" class="quota-estimator" aria-live="polite"></div>
+              </div>
+            </section>
+
+            <div class="location-rules-heading">
+              <div>
+                <h3 id="location-rules-title">Location notification rules</h3>
+                <p class="pane-subtext">A channel notifies when sunrise or sunset meets that location's selected quality threshold.</p>
+              </div>
+              <div class="form-actions form-actions-compact location-rules-bulk-actions">
+                <button type="button" id="rules-copy-all-btn" class="btn btn-secondary">Copy first location to all</button>
+                <button type="button" id="rules-reset-btn" class="btn btn-secondary">Reset to 50%</button>
+              </div>
+            </div>
+            <div id="location-rules-grid" class="location-rules-list" aria-labelledby="location-rules-title"></div>
+
+            <!-- app.js still owns location CRUD state in this hidden host. The visible cards above use the same APIs. -->
+            <div class="locations-list-container" id="locations-list-container" hidden aria-hidden="true">
               <div class="empty-state" id="empty-state-view">
                 <span class="material-symbols-outlined" aria-hidden="true">add_location_alt</span>
                 <p>No locations yet.<br>Add up to 10 coordinates to start monitoring.</p>
@@ -123,9 +170,7 @@
                   </div>
                 </div>
 
-                <button type="button" id="use-current-location-btn" class="link-btn">
-                  Use Current Location
-                </button>
+                <button type="button" id="use-current-location-btn" class="link-btn">Use Current Location</button>
 
                 <div class="form-group">
                   <label for="location-name">Location Name <span class="required-indicator" aria-hidden="true" title="required">*</span></label>
@@ -179,13 +224,21 @@
 
       <div id="pane-settings" class="tab-pane" role="tabpanel" aria-labelledby="nav-settings">
         <div class="pane-header"><h2>Settings</h2></div>
-        <p class="pane-subtext">Schedule, display timezone, notification channels, and provider credentials.</p>
+        <p class="pane-subtext">Global notification channels, provider credentials, display preferences, and maintenance.</p>
 
-<section class="form-card settings-card channel-card" id="channel-card-email" aria-labelledby="channel-email-title">
+        <div class="settings-section-heading">
+          <h3>Notification channels</h3>
+          <p class="pane-subtext">Enable channels globally here. Per-location thresholds live under Locations.</p>
+        </div>
+
+        <section class="form-card settings-card channel-card channel-card-compact" id="channel-card-email" aria-labelledby="channel-email-title">
           <div class="channel-card-header">
-            <div>
-              <h3 id="channel-email-title">Email</h3>
-              <p id="email-channel-subtitle" class="channel-card-subtitle pane-subtext" role="status">Loading…</p>
+            <div class="channel-card-title-row">
+              <span class="material-symbols-outlined channel-card-icon" aria-hidden="true">mail</span>
+              <div>
+                <h3 id="channel-email-title">Email</h3>
+                <p id="email-channel-subtitle" class="channel-card-subtitle pane-subtext" role="status">Loading…</p>
+              </div>
             </div>
             <label class="switch">
               <input id="notification-email-enabled" type="checkbox" role="switch">
@@ -193,49 +246,61 @@
               <span class="visually-hidden">Enable email</span>
             </label>
           </div>
-          <div class="channel-card-body">
-            <span id="notification-email-status" class="status-badge muted" role="status"></span>
-            <span id="gmail-credentials-status" class="status-badge muted" role="status">Loading…</span>
-            <div class="form-group">
-              <label for="notification-email-to">Email destination</label>
-              <input id="notification-email-to" class="form-input" type="email" autocomplete="email" aria-describedby="notification-email-help">
-              <small id="notification-email-help">Forecast email recipient</small>
+          <div class="channel-card-body compact-channel-body">
+            <span id="notification-email-status" class="visually-hidden" role="status"></span>
+            <div class="channel-summary-grid">
+              <div class="summary-field">
+                <label for="notification-email-to">Sends to</label>
+                <input id="notification-email-to" class="form-input" type="email" autocomplete="email" aria-describedby="notification-email-help">
+                <small id="notification-email-help">Forecast email recipient</small>
+              </div>
+              <div class="summary-field">
+                <span class="summary-field-label">Credentials</span>
+                <span id="gmail-credentials-status" class="status-badge muted" role="status">Loading…</span>
+              </div>
             </div>
-            <form id="gmail-credentials-form" novalidate>
-              <div class="settings-field-grid">
-                <div class="form-group">
-                  <label for="gmail-user">Gmail account</label>
-                  <input id="gmail-user" class="form-input" type="email" autocomplete="username" aria-describedby="gmail-user-help">
-                  <small id="gmail-user-help">SMTP login account</small>
+            <div class="form-actions form-actions-compact channel-primary-actions">
+              <button type="button" id="test-email-btn" class="btn btn-secondary">Send test email</button>
+              <button type="button" id="save-email-settings-btn" class="btn btn-secondary">Save destination</button>
+            </div>
+            <details class="credential-editor">
+              <summary class="btn btn-secondary">Edit credentials</summary>
+              <form id="gmail-credentials-form" novalidate>
+                <div class="settings-field-grid">
+                  <div class="form-group">
+                    <label for="gmail-user">Gmail account</label>
+                    <input id="gmail-user" class="form-input" type="email" autocomplete="username" aria-describedby="gmail-user-help">
+                    <small id="gmail-user-help">SMTP login account</small>
+                  </div>
+                  <div class="form-group">
+                    <label for="gmail-app-password">Gmail App Password</label>
+                    <input id="gmail-app-password" class="form-input" type="password" autocomplete="new-password" aria-describedby="gmail-password-help">
+                    <small id="gmail-password-help">16-char App Password. Leave blank to keep current.</small>
+                  </div>
                 </div>
                 <div class="form-group">
-                  <label for="gmail-app-password">Gmail App Password</label>
-                  <input id="gmail-app-password" class="form-input" type="password" autocomplete="new-password" aria-describedby="gmail-password-help">
-                  <small id="gmail-password-help">16-char App Password. Leave blank to keep current.</small>
+                  <label for="gmail-email-from">Sender mailbox</label>
+                  <input id="gmail-email-from" class="form-input" type="text" autocomplete="off" aria-describedby="gmail-from-help" placeholder="Sunsethue Helper &lt;you@example.com&gt;">
+                  <small id="gmail-from-help">From display name and mailbox</small>
                 </div>
-              </div>
-              <div class="form-group">
-                <label for="gmail-email-from">Sender mailbox</label>
-                <input id="gmail-email-from" class="form-input" type="text" autocomplete="off" aria-describedby="gmail-from-help" placeholder="Sunsethue Helper &lt;you@example.com&gt;">
-                <small id="gmail-from-help">From display name and mailbox</small>
-              </div>
-              <div class="form-actions form-actions-compact">
-                <button type="button" id="save-email-settings-btn" class="btn btn-secondary">Save email settings</button>
-                <button type="submit" id="save-gmail-credentials-btn" class="btn btn-primary">Save Gmail credentials</button>
-                <button type="button" id="remove-gmail-credentials-btn" class="btn btn-secondary">Remove credentials</button>
-                <button type="button" id="test-email-btn" class="btn btn-secondary">Send test email</button>
-              </div>
-            </form>
+                <div class="form-actions form-actions-compact">
+                  <button type="submit" id="save-gmail-credentials-btn" class="btn btn-primary">Save credentials</button>
+                  <button type="button" id="remove-gmail-credentials-btn" class="btn btn-secondary">Remove credentials</button>
+                </div>
+              </form>
+            </details>
           </div>
-          <!-- Legacy structural ids -->
           <h3 id="gmail-credentials-title" class="visually-hidden">Gmail credentials</h3>
         </section>
 
-        <section class="form-card settings-card channel-card" id="channel-card-pushover" aria-labelledby="channel-pushover-title">
+        <section class="form-card settings-card channel-card channel-card-compact" id="channel-card-pushover" aria-labelledby="channel-pushover-title">
           <div class="channel-card-header">
-            <div>
-              <h3 id="channel-pushover-title">Pushover</h3>
-              <p id="pushover-channel-subtitle" class="channel-card-subtitle pane-subtext" role="status">Loading…</p>
+            <div class="channel-card-title-row">
+              <span class="material-symbols-outlined channel-card-icon" aria-hidden="true">notifications</span>
+              <div>
+                <h3 id="channel-pushover-title">Pushover</h3>
+                <p id="pushover-channel-subtitle" class="channel-card-subtitle pane-subtext" role="status">Loading…</p>
+              </div>
             </div>
             <label class="switch">
               <input id="notification-pushover-enabled" type="checkbox" role="switch">
@@ -243,67 +308,83 @@
               <span class="visually-hidden">Enable Pushover</span>
             </label>
           </div>
-          <div class="channel-card-body">
-            <span id="notification-pushover-status" class="status-badge muted" role="status"></span>
-            <span id="pushover-credentials-status" class="status-badge muted" role="status">Loading…</span>
-            <div class="settings-field-grid">
+          <div class="channel-card-body compact-channel-body">
+            <span id="notification-pushover-status" class="visually-hidden" role="status"></span>
+            <div class="settings-field-grid channel-summary-grid">
               <div class="form-group">
-                <label for="notification-device">Pushover device (optional)</label>
-                <input id="notification-device" class="form-input" maxlength="64">
+                <label for="notification-device">Device (optional)</label>
+                <input id="notification-device" class="form-input" maxlength="64" placeholder="All devices">
               </div>
               <div class="form-group">
-                <label for="notification-priority">Pushover priority</label>
+                <label for="notification-priority">Priority</label>
                 <select id="notification-priority" class="form-input"><option value="-2">Lowest</option><option value="-1">Low</option><option value="0">Normal</option><option value="1">High</option></select>
               </div>
             </div>
-            <div class="form-group">
-              <label for="notification-sound">Pushover sound (optional)</label>
-              <input id="notification-sound" class="form-input" maxlength="64">
+            <div class="form-group compact-optional-field">
+              <label for="notification-sound">Sound (optional)</label>
+              <input id="notification-sound" class="form-input" maxlength="64" placeholder="Default">
             </div>
-            <form id="pushover-credentials-form" novalidate>
-              <div class="settings-field-grid">
-                <div class="form-group">
-                  <label for="pushover-app-token">Application API token</label>
-                  <input id="pushover-app-token" class="form-input" type="password" autocomplete="new-password" aria-describedby="pushover-token-help">
-                  <small id="pushover-token-help">App token. Leave blank to keep current.</small>
+            <div class="summary-field compact-credential-status">
+              <span class="summary-field-label">Credentials</span>
+              <span id="pushover-credentials-status" class="status-badge muted" role="status">Loading…</span>
+            </div>
+            <div class="form-actions form-actions-compact channel-primary-actions">
+              <button type="button" id="test-pushover-btn" class="btn btn-secondary">Send test notification</button>
+              <button type="button" id="save-pushover-settings-btn" class="btn btn-secondary">Save preferences</button>
+            </div>
+            <details class="credential-editor">
+              <summary class="btn btn-secondary">Edit credentials</summary>
+              <form id="pushover-credentials-form" novalidate>
+                <div class="settings-field-grid">
+                  <div class="form-group">
+                    <label for="pushover-app-token">Application API token</label>
+                    <input id="pushover-app-token" class="form-input" type="password" autocomplete="new-password" aria-describedby="pushover-token-help">
+                    <small id="pushover-token-help">App token. Leave blank to keep current.</small>
+                  </div>
+                  <div class="form-group">
+                    <label for="pushover-user-key">User / group key</label>
+                    <input id="pushover-user-key" class="form-input" type="password" autocomplete="new-password" aria-describedby="pushover-key-help">
+                    <small id="pushover-key-help">Recipient user or group key</small>
+                  </div>
                 </div>
-                <div class="form-group">
-                  <label for="pushover-user-key">User / group key</label>
-                  <input id="pushover-user-key" class="form-input" type="password" autocomplete="new-password" aria-describedby="pushover-key-help">
-                  <small id="pushover-key-help">Recipient user or group key</small>
+                <div class="form-actions form-actions-compact">
+                  <button type="submit" id="save-pushover-credentials-btn" class="btn btn-primary">Save credentials</button>
+                  <button type="button" id="remove-pushover-credentials-btn" class="btn btn-secondary">Remove credentials</button>
                 </div>
-              </div>
-              <div class="form-actions form-actions-compact">
-                <button type="button" id="save-pushover-settings-btn" class="btn btn-secondary">Save Pushover settings</button>
-                <button type="submit" id="save-pushover-credentials-btn" class="btn btn-primary">Save Pushover credentials</button>
-                <button type="button" id="remove-pushover-credentials-btn" class="btn btn-secondary">Remove credentials</button>
-                <button type="button" id="test-pushover-btn" class="btn btn-secondary">Send test Pushover</button>
-              </div>
-            </form>
+              </form>
+            </details>
           </div>
           <h3 id="pushover-credentials-title" class="visually-hidden">Pushover credentials</h3>
         </section>
 
-        <section class="form-card settings-card channel-card" id="channel-card-webpush" aria-labelledby="channel-webpush-title">
+        <section class="form-card settings-card channel-card channel-card-compact" id="channel-card-webpush" aria-labelledby="channel-webpush-title">
           <div class="channel-card-header">
-            <div>
-              <h3 id="channel-webpush-title">Browser push</h3>
-              <p id="webpush-channel-subtitle" class="channel-card-subtitle pane-subtext" role="status">Loading…</p>
+            <div class="channel-card-title-row">
+              <span class="material-symbols-outlined channel-card-icon" aria-hidden="true">smartphone</span>
+              <div>
+                <h3 id="channel-webpush-title">Browser push</h3>
+                <p id="webpush-channel-subtitle" class="channel-card-subtitle pane-subtext" role="status">Loading…</p>
+              </div>
             </div>
           </div>
-          <div class="channel-card-body">
-            <p class="pane-subtext">On iPhone/iPad, install this site to the Home Screen first. Permission is only requested when you click Enable.</p>
-            <button type="button" id="enable-web-push-btn" class="btn btn-primary">Enable browser notifications on this device</button>
+          <div class="channel-card-body compact-channel-body">
+            <p class="pane-subtext">On iPhone or iPad, add this site to the Home Screen before enabling notifications.</p>
+            <div class="form-actions form-actions-compact channel-primary-actions">
+              <button type="button" id="enable-web-push-btn" class="btn btn-secondary">Enable on this device</button>
+            </div>
             <div id="web-push-devices" class="form-group"></div>
           </div>
           <h3 id="web-push-title" class="visually-hidden">Browser notifications</h3>
         </section>
 
-        <section class="form-card settings-card channel-card" id="channel-card-webhook" aria-labelledby="channel-webhook-title">
+        <section class="form-card settings-card channel-card channel-card-compact" id="channel-card-webhook" aria-labelledby="channel-webhook-title">
           <div class="channel-card-header">
-            <div>
-              <h3 id="channel-webhook-title">Webhook</h3>
-              <p id="webhook-channel-subtitle" class="channel-card-subtitle pane-subtext" role="status">Loading…</p>
+            <div class="channel-card-title-row">
+              <span class="material-symbols-outlined channel-card-icon" aria-hidden="true">webhook</span>
+              <div>
+                <h3 id="channel-webhook-title">Webhook</h3>
+                <p id="webhook-channel-subtitle" class="channel-card-subtitle pane-subtext" role="status">Loading…</p>
+              </div>
             </div>
             <label class="switch">
               <input id="notification-webhook-enabled" type="checkbox" role="switch">
@@ -311,19 +392,21 @@
               <span class="visually-hidden">Enable webhook</span>
             </label>
           </div>
-          <div class="channel-card-body">
+          <div class="channel-card-body compact-channel-body">
             <span id="webhook-credentials-status" class="status-badge muted" role="status">Loading…</span>
-            <p class="pane-subtext">One HTTPS destination. Requests are HMAC-signed. Never paste secrets into issues or commits.</p>
+            <p class="pane-subtext">One HTTPS destination. Requests are HMAC-signed.</p>
             <form id="webhook-credentials-form" novalidate>
-              <div class="form-group">
-                <label for="webhook-url">Webhook URL</label>
-                <input id="webhook-url" class="form-input" type="url" autocomplete="off" placeholder="https://example.com/hooks/sunsethue">
+              <div class="settings-field-grid">
+                <div class="form-group">
+                  <label for="webhook-url">Webhook URL</label>
+                  <input id="webhook-url" class="form-input" type="url" autocomplete="off" placeholder="https://example.com/hooks/sunsethue">
+                </div>
+                <div class="form-group">
+                  <label for="webhook-signing-secret">Signing secret</label>
+                  <input id="webhook-signing-secret" class="form-input" type="password" autocomplete="new-password" placeholder="Leave blank to generate">
+                </div>
               </div>
-              <div class="form-group">
-                <label for="webhook-signing-secret">Signing secret</label>
-                <input id="webhook-signing-secret" class="form-input" type="password" autocomplete="new-password">
-              </div>
-              <div class="form-actions form-actions-compact">
+              <div class="form-actions form-actions-compact channel-primary-actions">
                 <button type="submit" class="btn btn-primary">Save webhook</button>
                 <button type="button" id="test-webhook-btn" class="btn btn-secondary">Send test webhook</button>
                 <button type="button" id="remove-webhook-btn" class="btn btn-secondary">Remove webhook</button>
@@ -335,54 +418,59 @@
 
         <section class="form-card settings-card" aria-labelledby="general-settings-title">
           <h3 id="general-settings-title">General</h3>
+          <p class="pane-subtext">Timezone and weekly health-check behavior. Default check times are configured under Locations.</p>
           <form id="application-settings-form" novalidate>
-            <div class="form-group">
-              <label for="schedule-timezone">Application schedule timezone</label>
-              <input id="schedule-timezone" class="form-input" type="text" list="iana-timezone-list" autocomplete="off" value="America/New_York">
+            <div class="settings-field-grid">
+              <div class="form-group">
+                <label for="schedule-timezone">Application schedule timezone</label>
+                <input id="schedule-timezone" class="form-input" type="text" list="iana-timezone-list" autocomplete="off" value="America/New_York">
+              </div>
+              <fieldset class="form-group compact-fieldset">
+                <legend>Display forecast times in</legend>
+                <label><input type="radio" name="display-timezone-mode" value="schedule" checked> Schedule timezone</label>
+                <label><input type="radio" name="display-timezone-mode" value="device"> This device</label>
+                <label><input type="radio" name="display-timezone-mode" value="selected"> Another timezone</label>
+                <input id="display-timezone" class="form-input" type="text" list="iana-timezone-list" placeholder="IANA timezone" autocomplete="off" hidden>
+              </fieldset>
             </div>
-            <fieldset class="form-group">
-              <legend>Display all forecast times in</legend>
-              <label><input type="radio" name="display-timezone-mode" value="schedule" checked> Schedule timezone</label>
-              <label><input type="radio" name="display-timezone-mode" value="device"> This device</label>
-              <label><input type="radio" name="display-timezone-mode" value="selected"> Another timezone</label>
-              <input id="display-timezone" class="form-input" type="text" list="iana-timezone-list" placeholder="IANA timezone" autocomplete="off" hidden>
-            </fieldset>
             <datalist id="iana-timezone-list"></datalist>
-            <fieldset class="form-group" id="weekly-self-test-fields">
-              <legend>Weekly self-test</legend>
-              <label><input id="weekly-self-test-enabled" type="checkbox" checked> Enable weekly self-test</label>
-              <label for="weekly-self-test-mode">Mode</label>
-              <select id="weekly-self-test-mode" class="form-input">
-                <option value="passive">Passive (no provider sends)</option>
-                <option value="active">Active (send test through enabled channels)</option>
-              </select>
-              <label for="weekly-self-test-day">Day (schedule timezone)</label>
-              <select id="weekly-self-test-day" class="form-input">
-                <option value="0">Sunday</option>
-                <option value="1">Monday</option>
-                <option value="2">Tuesday</option>
-                <option value="3">Wednesday</option>
-                <option value="4">Thursday</option>
-                <option value="5">Friday</option>
-                <option value="6">Saturday</option>
-              </select>
-              <label for="weekly-self-test-time">Time (whole hour)</label>
-              <input id="weekly-self-test-time" class="form-input" type="text" value="10:00" pattern="([01]\d|2[0-3]):00" placeholder="10:00">
-              <p id="notification-health-selftest" class="pane-subtext" role="status"></p>
-            </fieldset>
+            <details class="settings-details">
+              <summary>Weekly self-test</summary>
+              <fieldset class="form-group" id="weekly-self-test-fields">
+                <label><input id="weekly-self-test-enabled" type="checkbox" checked> Enable weekly self-test</label>
+                <label for="weekly-self-test-mode">Mode</label>
+                <select id="weekly-self-test-mode" class="form-input">
+                  <option value="passive">Passive (no provider sends)</option>
+                  <option value="active">Active (send test through enabled channels)</option>
+                </select>
+                <div class="settings-field-grid">
+                  <div class="form-group">
+                    <label for="weekly-self-test-day">Day (schedule timezone)</label>
+                    <select id="weekly-self-test-day" class="form-input">
+                      <option value="0">Sunday</option><option value="1">Monday</option><option value="2">Tuesday</option><option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label for="weekly-self-test-time">Time (whole hour)</label>
+                    <input id="weekly-self-test-time" class="form-input" type="text" value="10:00" pattern="([01]\d|2[0-3]):00" placeholder="10:00">
+                  </div>
+                </div>
+                <p id="notification-health-selftest" class="pane-subtext" role="status"></p>
+              </fieldset>
+            </details>
             <div class="form-actions">
-              <button type="submit" class="btn btn-primary" id="save-application-settings-btn">Save schedule settings</button>
+              <button type="submit" class="btn btn-primary" id="save-application-settings-btn">Save general settings</button>
             </div>
           </form>
         </section>
 
-        <section class="form-card" aria-labelledby="setup-checklist-title" id="setup-checklist-section">
-          <h3 id="setup-checklist-title">First-run setup checklist</h3>
+        <details class="form-card maintenance-details" id="setup-checklist-section">
+          <summary><span id="setup-checklist-title">Setup status</span></summary>
           <ul id="setup-checklist" class="setup-checklist"></ul>
-        </section>
+        </details>
 
-        <section class="form-card" aria-labelledby="clear-history-title" id="clear-history-section">
-          <h3 id="clear-history-title">Clear history</h3>
+        <details class="form-card maintenance-details" id="clear-history-section">
+          <summary><span id="clear-history-title">History &amp; data cleanup</span></summary>
           <p class="pane-subtext">Removes terminal report and delivery records only. Locations, settings, credentials, and pending jobs are never deleted.</p>
           <div id="clear-history-scopes" class="settings-field-grid">
             <label><input type="checkbox" data-history-scope="runs" checked> Report history</label>
@@ -402,64 +490,23 @@
             <button type="button" id="history-clear-btn" class="btn btn-secondary">Clear history</button>
           </div>
           <p id="clear-history-status" class="action-status" role="status"></p>
-        </section>
+        </details>
 
-        <section class="form-card settings-card" aria-labelledby="check-times-locations-title" id="check-times-locations-section">
-          <h3 id="check-times-locations-title">Check times &amp; locations</h3>
-          <p class="pane-subtext">Global check times apply by default. Expand a location to override with a custom schedule and set per-channel thresholds.</p>
-
-          <div class="form-group" id="check-times-block">
-            <span class="settings-section-title" id="check-times-heading">Check times</span>
-            <p class="pane-subtext" id="schedule-timezone-label">Timezone: America/New_York</p>
-            <div id="schedule-times-pills" class="time-pills" role="list" aria-labelledby="check-times-heading"></div>
-            <!-- Legacy host id for older selectors -->
-            <div id="schedule-times-checkboxes" class="visually-hidden" aria-hidden="true"></div>
-            <div class="time-pills-actions">
-              <label class="visually-hidden" for="add-schedule-time-select">Add check time</label>
-              <select id="add-schedule-time-select" class="form-input time-pill-add-select" aria-label="Add check time">
-                <option value="">Add time…</option>
-              </select>
-              <div class="form-actions form-actions-compact">
-                <button type="button" class="btn btn-secondary" data-schedule-preset="once">Once daily</button>
-                <button type="button" class="btn btn-secondary" data-schedule-preset="twice">Twice daily</button>
-                <button type="button" class="btn btn-secondary" data-schedule-preset="three">Three times</button>
-                <button type="button" class="btn btn-secondary" data-schedule-preset="four">Four times</button>
-              </div>
-            </div>
-            <p class="pane-subtext">Whole-hour slots only (max 8). Selecting 1:00 AM or 2:00 AM can be affected by DST.</p>
-            <div class="form-actions form-actions-compact">
-              <button type="button" class="btn btn-primary" id="save-check-times-btn">Save check times</button>
-            </div>
-            <div id="quota-estimator" class="form-group" aria-live="polite"></div>
-            <p id="notification-health-summary" class="pane-subtext" role="status"></p>
-            <div id="notification-health-skips" class="form-group"></div>
-          </div>
-
-          <div class="form-group" id="location-thresholds-block">
-            <span class="settings-section-title" id="location-rules-title">Locations</span>
-            <p class="pane-subtext">A location notifies a channel when sunrise or sunset meets that channel’s threshold. Notification channels do not change forecast quota.</p>
-            <div id="location-rules-grid" class="location-rules-list"></div>
-            <div class="form-actions form-actions-compact">
-              <button type="button" id="rules-copy-all-btn" class="btn btn-secondary">Copy first location’s rules to all</button>
-              <button type="button" id="rules-reset-btn" class="btn btn-secondary">Reset to defaults (50%)</button>
-            </div>
-          </div>
-        </section>
+        <!-- Notification health remains data-driven but no longer occupies a duplicate settings card. -->
+        <p id="notification-health-summary" class="visually-hidden" role="status"></p>
+        <div id="notification-health-skips" class="visually-hidden"></div>
       </div>
     </main>
 
     <nav id="bottom-nav" aria-label="Bottom navigation" role="tablist">
       <button class="bottom-nav-item active" data-tab="main" role="tab" aria-selected="true" aria-controls="pane-main">
-        <span class="material-symbols-outlined" aria-hidden="true">wb_sunny</span>
-        <span>Forecast</span>
+        <span class="material-symbols-outlined" aria-hidden="true">wb_sunny</span><span>Forecast</span>
       </button>
       <button class="bottom-nav-item" data-tab="locations" role="tab" aria-selected="false" aria-controls="pane-locations">
-        <span class="material-symbols-outlined" aria-hidden="true">location_on</span>
-        <span>Locations</span>
+        <span class="material-symbols-outlined" aria-hidden="true">location_on</span><span>Locations</span>
       </button>
       <button class="bottom-nav-item" data-tab="activity" role="tab" aria-selected="false" aria-controls="pane-activity">
-        <span class="material-symbols-outlined" aria-hidden="true">history</span>
-        <span>Activity</span>
+        <span class="material-symbols-outlined" aria-hidden="true">history</span><span>Activity</span>
       </button>
     </nav>
   </div>
@@ -468,18 +515,14 @@
     <div class="modal-dialog">
       <button type="button" id="email-success-modal-close" class="modal-close" aria-label="Close">&times;</button>
       <div class="modal-header-row">
-        <div class="modal-icon" aria-hidden="true">
-          <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>
-        </div>
+        <div class="modal-icon" aria-hidden="true"><span class="material-symbols-outlined" aria-hidden="true">check_circle</span></div>
         <div>
           <h2 id="email-success-modal-title" class="modal-title">Email sent</h2>
           <p id="email-success-modal-message" class="modal-message">Success! Test report email sent.</p>
         </div>
       </div>
       <p class="modal-subtext">Forecast data was refreshed for all monitored locations.</p>
-      <div class="modal-actions">
-        <button type="button" id="email-success-modal-done" class="btn btn-modal-primary">Done</button>
-      </div>
+      <div class="modal-actions"><button type="button" id="email-success-modal-done" class="btn btn-modal-primary">Done</button></div>
     </div>
   </div>
 

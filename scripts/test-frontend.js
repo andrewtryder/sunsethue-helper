@@ -12,6 +12,7 @@ test("Frontend File Structure & Integrity Checks", () => {
   // 1. Verify file existence
   const htmlPath = path.join(publicDir, "index.html");
   const cssPath = path.join(publicDir, "style.css");
+  const polishCssPath = path.join(publicDir, "ui-polish.css");
   const jsPath = path.join(publicDir, "app.js");
   const helpersPath = path.join(publicDir, "lib", "helpers.js");
   const apiClientPath = path.join(publicDir, "lib", "api-client.js");
@@ -29,6 +30,7 @@ test("Frontend File Structure & Integrity Checks", () => {
 
   assert.ok(fs.existsSync(htmlPath), "index.html should exist");
   assert.ok(fs.existsSync(cssPath), "style.css should exist");
+  assert.ok(fs.existsSync(polishCssPath), "ui-polish.css should exist");
   assert.ok(fs.existsSync(jsPath), "app.js should exist");
   assert.ok(fs.existsSync(helpersPath), "lib/helpers.js should exist");
   assert.ok(fs.existsSync(apiClientPath), "lib/api-client.js should exist");
@@ -47,6 +49,7 @@ test("Frontend File Structure & Integrity Checks", () => {
   // 2. Verify files are not empty
   assert.ok(fs.statSync(htmlPath).size > 100, "index.html should not be empty");
   assert.ok(fs.statSync(cssPath).size > 100, "style.css should not be empty");
+  assert.ok(fs.statSync(polishCssPath).size > 100, "ui-polish.css should not be empty");
   assert.ok(fs.statSync(jsPath).size > 100, "app.js should not be empty");
 
   // 3. Structural validation of index.html (asserting essential DOM bindings are present)
@@ -96,11 +99,15 @@ test("Frontend File Structure & Integrity Checks", () => {
     // Dashboard
     "forecast-cards-container",
     "dashboard-last-updated",
-    // Locations list
+    // Locations configuration
     "locations-list-container",
     "empty-state-view",
     "locations-count-badge",
     "open-location-drawer-btn",
+    "location-rules-grid",
+    "schedule-times-pills",
+    "check-times-locations-section",
+    "location-rules-title",
     // Activity
     "logs-list-container",
     // Settings
@@ -114,10 +121,6 @@ test("Frontend File Structure & Integrity Checks", () => {
     "notification-pushover-enabled",
     "notification-webhook-enabled",
     "application-settings-form",
-    "location-rules-grid",
-    "schedule-times-pills",
-    "check-times-locations-section",
-    "location-rules-title",
     "enable-web-push-btn",
     "webhook-credentials-form",
   ];
@@ -129,8 +132,37 @@ test("Frontend File Structure & Integrity Checks", () => {
     );
   });
 
+  assert.ok(htmlContent.includes('href="ui-polish.css"'), "index.html should load focused UI polish styles");
+
+  const locationsStart = htmlContent.indexOf('id="pane-locations"');
+  const activityStart = htmlContent.indexOf('id="pane-activity"');
+  const settingsStart = htmlContent.indexOf('id="pane-settings"');
+  const checkTimesStart = htmlContent.indexOf('id="check-times-locations-section"');
+  const rulesStart = htmlContent.indexOf('id="location-rules-grid"');
+  const emailCardStart = htmlContent.indexOf('id="channel-card-email"');
+
+  assert.ok(locationsStart >= 0 && activityStart > locationsStart, "Locations pane should precede Activity");
+  assert.ok(checkTimesStart > locationsStart && checkTimesStart < activityStart, "Default check times should live in Locations");
+  assert.ok(rulesStart > locationsStart && rulesStart < activityStart, "Per-location notification rules should live in Locations");
+  assert.ok(emailCardStart > settingsStart, "Global provider cards should remain in Settings");
+  assert.match(
+    htmlContent,
+    /id="locations-list-container"[^>]*hidden/,
+    "legacy app.js location renderer should stay hidden behind the combined location cards"
+  );
+  assert.match(
+    htmlContent,
+    /<details class="credential-editor">[\s\S]*id="gmail-credentials-form"/,
+    "Gmail credential editor should be collapsed by default"
+  );
+  assert.match(
+    htmlContent,
+    /<details class="credential-editor">[\s\S]*id="pushover-credentials-form"/,
+    "Pushover credential editor should be collapsed by default"
+  );
+
   // 4. Verify CSS design system tokens and key selectors are defined
-  const cssContent = fs.readFileSync(cssPath, "utf8");
+  const cssContent = `${fs.readFileSync(cssPath, "utf8")}\n${fs.readFileSync(polishCssPath, "utf8")}`;
   const requiredCssSelectors = [
     ".tab-pane",
     ".tab-pane.active",
@@ -147,7 +179,9 @@ test("Frontend File Structure & Integrity Checks", () => {
     ".channel-card-header",
     ".switch-ui",
     ".time-pills",
-    ".segmented-control",
+    ".rule-control",
+    ".location-rule-toggle-label",
+    ".credential-editor",
     ".quality-indicator",
     ".quality-meter",
   ];
@@ -155,7 +189,7 @@ test("Frontend File Structure & Integrity Checks", () => {
   requiredCssSelectors.forEach(selector => {
     assert.ok(
       cssContent.includes(selector),
-      `style.css must define styles for ${selector}`
+      `frontend styles must define ${selector}`
     );
   });
 });

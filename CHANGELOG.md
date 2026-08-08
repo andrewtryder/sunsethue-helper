@@ -4,6 +4,13 @@ All notable changes to this project are documented in this file.
 
 This changelog follows [Conventional Commits](https://www.conventionalcommits.org/) and is maintained by [release-please](https://github.com/googleapis/release-please). Release sections group changes by commit type (`feat`, `fix`, etc.). Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.23.2](https://github.com/andrewtryder/sunsethue-helper/compare/v1.23.1...v1.23.2) (2026-08-08)
+
+
+### Reverts
+
+* **frontend:** roll back forecast pane polish ([#105](https://github.com/andrewtryder/sunsethue-helper/issues/105)) ([d3900b0](https://github.com/andrewtryder/sunsethue-helper/commit/d3900b052a3463540776f2c2f2243878d6a0e2e6))
+
 ## [1.23.1](https://github.com/andrewtryder/sunsethue-helper/compare/v1.23.0...v1.23.1) (2026-08-08)
 
 

@@ -33,11 +33,8 @@ function formatChannelSubtitle(ch, formatDateTime) {
 export function initHealth({ api, formatDateTime = (v) => v, capabilities }) {
   async function fetchOperationalStatus() {
     const summary = document.getElementById("notification-health-summary");
-    const channelsHost = document.getElementById("notification-health-channels");
-    const scheduleHost = document.getElementById("notification-health-schedule");
     const skipsHost = document.getElementById("notification-health-skips");
     const selfTestHost = document.getElementById("notification-health-selftest");
-    if (!summary) return;
     try {
       const health = await api.get("/api/notification-health");
       const stateLabel = {
@@ -47,7 +44,8 @@ export function initHealth({ api, formatDateTime = (v) => v, capabilities }) {
         disabled: "Disabled"
       }[health.state] || health.state;
       const lastReportText = health.lastReportAt ? formatDateTime(health.lastReportAt) : "never";
-      summary.textContent = `${stateLabel} · last report ${lastReportText}`;
+      const summaryText = `${stateLabel} · last report ${lastReportText}`;
+      if (summary) summary.textContent = summaryText;
 
       for (const ch of health.channels || []) {
         const key = channelKey(ch.channel);
@@ -56,24 +54,6 @@ export function initHealth({ api, formatDateTime = (v) => v, capabilities }) {
         if (el) el.textContent = formatChannelSubtitle(ch, formatDateTime);
       }
 
-      if (channelsHost) {
-        channelsHost.innerHTML = (health.channels || []).map((ch) => `
-          <article class="health-channel-card">
-            <h4>${escapeHtml(ch.channel)}</h4>
-            <p>${ch.enabled ? "Enabled" : "Off"} · ${ch.configured ? "Configured" : "Not configured"}</p>
-            <p>Qualifying locations: ${ch.qualifyingLocationCount}</p>
-            <p>Pending ${ch.pending} · Failed ${ch.failed}</p>
-            <p>Last success: ${ch.lastSuccessAt ? formatDateTime(ch.lastSuccessAt) : "—"}</p>
-            <p>Last failure: ${ch.lastFailureCode || "—"}</p>
-            ${ch.devicesEnabled != null ? `<p>Devices: ${ch.devicesEnabled} enabled · ${ch.devicesStale || 0} stale · ${ch.devicesRevoked || 0} revoked</p>` : ""}
-            ${ch.maskedHostname ? `<p>Host: ${escapeHtml(ch.maskedHostname)} · signing ${ch.signingEnabled ? "on" : "off"}</p>` : ""}
-          </article>`).join("");
-      }
-      if (scheduleHost && health.schedule) {
-        const q = health.schedule.quota || {};
-        scheduleHost.innerHTML = `<strong>Schedule</strong> (${escapeHtml(health.schedule.timeZone || "")}): ${(health.schedule.times || []).join(", ")}
-          <br>Quota estimate: ${q.estimatedRequestsPerDay ?? "—"}/day · next: ${health.nextScheduled?.slot || "—"}`;
-      }
       if (skipsHost) {
         const skips = health.skips || [];
         skipsHost.innerHTML = skips.length
@@ -87,7 +67,8 @@ export function initHealth({ api, formatDateTime = (v) => v, capabilities }) {
         window.__lastSelfTestSummary = selfTestHost.textContent;
       }
     } catch {
-      summary.textContent = "Unable to load notification health.";
+      if (summary) summary.textContent = "Unable to load notification health.";
+      if (selfTestHost) selfTestHost.textContent = "Unable to load self-test status.";
     }
   }
 

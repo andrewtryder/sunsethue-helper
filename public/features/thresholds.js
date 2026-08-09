@@ -68,15 +68,19 @@ function thresholdSummaryLabel(value) {
   return `≥${value}%`;
 }
 
-function getGlobalChannelEnabled(channel) {
-  const id = {
-    email: "notification-email-enabled",
-    pushover: "notification-pushover-enabled",
-    webhook: "notification-webhook-enabled"
-  }[channel];
-  if (!id) return true; // browser push is device-based
-  const el = document.getElementById(id);
-  return el ? Boolean(el.checked) : true;
+function locationThresholdSummary(locRules) {
+  const values = CHANNELS.map((channel) => {
+    const rule = locRules.find((item) => item.channel === channel);
+    return ruleValue(rule);
+  });
+  const labels = values.map((value) => thresholdSummaryLabel(value));
+  if (labels.every((label) => label === labels[0])) {
+    return `All ${labels[0]}`;
+  }
+  return CHANNELS.map((channel, index) => {
+    const short = channel === "webpush" ? "Browser" : CHANNEL_LABELS[channel];
+    return `${short} ${labels[index]}`;
+  }).join(" · ");
 }
 
 export function initThresholds({
@@ -86,11 +90,37 @@ export function initThresholds({
   getLocationsList,
   getGlobalScheduleTimes = () => ["06:00", "12:00", "18:00"],
   refreshLocations = async () => {},
+  setDrawerReturnFocus = null,
   capabilities
 }) {
   let cachedRules = [];
   let rulesLoaded = false;
   let drawerLocationId = null;
+  /** @type {{ email: boolean|null, pushover: boolean|null, webhook: boolean|null }} */
+  let globalChannelState = { email: null, pushover: null, webhook: null };
+
+  function getGlobalChannelEnabled(channel) {
+    if (channel === "webpush") return true;
+    const state = globalChannelState[channel];
+    if (state == null) return true;
+    return Boolean(state);
+  }
+
+  function applyNotificationSettings(settings) {
+    if (!settings) return;
+    globalChannelState = {
+      email: Boolean(settings.emailEnabled),
+      pushover: Boolean(settings.pushoverEnabled),
+      webhook: Boolean(settings.webhookEnabled)
+    };
+    if (rulesLoaded) {
+      renderLocationRules(cachedRules);
+      if (drawerLocationId) {
+        const loc = getLocationsList().find((item) => item.id === drawerLocationId);
+        if (loc) renderDrawerLocationConfig(loc);
+      }
+    }
+  }
 
   function setLocationCount(count) {
     const badge = document.getElementById("locations-count-badge");
@@ -111,6 +141,8 @@ export function initThresholds({
   async function refreshLocationConfiguration() {
     try {
       await refreshLocations();
+      const settings = await api.get("/api/notification-settings");
+      applyNotificationSettings(settings);
       await fetchLocationRules();
     } catch (error) {
       rulesLoaded = true;
@@ -119,8 +151,8 @@ export function initThresholds({
     }
   }
 
-  function renderRuleControl(locationId, channel, currentValue) {
-    const disabled = !capabilities?.mutations;
+  function renderRuleControl(locationId, channel, currentValue, { forceDisabled = false } = {}) {
+    const disabled = !capabilities?.mutations || forceDisabled;
     const threshold = QUALITY_THRESHOLDS.includes(Number(currentValue)) ? Number(currentValue) : 50;
     const thresholdSelected = currentValue !== "" && currentValue !== "off";
     const label = CHANNEL_LABELS[channel] || channel;
@@ -158,9 +190,10 @@ export function initThresholds({
       const rule = locRules.find((item) => item.channel === channel);
       const value = ruleValue(rule);
       const globallyOn = getGlobalChannelEnabled(channel);
-      const body = globallyOn
-        ? renderRuleControl(loc.id, channel, value)
-        : `<p class="pane-subtext channel-global-off-note">Off globally — enable it in Settings to use it here.</p>`;
+      const body = `
+        ${renderRuleControl(loc.id, channel, value, { forceDisabled: !globallyOn })}
+        ${!globallyOn ? `<p class="pane-subtext channel-global-off-note">Off globally — enable it in Settings to use it here.</p>` : ""}
+      `;
 
       return `<div class="location-rule-channel drawer-rule-channel${!globallyOn ? " is-global-off" : ""}">
         <span class="location-rule-channel-label">
@@ -270,8 +303,7 @@ export function initThresholds({
         </span>`;
       }).join("");
 
-      const emailRule = ruleValue(locRules.find((r) => r.channel === "email"));
-      const thresholdLine = `Threshold ${thresholdSummaryLabel(emailRule)}`;
+      const thresholdLine = locationThresholdSummary(locRules);
       const custom = locationUsesCustomSchedule(loc);
 
       return `<article class="loc-rule-card" data-location-id="${loc.id}">
@@ -289,7 +321,7 @@ export function initThresholds({
         </div>
         <div class="loc-rule-meta-row">
           <div class="channel-dots">${channelDots}</div>
-          <span class="hint-text">${escapeHtml(thresholdLine)}</span>
+          <span class="hint-text loc-rule-threshold-line">${escapeHtml(thresholdLine)}</span>
         </div>
         <div class="hint-text loc-rule-schedule-line${custom ? " is-custom" : ""}">
           <span class="material-symbols-outlined" aria-hidden="true">schedule</span>
@@ -433,7 +465,7 @@ export function initThresholds({
     });
   }
 
-  function openLocationEditor(loc) {
+  function openLocationEditor(loc, { returnFocus = null } = {}) {
     if (!capabilities?.mutations || !loc) return;
     const drawer = document.getElementById("location-drawer");
     const overlay = document.getElementById("location-drawer-overlay");
@@ -449,6 +481,10 @@ export function initThresholds({
     if (lngInput) lngInput.value = String(loc.longitude ?? "");
     if (title) title.textContent = `Edit location — ${loc.name || ""}`;
 
+    if (typeof setDrawerReturnFocus === "function") {
+      setDrawerReturnFocus(returnFocus || document.activeElement);
+    }
+
     drawer?.classList.add("open");
     drawer?.setAttribute("aria-hidden", "false");
     if (overlay) {
@@ -456,6 +492,11 @@ export function initThresholds({
       overlay.classList.add("open");
     }
     document.body.classList.add("drawer-open");
+    const deleteBtn = document.getElementById("delete-location-drawer-btn");
+    if (deleteBtn) {
+      deleteBtn.hidden = false;
+      deleteBtn.disabled = !capabilities?.mutations;
+    }
     renderDrawerLocationConfig(loc);
     nameInput?.focus();
     nameInput?.select();
@@ -465,7 +506,7 @@ export function initThresholds({
     host.querySelectorAll("[data-location-edit]").forEach((btn) => {
       btn.addEventListener("click", () => {
         const loc = getLocationsList().find((item) => item.id === btn.getAttribute("data-location-edit"));
-        if (loc) openLocationEditor(loc);
+        if (loc) openLocationEditor(loc, { returnFocus: btn });
       });
     });
   }
@@ -534,6 +575,7 @@ export function initThresholds({
     renderLocationRules: () => renderLocationRules(cachedRules),
     renderDrawerLocationConfig,
     clearDrawerHosts,
-    openLocationEditor
+    openLocationEditor,
+    applyNotificationSettings
   };
 }

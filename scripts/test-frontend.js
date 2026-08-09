@@ -175,6 +175,21 @@ test("Frontend File Structure & Integrity Checks", () => {
     /id="email-enabled-pill"/,
     "Settings channel cards should expose enabled status pills"
   );
+  assert.match(
+    htmlContent,
+    /id="delete-location-drawer-btn"/,
+    "Location drawer should expose a destructive delete action"
+  );
+  assert.match(
+    htmlContent,
+    /id="cancel-edit-btn"[^>]*>Close</,
+    "Location drawer footer should label Close instead of Cancel"
+  );
+  assert.match(
+    htmlContent,
+    /Saved automatically/,
+    "Schedule and Notifications should advertise auto-save"
+  );
 
   // 4. Verify CSS design system tokens and key selectors are defined
   const cssContent = `${fs.readFileSync(cssPath, "utf8")}\n${fs.readFileSync(polishCssPath, "utf8")}`;
@@ -200,9 +215,10 @@ test("Frontend File Structure & Integrity Checks", () => {
     ".quality-indicator",
     ".quality-meter",
     ".loc-rule-card",
-    ".quota-bar",
+    ".quota-label",
     ".status-pill",
     ".quality-stack",
+    ".btn-danger-text",
   ];
 
   requiredCssSelectors.forEach(selector => {

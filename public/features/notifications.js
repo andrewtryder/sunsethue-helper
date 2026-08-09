@@ -1,6 +1,15 @@
 import { setStatusBadge, syncEnabledPill } from "../ui/forms.js";
 
-export function initNotifications({ api, showBanner, showSuccess, showError, CREDENTIAL_ADMIN_HEADER, fetchDeliveries, capabilities }) {
+export function initNotifications({
+  api,
+  showBanner,
+  showSuccess,
+  showError,
+  CREDENTIAL_ADMIN_HEADER,
+  fetchDeliveries,
+  capabilities,
+  onSettingsLoaded = null
+}) {
   const notificationEmailEnabled = document.getElementById("notification-email-enabled");
   const notificationEmailTo = document.getElementById("notification-email-to");
   const notificationPushoverEnabled = document.getElementById("notification-pushover-enabled");
@@ -120,6 +129,9 @@ export function initNotifications({ api, showBanner, showSuccess, showError, CRE
       notificationPushoverStatus.textContent = settings.pushoverConfigured ? "Configured" : "No credentials";
       notificationPushoverStatus.classList.toggle("success", settings.pushoverConfigured);
       notificationPushoverStatus.classList.toggle("muted", !settings.pushoverConfigured);
+    }
+    if (typeof onSettingsLoaded === "function") {
+      onSettingsLoaded(settings);
     }
   }
 

@@ -136,7 +136,7 @@
                 <button type="button" id="rules-reset-btn" class="btn btn-secondary">Reset to 50%</button>
               </div>
             </div>
-            <div id="location-rules-grid" class="location-rules-list loc-rules-grid" aria-labelledby="location-rules-title"></div>
+            <div id="location-rules-grid" class="location-rules-list loc-rules-grid" role="region" aria-labelledby="location-rules-title"></div>
 
             <!-- app.js still owns location CRUD state in this hidden host. The visible cards above use the same APIs. -->
             <div class="locations-list-container" id="locations-list-container" hidden aria-hidden="true">
@@ -192,7 +192,7 @@
 
                 <div class="drawer-section-heading">
                   <h4>Schedule</h4>
-                  <p class="pane-subtext">Use default check times or set a custom schedule for this location.</p>
+                  <p class="pane-subtext">Use default check times or set a custom schedule for this location. <span class="autosave-hint">Saved automatically</span></p>
                 </div>
                 <div id="location-drawer-schedule-host" class="location-drawer-host">
                   <p class="pane-subtext">Save the location first to configure a custom schedule.</p>
@@ -200,18 +200,26 @@
 
                 <div class="drawer-section-heading">
                   <h4>Notifications</h4>
-                  <p class="pane-subtext">Only this location's thresholds — global channel setup lives in Settings.</p>
+                  <p class="pane-subtext">Only this location's thresholds — global channel setup lives in Settings. <span class="autosave-hint">Saved automatically</span></p>
                 </div>
                 <div id="location-drawer-rules-host" class="location-drawer-host">
                   <p class="pane-subtext">Save the location first to configure notification thresholds.</p>
                 </div>
 
-                <div class="form-actions drawer-foot-actions">
-                  <button type="button" id="cancel-edit-btn" class="btn btn-secondary" style="flex:1;">Cancel</button>
-                  <button type="submit" id="save-location-btn" class="btn btn-primary" style="flex:2;">
-                    <span class="material-symbols-outlined" aria-hidden="true" style="font-size:18px;">save</span>
-                    <span>Save Location</span>
-                  </button>
+                <div class="drawer-foot">
+                  <p class="pane-subtext drawer-foot-note">Schedule and notification changes save immediately. Save location updates the name and coordinates only.</p>
+                  <div class="form-actions drawer-foot-actions">
+                    <button type="button" id="cancel-edit-btn" class="btn btn-secondary" style="flex:1;">Close</button>
+                    <button type="submit" id="save-location-btn" class="btn btn-primary" style="flex:2;">
+                      <span class="material-symbols-outlined" aria-hidden="true" style="font-size:18px;">save</span>
+                      <span>Save location</span>
+                    </button>
+                  </div>
+                  <div class="drawer-delete-row">
+                    <button type="button" id="delete-location-drawer-btn" class="btn btn-danger-text" hidden>
+                      Delete location
+                    </button>
+                  </div>
                 </div>
               </form>
             </div>

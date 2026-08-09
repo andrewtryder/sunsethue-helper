@@ -1185,8 +1185,8 @@ input:disabled {
 .quota-footnote {
   display: block;
   margin-top: 4px;
-  color: var(--text-tertiary);
-  font-size: 11px;
+  color: var(--text-secondary);
+  font-size: 12px;
   line-height: 1.4;
 }
 

@@ -122,8 +122,19 @@ const emailModal = initEmailSuccessModal();
 
 // ── Location Drawer ──────────────────────────────────────────────────
 
-function openLocationDrawer() {
+let locationDrawerReturnFocus = null;
+
+function syncDeleteLocationDrawerButton() {
+  const deleteBtn = document.getElementById("delete-location-drawer-btn");
+  if (!deleteBtn) return;
+  const editing = Boolean(locationIdInput?.value);
+  deleteBtn.hidden = !editing;
+  deleteBtn.disabled = !editing || !capabilities.mutations;
+}
+
+function openLocationDrawer({ returnFocus = null } = {}) {
   if (!locationDrawer) return;
+  locationDrawerReturnFocus = returnFocus || document.activeElement;
   locationDrawer.classList.add("open");
   locationDrawer.setAttribute("aria-hidden", "false");
   if (locationDrawerOverlay) {
@@ -131,6 +142,7 @@ function openLocationDrawer() {
     locationDrawerOverlay.classList.add("open");
   }
   document.body.classList.add("drawer-open");
+  syncDeleteLocationDrawerButton();
   locationNameInput?.focus();
 }
 
@@ -145,6 +157,14 @@ function closeLocationDrawer() {
   document.body.classList.remove("drawer-open");
   clearDrawerHosts?.();
   resetForm();
+  syncDeleteLocationDrawerButton();
+  const returnTo = locationDrawerReturnFocus;
+  locationDrawerReturnFocus = null;
+  if (returnTo && typeof returnTo.focus === "function" && document.contains(returnTo)) {
+    returnTo.focus();
+  } else {
+    openLocationDrawerBtn?.focus();
+  }
   void refreshLocationConfiguration?.();
 }
 
@@ -153,7 +173,7 @@ openLocationDrawerBtn?.addEventListener("click", () => {
   clearDrawerHosts?.();
   const title = document.getElementById("form-title");
   if (title) title.textContent = "Add Location";
-  openLocationDrawer();
+  openLocationDrawer({ returnFocus: openLocationDrawerBtn });
 });
 closeLocationDrawerBtn?.addEventListener("click", closeLocationDrawer);
 locationDrawerOverlay?.addEventListener("click", closeLocationDrawer);
@@ -170,17 +190,6 @@ async function fetchNotificationDeliveries() {
 }
 
 // ── Feature wiring ───────────────────────────────────────────────────
-
-const { fetchNotificationSettings, fetchProviderCredentials } = initNotifications({
-  api, 
-  showBanner, 
-  showSuccess, 
-  showError, 
-  DEMO_READ_ONLY,
-  capabilities,
-  CREDENTIAL_ADMIN_HEADER,
-  fetchDeliveries: () => fetchNotificationDeliveries()
-});
 
 let globalScheduleTimes = ["06:00", "12:00", "18:00"];
 
@@ -202,7 +211,8 @@ const {
   fetchLocationRules,
   clearDrawerHosts,
   renderDrawerLocationConfig,
-  refreshLocationConfiguration
+  refreshLocationConfiguration,
+  applyNotificationSettings
 } = initThresholds({
   api,
   showSuccess,
@@ -212,13 +222,28 @@ const {
   capabilities,
   getLocationsList: () => locationsList,
   getGlobalScheduleTimes: () => globalScheduleTimes,
-  refreshLocations: () => fetchLocations()
+  refreshLocations: () => fetchLocations(),
+  setDrawerReturnFocus: (el) => {
+    locationDrawerReturnFocus = el;
+  }
+});
+
+const { fetchNotificationSettings, fetchProviderCredentials } = initNotifications({
+  api,
+  showBanner,
+  showSuccess,
+  showError,
+  DEMO_READ_ONLY,
+  capabilities,
+  CREDENTIAL_ADMIN_HEADER,
+  fetchDeliveries: () => fetchNotificationDeliveries(),
+  onSettingsLoaded: applyNotificationSettings
 });
 
 initWebhook({
-  api, 
-  showSuccess, 
-  showError, 
+  api,
+  showSuccess,
+  showError,
   DEMO_READ_ONLY,
   capabilities,
   CREDENTIAL_ADMIN_HEADER,
@@ -797,16 +822,24 @@ async function deleteLocation(id) {
         throw new Error(await response.text());
       }
       showBanner(dbSuccessBanner, `Location "${loc.name}" deleted.`);
-      if (locationIdInput.value === id) {
-        resetForm();
+      const drawerWasOpen = locationDrawer?.classList.contains("open");
+      if (locationIdInput.value === id || drawerWasOpen) {
+        closeLocationDrawer();
+      } else {
+        await fetchLocations();
+        await refreshLocationConfiguration?.();
       }
-      await fetchLocations();
     } catch (error) {
       console.error(error);
       showBanner(dbErrorBanner, "Delete failed: " + error.message);
     }
   }
 }
+
+document.getElementById("delete-location-drawer-btn")?.addEventListener("click", () => {
+  const id = locationIdInput?.value;
+  if (id) void deleteLocation(id);
+});
 
 // ── Trigger Report ───────────────────────────────────────────────────
 

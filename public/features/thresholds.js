@@ -3,6 +3,7 @@ import { escapeHtml } from "../lib/helpers.js";
 const MAX_SCHEDULE_SLOTS = 8;
 const HOUR_OPTIONS = Array.from({ length: 24 }, (_, hour) => `${String(hour).padStart(2, "0")}:00`);
 const QUALITY_THRESHOLDS = [20, 40, 50, 60, 70, 80];
+const CHANNELS = ["email", "pushover", "webpush", "webhook"];
 
 const CHANNEL_LABELS = {
   email: "Email",
@@ -53,8 +54,29 @@ function locationUsesCustomSchedule(loc) {
   return Array.isArray(loc?.scheduleTimes) && loc.scheduleTimes.length > 0;
 }
 
-function scheduleStatusLabel(loc) {
-  return locationUsesCustomSchedule(loc) ? "custom schedule" : "using default check times";
+function scheduleSummaryLabel(loc) {
+  if (locationUsesCustomSchedule(loc)) {
+    const n = loc.scheduleTimes.length;
+    return `Custom · ${n} check${n === 1 ? "" : "s"}/day`;
+  }
+  return "Default check times";
+}
+
+function thresholdSummaryLabel(value) {
+  if (value === "off") return "Off";
+  if (value === "") return "Always";
+  return `≥${value}%`;
+}
+
+function getGlobalChannelEnabled(channel) {
+  const id = {
+    email: "notification-email-enabled",
+    pushover: "notification-pushover-enabled",
+    webhook: "notification-webhook-enabled"
+  }[channel];
+  if (!id) return true; // browser push is device-based
+  const el = document.getElementById(id);
+  return el ? Boolean(el.checked) : true;
 }
 
 export function initThresholds({
@@ -68,6 +90,7 @@ export function initThresholds({
 }) {
   let cachedRules = [];
   let rulesLoaded = false;
+  let drawerLocationId = null;
 
   function setLocationCount(count) {
     const badge = document.getElementById("locations-count-badge");
@@ -79,6 +102,10 @@ export function initThresholds({
     cachedRules = data.rules || [];
     rulesLoaded = true;
     renderLocationRules(cachedRules);
+    if (drawerLocationId) {
+      const loc = getLocationsList().find((item) => item.id === drawerLocationId);
+      if (loc) renderDrawerLocationConfig(loc);
+    }
   }
 
   async function refreshLocationConfiguration() {
@@ -86,6 +113,8 @@ export function initThresholds({
       await refreshLocations();
       await fetchLocationRules();
     } catch (error) {
+      rulesLoaded = true;
+      renderLocationRules(cachedRules);
       showError(error.message || "Unable to load location notification settings.");
     }
   }
@@ -124,6 +153,25 @@ export function initThresholds({
     </div>`;
   }
 
+  function renderLocationRuleControls(loc, locRules) {
+    return CHANNELS.map((channel) => {
+      const rule = locRules.find((item) => item.channel === channel);
+      const value = ruleValue(rule);
+      const globallyOn = getGlobalChannelEnabled(channel);
+      const body = globallyOn
+        ? renderRuleControl(loc.id, channel, value)
+        : `<p class="pane-subtext channel-global-off-note">Off globally — enable it in Settings to use it here.</p>`;
+
+      return `<div class="location-rule-channel drawer-rule-channel${!globallyOn ? " is-global-off" : ""}">
+        <span class="location-rule-channel-label">
+          <span class="material-symbols-outlined" aria-hidden="true">${CHANNEL_ICONS[channel]}</span>
+          ${CHANNEL_LABELS[channel] || channel}
+        </span>
+        ${body}
+      </div>`;
+    }).join("");
+  }
+
   function renderLocationScheduleEditor(loc) {
     const custom = locationUsesCustomSchedule(loc);
     const times = custom ? normalizeTimes(loc.scheduleTimes) : [];
@@ -142,10 +190,10 @@ export function initThresholds({
     return `<div class="location-schedule-block" data-location-schedule="${loc.id}">
       <div class="location-customize-heading">
         <div>
-          <strong>Check times for this location only</strong>
+          <strong>${custom ? "Custom check times" : "Using default check times"}</strong>
           <p class="pane-subtext">${custom
-        ? "Overrides the default check times above."
-        : `Currently inherits ${inherited.map(formatHourLabel).join(", ") || "no default times"}.`}</p>
+        ? "This location is checked only at the times below."
+        : `Inherits ${inherited.map(formatHourLabel).join(", ") || "no default times"}.`}</p>
         </div>
         <label class="switch location-schedule-switch">
           <input type="checkbox" data-custom-schedule-toggle="${loc.id}" ${custom ? "checked" : ""} ${disabled ? "disabled" : ""}>
@@ -157,19 +205,39 @@ export function initThresholds({
         <div class="time-pills" role="list">${pills}</div>
         <label class="visually-hidden" for="add-location-time-${loc.id}">Add check time</label>
         <select id="add-location-time-${loc.id}" class="form-input time-pill-add-select" data-add-location-time="${loc.id}" ${disabled || atMax || !available.length ? "disabled" : ""}>
-          <option value="">${atMax ? "Maximum 8 times" : "+ add time"}</option>
+          <option value="">${atMax ? "Maximum 8 times" : "Add time…"}</option>
           ${available.map((slot) => `<option value="${slot}">${formatHourLabel(slot)}</option>`).join("")}
         </select>
       </div>
     </div>`;
   }
 
-  function renderLocationActions(loc) {
-    const disabled = !capabilities?.mutations;
-    return `<div class="location-card-actions">
-      <button type="button" class="btn btn-secondary" data-location-edit="${loc.id}" ${disabled ? "disabled" : ""}>Edit location</button>
-      <button type="button" class="btn btn-secondary location-delete-action" data-location-delete="${loc.id}" ${disabled ? "disabled" : ""}>Delete</button>
-    </div>`;
+  function clearDrawerHosts() {
+    drawerLocationId = null;
+    const scheduleHost = document.getElementById("location-drawer-schedule-host");
+    const rulesHost = document.getElementById("location-drawer-rules-host");
+    if (scheduleHost) {
+      scheduleHost.innerHTML = "<p class=\"pane-subtext\">Save the location first to configure a custom schedule.</p>";
+    }
+    if (rulesHost) {
+      rulesHost.innerHTML = "<p class=\"pane-subtext\">Save the location first to configure notification thresholds.</p>";
+    }
+  }
+
+  function renderDrawerLocationConfig(loc) {
+    const scheduleHost = document.getElementById("location-drawer-schedule-host");
+    const rulesHost = document.getElementById("location-drawer-rules-host");
+    if (!scheduleHost || !rulesHost || !loc?.id) {
+      clearDrawerHosts();
+      return;
+    }
+    drawerLocationId = loc.id;
+    const locRules = cachedRules.filter((rule) => rule.locationId === loc.id);
+    scheduleHost.innerHTML = renderLocationScheduleEditor(loc);
+    rulesHost.innerHTML = `<div class="location-rule-channel-grid">${renderLocationRuleControls(loc, locRules)}</div>`;
+    bindThresholdHandlers(scheduleHost);
+    bindScheduleHandlers(scheduleHost);
+    bindThresholdHandlers(rulesHost);
   }
 
   function renderLocationRules(rules) {
@@ -192,42 +260,44 @@ export function initThresholds({
       return;
     }
 
-    const openIds = new Set(
-      [...host.querySelectorAll("details.location-rule-row[open]")].map((el) => el.getAttribute("data-location-id"))
-    );
-
     host.innerHTML = locationsList.map((loc) => {
       const locRules = byLocation.get(loc.id) || [];
-      const channels = ["email", "pushover", "webpush", "webhook"].map((channel) => {
+      const channelDots = CHANNELS.map((channel) => {
         const rule = locRules.find((item) => item.channel === channel);
-        const value = ruleValue(rule);
-        return `<div class="location-rule-channel">
-          <span class="location-rule-channel-label">
-            <span class="material-symbols-outlined" aria-hidden="true">${CHANNEL_ICONS[channel]}</span>
-            ${CHANNEL_LABELS[channel] || channel}
-          </span>
-          ${renderRuleControl(loc.id, channel, value)}
-        </div>`;
+        const on = ruleValue(rule) !== "off" && getGlobalChannelEnabled(channel);
+        return `<span class="channel-dot${on ? " on" : ""}" title="${CHANNEL_LABELS[channel]}${on ? " on" : " off"}">
+          <span class="material-symbols-outlined" aria-hidden="true">${CHANNEL_ICONS[channel]}</span>
+        </span>`;
       }).join("");
 
-      return `<details class="location-rule-row" data-location-id="${loc.id}" ${openIds.has(loc.id) ? "open" : ""}>
-        <summary class="location-rule-summary">
-          <span class="location-rule-summary-main">
-            <span class="location-rule-name">${escapeHtml(loc.name)}</span>
-            <span class="location-rule-meta">${escapeHtml(formatCoords(loc.latitude, loc.longitude))} · ${escapeHtml(scheduleStatusLabel(loc))}</span>
-          </span>
-          <span class="location-rule-toggle-label"><span class="closed-label">Customize</span><span class="open-label">Editing</span><span class="material-symbols-outlined" aria-hidden="true">expand_more</span></span>
-        </summary>
-        <div class="location-rule-customize">
-          ${renderLocationScheduleEditor(loc)}
-          <div class="location-rule-channel-grid">${channels}</div>
-          ${renderLocationActions(loc)}
+      const emailRule = ruleValue(locRules.find((r) => r.channel === "email"));
+      const thresholdLine = `Threshold ${thresholdSummaryLabel(emailRule)}`;
+      const custom = locationUsesCustomSchedule(loc);
+
+      return `<article class="loc-rule-card" data-location-id="${loc.id}">
+        <div class="loc-rule-top">
+          <div class="loc-rule-name">
+            <span class="pin" aria-hidden="true">🌅</span>
+            <div>
+              ${escapeHtml(loc.name)}
+              <span class="coords">${escapeHtml(formatCoords(loc.latitude, loc.longitude))}</span>
+            </div>
+          </div>
+          <button type="button" class="icon-btn" data-location-edit="${loc.id}" aria-label="Edit ${escapeHtml(loc.name)}" ${!capabilities?.mutations ? "disabled" : ""}>
+            <span class="material-symbols-outlined" aria-hidden="true">edit</span>
+          </button>
         </div>
-      </details>`;
+        <div class="loc-rule-meta-row">
+          <div class="channel-dots">${channelDots}</div>
+          <span class="hint-text">${escapeHtml(thresholdLine)}</span>
+        </div>
+        <div class="hint-text loc-rule-schedule-line${custom ? " is-custom" : ""}">
+          <span class="material-symbols-outlined" aria-hidden="true">schedule</span>
+          ${escapeHtml(scheduleSummaryLabel(loc))}
+        </div>
+      </article>`;
     }).join("");
 
-    bindThresholdHandlers(host);
-    bindScheduleHandlers(host);
     bindLocationActions(host);
   }
 
@@ -248,6 +318,10 @@ export function initThresholds({
       cachedRules.push({ locationId, channel, enabled, thresholdPercent, eventScope: "either" });
     }
     renderLocationRules(cachedRules);
+    if (drawerLocationId === locationId) {
+      const loc = getLocationsList().find((item) => item.id === locationId);
+      if (loc) renderDrawerLocationConfig(loc);
+    }
     showSuccess("Notification rule saved.");
   }
 
@@ -300,6 +374,10 @@ export function initThresholds({
     }
     await refreshLocations();
     renderLocationRules(cachedRules);
+    if (drawerLocationId === locationId) {
+      const loc = getLocationsList().find((item) => item.id === locationId);
+      if (loc) renderDrawerLocationConfig(loc);
+    }
     showSuccess(scheduleTimes == null ? "Location now uses default check times." : "Custom check times saved.");
   }
 
@@ -356,30 +434,31 @@ export function initThresholds({
   }
 
   function openLocationEditor(loc) {
-    if (!capabilities?.mutations) return;
-    document.getElementById("open-location-drawer-btn")?.click();
+    if (!capabilities?.mutations || !loc) return;
+    const drawer = document.getElementById("location-drawer");
+    const overlay = document.getElementById("location-drawer-overlay");
     const idInput = document.getElementById("edit-location-id");
     const nameInput = document.getElementById("location-name");
     const latInput = document.getElementById("location-lat");
     const lngInput = document.getElementById("location-lng");
     const title = document.getElementById("form-title");
+
     if (idInput) idInput.value = loc.id;
     if (nameInput) nameInput.value = loc.name || "";
     if (latInput) latInput.value = String(loc.latitude ?? "");
     if (lngInput) lngInput.value = String(loc.longitude ?? "");
-    if (title) title.textContent = "Edit Location";
+    if (title) title.textContent = `Edit location — ${loc.name || ""}`;
+
+    drawer?.classList.add("open");
+    drawer?.setAttribute("aria-hidden", "false");
+    if (overlay) {
+      overlay.hidden = false;
+      overlay.classList.add("open");
+    }
+    document.body.classList.add("drawer-open");
+    renderDrawerLocationConfig(loc);
     nameInput?.focus();
     nameInput?.select();
-  }
-
-  async function deleteLocationFromCard(loc) {
-    if (!capabilities?.mutations) return;
-    if (!window.confirm(`Are you sure you want to delete "${loc.name}"?`)) return;
-    const response = await api.send(`/api/locations/${loc.id}`, { method: "DELETE" });
-    if (!response.ok) throw new Error("Unable to delete location.");
-    showSuccess(`Location "${loc.name}" deleted.`);
-    await refreshLocations();
-    await fetchLocationRules();
   }
 
   function bindLocationActions(host) {
@@ -387,17 +466,6 @@ export function initThresholds({
       btn.addEventListener("click", () => {
         const loc = getLocationsList().find((item) => item.id === btn.getAttribute("data-location-edit"));
         if (loc) openLocationEditor(loc);
-      });
-    });
-    host.querySelectorAll("[data-location-delete]").forEach((btn) => {
-      btn.addEventListener("click", async () => {
-        const loc = getLocationsList().find((item) => item.id === btn.getAttribute("data-location-delete"));
-        if (!loc) return;
-        try {
-          await deleteLocationFromCard(loc);
-        } catch (error) {
-          showError(error.message);
-        }
       });
     });
   }
@@ -463,6 +531,9 @@ export function initThresholds({
   return {
     fetchLocationRules,
     refreshLocationConfiguration,
-    renderLocationRules: () => renderLocationRules(cachedRules)
+    renderLocationRules: () => renderLocationRules(cachedRules),
+    renderDrawerLocationConfig,
+    clearDrawerHosts,
+    openLocationEditor
   };
 }

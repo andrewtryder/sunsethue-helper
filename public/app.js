@@ -143,11 +143,16 @@ function closeLocationDrawer() {
     locationDrawerOverlay.hidden = true;
   }
   document.body.classList.remove("drawer-open");
+  clearDrawerHosts?.();
   resetForm();
+  void refreshLocationConfiguration?.();
 }
 
 openLocationDrawerBtn?.addEventListener("click", () => {
   resetForm();
+  clearDrawerHosts?.();
+  const title = document.getElementById("form-title");
+  if (title) title.textContent = "Add Location";
   openLocationDrawer();
 });
 closeLocationDrawerBtn?.addEventListener("click", closeLocationDrawer);
@@ -193,7 +198,12 @@ const { fetchApplicationSettings } = initSchedule({
   }
 });
 
-const { fetchLocationRules } = initThresholds({
+const {
+  fetchLocationRules,
+  clearDrawerHosts,
+  renderDrawerLocationConfig,
+  refreshLocationConfiguration
+} = initThresholds({
   api,
   showSuccess,
   showError,
@@ -500,21 +510,34 @@ function formatForecastColumnDate(isoTime) {
   return `(${formatted})`;
 }
 
-function buildForecastEventColumnHtml({ timeText, badgeHtml, mobileLabel, errorHtml, emptyHtml }) {
+function buildForecastEventColumnHtml({ timeText, badgeHtml, mobileLabel, errorHtml, emptyHtml, eventIcon }) {
+  const icon = eventIcon
+    ? `<span class="forecast-event-icon" aria-hidden="true">${eventIcon}</span>`
+    : "";
+
   if (errorHtml) {
-    return `<div class="forecast-event-col">${errorHtml}</div>`;
+    return `<div class="forecast-event-col">${icon}<div class="forecast-event-body">${errorHtml}</div></div>`;
   }
   if (emptyHtml) {
-    return `<div class="forecast-event-col">${emptyHtml}</div>`;
+    return `<div class="forecast-event-col">${icon}<div class="forecast-event-body"><span class="forecast-event-mobile-label">${mobileLabel || ""}</span>${emptyHtml}</div></div>`;
   }
 
   return `
     <div class="forecast-event-col">
-      <span class="forecast-event-mobile-label">${mobileLabel}:</span>
-      <span class="forecast-event-time">${timeText}</span>
-      ${badgeHtml}
+      ${icon}
+      <div class="forecast-event-body">
+        <span class="forecast-event-mobile-label">${mobileLabel}</span>
+        <span class="forecast-event-time">${timeText}</span>
+      </div>
+      <div class="forecast-event-quality">${badgeHtml}</div>
     </div>
   `;
+}
+
+function setForecastRowsLoading(isLoading) {
+  document.querySelectorAll(".forecast-table-row").forEach((row) => {
+    row.classList.toggle("is-loading", Boolean(isLoading));
+  });
 }
 
 function renderForecastDashboard() {
@@ -584,22 +607,24 @@ function renderForecastDashboard() {
 
       if (location.forecastError) {
         const errHtml = `<span class="forecast-error-text">⚠️ ${escapeHtml(location.forecastError)}</span>`;
-        sunriseColHtml = buildForecastEventColumnHtml({ errorHtml: errHtml });
-        sunsetColHtml = buildForecastEventColumnHtml({ errorHtml: errHtml });
+        sunriseColHtml = buildForecastEventColumnHtml({ errorHtml: errHtml, eventIcon: "🌅", mobileLabel: "Sunrise" });
+        sunsetColHtml = buildForecastEventColumnHtml({ errorHtml: errHtml, eventIcon: "🌇", mobileLabel: "Sunset" });
       } else if (!hasForecast) {
         const emptyHtml = `<span class="forecast-no-data">No forecast cached yet</span>`;
-        sunriseColHtml = buildForecastEventColumnHtml({ emptyHtml });
-        sunsetColHtml = buildForecastEventColumnHtml({ emptyHtml });
+        sunriseColHtml = buildForecastEventColumnHtml({ emptyHtml, eventIcon: "🌅", mobileLabel: "Sunrise" });
+        sunsetColHtml = buildForecastEventColumnHtml({ emptyHtml, eventIcon: "🌇", mobileLabel: "Sunset" });
       } else {
         sunriseColHtml = buildForecastEventColumnHtml({
           timeText: sunriseTimeText,
           badgeHtml: sunriseBadge,
-          mobileLabel: "Sunrise"
+          mobileLabel: "Sunrise",
+          eventIcon: "🌅"
         });
         sunsetColHtml = buildForecastEventColumnHtml({
           timeText: sunsetTimeText,
           badgeHtml: sunsetBadge,
-          mobileLabel: "Sunset"
+          mobileLabel: "Sunset",
+          eventIcon: "🌇"
         });
       }
 
@@ -800,6 +825,7 @@ triggerTestBtn.addEventListener("click", async () => {
     triggerStatus.classList.remove("hidden");
     triggerStatus.setAttribute("aria-hidden", "false");
     if (triggerStatusText) triggerStatusText.textContent = "Sending…";
+    setForecastRowsLoading(true);
 
     const reportResponse = await api.send("/api/triggerReport", {
       method: "POST"
@@ -824,6 +850,7 @@ triggerTestBtn.addEventListener("click", async () => {
     triggerTestBtn.disabled = false;
     triggerStatus.classList.add("hidden");
     triggerStatus.setAttribute("aria-hidden", "true");
+    setForecastRowsLoading(false);
   }
 });
 
@@ -1125,8 +1152,13 @@ function buildActivityListItem({
   expandable = false
 }) {
   const isExpanded = expandable && expandedActivityIds.has(itemKey);
+  const statusTone = badgeClass === "failure"
+    ? "err"
+    : badgeClass === "warning"
+      ? "pending"
+      : "ok";
   const logItem = document.createElement("div");
-  logItem.className = "log-item" + (isExpanded ? " expanded" : "") + (expandable ? " is-expandable" : "");
+  logItem.className = `log-item ${statusTone}` + (isExpanded ? " expanded" : "") + (expandable ? " is-expandable" : "");
   logItem.setAttribute("data-activity-key", itemKey);
   if (expandable) {
     logItem.setAttribute("role", "button");
@@ -1286,17 +1318,20 @@ function switchTab(targetTab) {
   allNavButtons.forEach(b => {
     const tab = b.getAttribute("data-tab");
     const isActive = tab === targetTab;
+    const isTabRole = b.getAttribute("role") === "tab";
     if (b.classList.contains("bottom-nav-item") && targetTab === "settings") {
       b.classList.remove("active");
-      b.setAttribute("aria-selected", "false");
+      if (isTabRole) b.setAttribute("aria-selected", "false");
       return;
     }
     if (isActive) {
       b.classList.add("active");
-      b.setAttribute("aria-selected", "true");
+      if (isTabRole) b.setAttribute("aria-selected", "true");
+      else b.setAttribute("aria-current", "page");
     } else {
       b.classList.remove("active");
-      b.setAttribute("aria-selected", "false");
+      if (isTabRole) b.setAttribute("aria-selected", "false");
+      else b.removeAttribute("aria-current");
     }
   });
   tabPanes.forEach(p => p.classList.remove("active"));

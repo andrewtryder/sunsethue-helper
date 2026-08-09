@@ -170,11 +170,13 @@ test("a downstream failure becomes a generic 502", async () => {
 test("the local bypass forwards without an assertion only on loopback", async () => {
   const { onRequest } = await loadPagesProxy();
   let forwarded = 0;
+  let forwardedHost = null;
   const env = {
     DEV_AUTH_BYPASS: "true",
     API_SERVICE: {
-      async fetch() {
+      async fetch(request) {
         forwarded += 1;
+        forwardedHost = new URL(request.url).hostname;
         return new Response("[]", { status: 200 });
       }
     }
@@ -187,6 +189,7 @@ test("the local bypass forwards without an assertion only on loopback", async ()
   });
   assert.equal(loopback.status, 200);
   assert.equal(forwarded, 1);
+  assert.equal(forwardedHost, "127.0.0.1");
 
   for (const host of ["app.example.com", "worker.example.workers.dev", "evil.example"]) {
     const response = await onRequest({

@@ -10,7 +10,7 @@ export function initWebhook({ api, showSuccess, showError, CREDENTIAL_ADMIN_HEAD
       }
       return;
     }
-    if (statusEl) statusEl.className = "status-badge muted";
+    if (statusEl) statusEl.className = "status-badge status-pill off muted";
     try {
       const putRes = await api.send("/api/webhook-credentials", {
         method: "PUT",

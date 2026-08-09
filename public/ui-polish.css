@@ -175,10 +175,215 @@
   margin-bottom: var(--space-xs);
 }
 
-.location-time-pill,
-#pane-locations #schedule-times-pills .time-pill {
-  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+.loc-rules-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-md);
+}
+
+.loc-rule-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-md) var(--space-lg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-sm);
+  transition: border-color var(--t-fast), background-color var(--t-fast), box-shadow var(--t-med);
+}
+
+.loc-rule-card:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+  box-shadow: var(--shadow-md);
+}
+
+.loc-rule-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.loc-rule-name {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  font-weight: 600;
+  min-width: 0;
+}
+
+.loc-rule-name .pin {
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.loc-rule-name .coords {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 400;
+  font-family: var(--font-mono);
+  color: var(--text-tertiary);
+}
+
+.loc-rule-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.channel-dots {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.channel-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-tertiary);
+}
+
+.channel-dot.on {
+  color: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
   background: var(--accent-muted);
+}
+
+.channel-dot .material-symbols-outlined {
+  font-size: 16px;
+}
+
+.hint-text {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.loc-rule-schedule-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.loc-rule-schedule-line .material-symbols-outlined {
+  font-size: 16px;
+}
+
+.loc-rule-schedule-line.is-custom {
+  color: var(--accent-soft);
+}
+
+.location-drawer-host {
+  margin-top: var(--space-sm);
+}
+
+.drawer-section-heading {
+  margin-top: var(--space-lg);
+  margin-bottom: var(--space-xs);
+}
+
+.drawer-section-heading h4 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.drawer-rule-channel.is-global-off {
+  opacity: 0.72;
+}
+
+.channel-status-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: var(--space-sm);
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.status-pill .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.status-pill.on {
+  color: var(--success);
+  border-color: color-mix(in srgb, var(--success) 45%, var(--border));
+  background: var(--success-muted);
+}
+
+.status-pill.on .dot {
+  background: var(--success);
+}
+
+.status-pill.off {
+  color: var(--text-secondary);
+}
+
+.status-badge.status-pill.success,
+.status-badge.status-pill.on {
+  color: var(--success);
+  border-color: color-mix(in srgb, var(--success) 45%, var(--border));
+  background: var(--success-muted);
+}
+
+.credential-editor.accordion > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  transition: border-color var(--t-fast), background-color var(--t-fast);
+}
+
+.credential-editor.accordion > summary:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+}
+
+.credential-editor.accordion > summary .material-symbols-outlined {
+  font-size: 20px;
+  color: var(--text-secondary);
+  transition: transform var(--t-fast);
+}
+
+.credential-editor.accordion[open] > summary .material-symbols-outlined {
+  transform: rotate(180deg);
+}
+
+.credential-editor.accordion .accordion-content {
+  padding-top: var(--space-md);
 }
 
 .location-rule-channel-grid {

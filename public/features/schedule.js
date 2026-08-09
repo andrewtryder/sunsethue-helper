@@ -103,11 +103,22 @@ export function initSchedule({ api, showSuccess, showError, onSettingsUpdate, ca
     const quota = document.getElementById("quota-estimator");
     if (quota && data.quota) {
       const q = data.quota;
-      quota.innerHTML = `<strong>Estimated Sunsethue usage</strong><br>
-        ${q.scheduledRunsPerDay} runs/day × ${q.activeLocations} locations = ${q.estimatedRequestsPerDay} requests/day
-        (~${q.estimatedRequestsPer30Days}/30 days).
-        ${q.remainingCredits != null ? ` Remaining credits: ${q.remainingCredits}.` : ""}
-        <br><small>Channels, thresholds, and delivery retries do not add forecast quota. Manual reports are not included.</small>`;
+      const used = Number(q.estimatedRequestsPer30Days) || 0;
+      const cap = q.remainingCredits != null
+        ? used + Number(q.remainingCredits)
+        : Math.max(used, 400);
+      const pct = cap > 0 ? Math.min(100, Math.round((used / cap) * 100)) : 0;
+      const label = q.remainingCredits != null
+        ? `${used} / ${cap} monthly checks`
+        : `~${used} checks / 30 days`;
+      quota.innerHTML = `
+        <div class="quota-bar-wrap">
+          <div class="quota-bar" role="meter" aria-valuemin="0" aria-valuemax="${cap}" aria-valuenow="${used}" aria-label="Estimated monthly forecast checks">
+            <i style="width:${pct}%"></i>
+          </div>
+          <span class="quota-label">${label}</span>
+        </div>
+        <small class="quota-footnote">${q.scheduledRunsPerDay} runs/day × ${q.activeLocations} locations = ${q.estimatedRequestsPerDay}/day. Channels and manual reports do not add forecast quota.</small>`;
     }
 
     if (typeof onSettingsUpdate === "function") {

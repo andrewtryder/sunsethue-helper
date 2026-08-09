@@ -1,4 +1,4 @@
-import { setStatusBadge } from "../ui/forms.js";
+import { setStatusBadge, syncEnabledPill } from "../ui/forms.js";
 
 export function initNotifications({ api, showBanner, showSuccess, showError, CREDENTIAL_ADMIN_HEADER, fetchDeliveries, capabilities }) {
   const notificationEmailEnabled = document.getElementById("notification-email-enabled");
@@ -100,21 +100,24 @@ export function initNotifications({ api, showBanner, showSuccess, showError, CRE
       webhookEnabledEl.checked = Boolean(settings.webhookEnabled);
       syncSwitchAria(webhookEnabledEl);
     }
+    syncEnabledPill(document.getElementById("email-enabled-pill"), Boolean(settings.emailEnabled));
+    syncEnabledPill(document.getElementById("pushover-enabled-pill"), Boolean(settings.pushoverEnabled));
+    syncEnabledPill(document.getElementById("webhook-enabled-pill"), Boolean(settings.webhookEnabled));
     const webhookStatus = document.getElementById("webhook-credentials-status");
     if (webhookStatus) {
-      webhookStatus.textContent = settings.webhookConfigured
-        ? (settings.webhookMaskedHostname ? `Configured · ${settings.webhookMaskedHostname}` : "Configured")
-        : "Not configured";
-      webhookStatus.classList.toggle("success", settings.webhookConfigured);
-      webhookStatus.classList.toggle("muted", !settings.webhookConfigured);
+      setStatusBadge(
+        webhookStatus,
+        Boolean(settings.webhookConfigured),
+        settings.webhookMaskedHostname || ""
+      );
     }
     if (notificationEmailStatus) {
-      notificationEmailStatus.textContent = settings.emailConfigured ? "Configured" : "Not configured";
+      notificationEmailStatus.textContent = settings.emailConfigured ? "Configured" : "No credentials";
       notificationEmailStatus.classList.toggle("success", settings.emailConfigured);
       notificationEmailStatus.classList.toggle("muted", !settings.emailConfigured);
     }
     if (notificationPushoverStatus) {
-      notificationPushoverStatus.textContent = settings.pushoverConfigured ? "Configured" : "Not configured";
+      notificationPushoverStatus.textContent = settings.pushoverConfigured ? "Configured" : "No credentials";
       notificationPushoverStatus.classList.toggle("success", settings.pushoverConfigured);
       notificationPushoverStatus.classList.toggle("muted", !settings.pushoverConfigured);
     }
@@ -133,13 +136,13 @@ export function initNotifications({ api, showBanner, showSuccess, showError, CRE
     } catch (error) {
       if (gmailCredentialsStatus) {
         gmailCredentialsStatus.textContent = "Credential status temporarily unavailable";
-        gmailCredentialsStatus.classList.remove("success");
-        gmailCredentialsStatus.classList.add("muted");
+        gmailCredentialsStatus.classList.remove("success", "on");
+        gmailCredentialsStatus.classList.add("muted", "off");
       }
       if (pushoverCredentialsStatus) {
         pushoverCredentialsStatus.textContent = "Credential status temporarily unavailable";
-        pushoverCredentialsStatus.classList.remove("success");
-        pushoverCredentialsStatus.classList.add("muted");
+        pushoverCredentialsStatus.classList.remove("success", "on");
+        pushoverCredentialsStatus.classList.add("muted", "off");
       }
       throw error;
     }

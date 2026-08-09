@@ -24,19 +24,20 @@ test.describe("Horizon app smoke", () => {
     await expect(page.locator("#loading-overlay")).toHaveClass(/fade-out/, { timeout: 30_000 });
     await expect(page.locator("#app-container")).toBeVisible({ timeout: 30_000 });
 
-    await page.locator("#nav-locations").click();
+    await page.locator('[data-tab="locations"]:visible').first().click();
     await expect(page.locator("#pane-locations")).toBeVisible();
     await expect(page.locator("#check-times-locations-section")).toBeVisible();
     await expect(page.locator("#schedule-times-pills")).toBeVisible();
-    await expect(page.locator("#location-rules-grid")).toBeVisible();
+    await expect(page.locator("#location-rules-grid .location-config-empty, #location-rules-grid .loc-rule-card").first()).toBeVisible();
 
-    await page.locator("#nav-activity").click();
+    await page.locator('[data-tab="activity"]:visible').first().click();
     await expect(page.locator("#pane-activity")).toBeVisible();
 
     await page.locator("#nav-settings").click();
     await expect(page.locator("#pane-settings")).toBeVisible();
     await expect(page.locator("#channel-card-email")).toBeVisible();
     await expect(page.locator("#notification-email-enabled")).toBeAttached();
+    await expect(page.locator("#email-enabled-pill")).toBeVisible();
     await expect(page.locator("#channel-card-pushover")).toBeVisible();
     await expect(page.locator("#channel-card-webpush")).toBeVisible();
     await expect(page.locator("#channel-card-webhook")).toBeVisible();
@@ -46,10 +47,12 @@ test.describe("Horizon app smoke", () => {
   test("location drawer opens and closes with focus restore", async ({ page }) => {
     await page.goto("/");
     await expect(page.locator("#app-container")).toBeVisible({ timeout: 30_000 });
-    await page.locator("#nav-locations").click();
+    await page.locator('[data-tab="locations"]:visible').first().click();
     const openBtn = page.locator("#open-location-drawer-btn");
     await openBtn.click();
     await expect(page.locator("#location-drawer")).toBeVisible();
+    await expect(page.locator("#location-drawer-schedule-host")).toBeAttached();
+    await expect(page.locator("#location-drawer-rules-host")).toBeAttached();
     await page.locator("#close-location-drawer-btn").click();
     await expect(page.locator("#location-drawer")).toBeHidden();
   });
@@ -60,8 +63,10 @@ test.describe("Horizon app smoke", () => {
     await page.locator("#nav-settings").click();
     const gmailEditor = page.locator("#gmail-credentials-form").locator("xpath=..");
     const pushoverEditor = page.locator("#pushover-credentials-form").locator("xpath=..");
+    const webhookEditor = page.locator("#webhook-credentials-form").locator("xpath=..");
     await expect(gmailEditor).not.toHaveAttribute("open", "");
     await expect(pushoverEditor).not.toHaveAttribute("open", "");
+    await expect(webhookEditor).not.toHaveAttribute("open", "");
     await expect(page.locator("#test-email-btn")).toBeVisible();
     await expect(page.locator("#test-pushover-btn")).toBeVisible();
   });
@@ -79,12 +84,12 @@ test.describe("Horizon app smoke", () => {
     await page.goto("/");
     await expect(page.locator("#app-container")).toBeVisible({ timeout: 30_000 });
     for (const [tab, pane] of [
-      ["#nav-main", "#pane-main"],
-      ["#nav-locations", "#pane-locations"],
-      ["#nav-activity", "#pane-activity"],
+      ['[data-tab="main"]:visible', "#pane-main"],
+      ['[data-tab="locations"]:visible', "#pane-locations"],
+      ['[data-tab="activity"]:visible', "#pane-activity"],
       ["#nav-settings", "#pane-settings"]
     ]) {
-      await page.locator(tab).click();
+      await page.locator(tab).first().click();
       await expect(page.locator(pane)).toBeVisible();
       await expect(page.locator(pane)).toHaveScreenshot(`${pane.slice(1)}.png`, {
         maxDiffPixelRatio: 0.05

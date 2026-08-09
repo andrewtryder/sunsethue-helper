@@ -21,11 +21,18 @@ export function initBrowserNotifications({ api, showSuccess, showError, DEMO_REA
     if (!host) return;
     const devices = data.devices || [];
     const subtitle = document.getElementById("webpush-channel-subtitle");
+    const enabledCount = devices.filter((d) => d.enabled).length;
     if (subtitle) {
-      const enabledCount = devices.filter((d) => d.enabled).length;
       subtitle.textContent = devices.length
         ? `${enabledCount} device${enabledCount === 1 ? "" : "s"} enabled · ${devices.length} registered`
         : "No devices registered yet";
+    }
+    const webpushPill = document.getElementById("webpush-enabled-pill");
+    if (webpushPill) {
+      const on = enabledCount > 0;
+      webpushPill.classList.toggle("on", on);
+      webpushPill.classList.toggle("off", !on);
+      webpushPill.innerHTML = `<span class="dot" aria-hidden="true"></span>${on ? `${enabledCount} enabled` : "No devices"}`;
     }
     if (!devices.length) {
       host.innerHTML = "<p class=\"pane-subtext\">No devices registered yet.</p>";

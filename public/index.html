@@ -8,7 +8,7 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,1,0" rel="stylesheet">
 
   <link rel="manifest" href="manifest.webmanifest">
@@ -39,7 +39,7 @@
             <button class="nav-tab" data-tab="locations" id="nav-locations" role="tab" aria-selected="false" aria-controls="pane-locations">Locations</button>
             <button class="nav-tab" data-tab="activity" id="nav-activity" role="tab" aria-selected="false" aria-controls="pane-activity">Activity</button>
           </nav>
-          <button type="button" class="settings-gear-btn" data-tab="settings" id="nav-settings" role="tab" aria-selected="false" aria-controls="pane-settings" aria-label="Settings" title="Settings">
+          <button type="button" class="settings-gear-btn" data-tab="settings" id="nav-settings" aria-controls="pane-settings" aria-label="Settings" title="Settings">
             <span class="material-symbols-outlined" aria-hidden="true">settings</span>
           </button>
         </div>
@@ -128,15 +128,15 @@
 
             <div class="location-rules-heading">
               <div>
-                <h3 id="location-rules-title">Location notification rules</h3>
-                <p class="pane-subtext">A channel notifies when sunrise or sunset meets that location's selected quality threshold.</p>
+                <h3 id="location-rules-title">Your locations</h3>
+                <p class="pane-subtext">Edit a location to set its own schedule and notification thresholds.</p>
               </div>
               <div class="form-actions form-actions-compact location-rules-bulk-actions">
                 <button type="button" id="rules-copy-all-btn" class="btn btn-secondary">Copy first location to all</button>
                 <button type="button" id="rules-reset-btn" class="btn btn-secondary">Reset to 50%</button>
               </div>
             </div>
-            <div id="location-rules-grid" class="location-rules-list" aria-labelledby="location-rules-title"></div>
+            <div id="location-rules-grid" class="location-rules-list loc-rules-grid" aria-labelledby="location-rules-title"></div>
 
             <!-- app.js still owns location CRUD state in this hidden host. The visible cards above use the same APIs. -->
             <div class="locations-list-container" id="locations-list-container" hidden aria-hidden="true">
@@ -155,9 +155,11 @@
                 <span class="material-symbols-outlined" aria-hidden="true">close</span>
               </button>
             </div>
-            <div class="form-card">
+            <div class="form-card drawer-form-card">
               <form id="location-form" novalidate>
                 <input type="hidden" id="edit-location-id">
+
+                <div class="drawer-section-heading"><h4>Basics</h4></div>
 
                 <div class="form-group">
                   <label for="search-address">Search Address / City</label>
@@ -188,7 +190,23 @@
                   </div>
                 </div>
 
-                <div class="form-actions">
+                <div class="drawer-section-heading">
+                  <h4>Schedule</h4>
+                  <p class="pane-subtext">Use default check times or set a custom schedule for this location.</p>
+                </div>
+                <div id="location-drawer-schedule-host" class="location-drawer-host">
+                  <p class="pane-subtext">Save the location first to configure a custom schedule.</p>
+                </div>
+
+                <div class="drawer-section-heading">
+                  <h4>Notifications</h4>
+                  <p class="pane-subtext">Only this location's thresholds — global channel setup lives in Settings.</p>
+                </div>
+                <div id="location-drawer-rules-host" class="location-drawer-host">
+                  <p class="pane-subtext">Save the location first to configure notification thresholds.</p>
+                </div>
+
+                <div class="form-actions drawer-foot-actions">
                   <button type="button" id="cancel-edit-btn" class="btn btn-secondary" style="flex:1;">Cancel</button>
                   <button type="submit" id="save-location-btn" class="btn btn-primary" style="flex:2;">
                     <span class="material-symbols-outlined" aria-hidden="true" style="font-size:18px;">save</span>
@@ -248,24 +266,24 @@
           </div>
           <div class="channel-card-body compact-channel-body">
             <span id="notification-email-status" class="visually-hidden" role="status"></span>
+            <div class="channel-status-pills" aria-live="polite">
+              <span id="email-enabled-pill" class="status-pill off"><span class="dot" aria-hidden="true"></span>Disabled</span>
+              <span id="gmail-credentials-status" class="status-badge status-pill off muted" role="status">No credentials</span>
+            </div>
             <div class="channel-summary-grid">
               <div class="summary-field">
                 <label for="notification-email-to">Sends to</label>
                 <input id="notification-email-to" class="form-input" type="email" autocomplete="email" aria-describedby="notification-email-help">
                 <small id="notification-email-help">Forecast email recipient</small>
               </div>
-              <div class="summary-field">
-                <span class="summary-field-label">Credentials</span>
-                <span id="gmail-credentials-status" class="status-badge muted" role="status">Loading…</span>
-              </div>
             </div>
             <div class="form-actions form-actions-compact channel-primary-actions">
               <button type="button" id="test-email-btn" class="btn btn-secondary">Send test email</button>
               <button type="button" id="save-email-settings-btn" class="btn btn-secondary">Save destination</button>
             </div>
-            <details class="credential-editor">
-              <summary class="btn btn-secondary">Edit credentials</summary>
-              <form id="gmail-credentials-form" novalidate>
+            <details class="credential-editor accordion">
+              <summary>Edit credentials <span class="material-symbols-outlined" aria-hidden="true">expand_more</span></summary>
+              <form id="gmail-credentials-form" class="accordion-content" novalidate>
                 <div class="settings-field-grid">
                   <div class="form-group">
                     <label for="gmail-user">Gmail account</label>
@@ -310,6 +328,10 @@
           </div>
           <div class="channel-card-body compact-channel-body">
             <span id="notification-pushover-status" class="visually-hidden" role="status"></span>
+            <div class="channel-status-pills" aria-live="polite">
+              <span id="pushover-enabled-pill" class="status-pill off"><span class="dot" aria-hidden="true"></span>Disabled</span>
+              <span id="pushover-credentials-status" class="status-badge status-pill off muted" role="status">No credentials</span>
+            </div>
             <div class="settings-field-grid channel-summary-grid">
               <div class="form-group">
                 <label for="notification-device">Device (optional)</label>
@@ -324,17 +346,13 @@
               <label for="notification-sound">Sound (optional)</label>
               <input id="notification-sound" class="form-input" maxlength="64" placeholder="Default">
             </div>
-            <div class="summary-field compact-credential-status">
-              <span class="summary-field-label">Credentials</span>
-              <span id="pushover-credentials-status" class="status-badge muted" role="status">Loading…</span>
-            </div>
             <div class="form-actions form-actions-compact channel-primary-actions">
               <button type="button" id="test-pushover-btn" class="btn btn-secondary">Send test notification</button>
               <button type="button" id="save-pushover-settings-btn" class="btn btn-secondary">Save preferences</button>
             </div>
-            <details class="credential-editor">
-              <summary class="btn btn-secondary">Edit credentials</summary>
-              <form id="pushover-credentials-form" novalidate>
+            <details class="credential-editor accordion">
+              <summary>Edit credentials <span class="material-symbols-outlined" aria-hidden="true">expand_more</span></summary>
+              <form id="pushover-credentials-form" class="accordion-content" novalidate>
                 <div class="settings-field-grid">
                   <div class="form-group">
                     <label for="pushover-app-token">Application API token</label>
@@ -368,6 +386,10 @@
             </div>
           </div>
           <div class="channel-card-body compact-channel-body">
+            <div class="channel-status-pills" aria-live="polite">
+              <span id="webpush-enabled-pill" class="status-pill off"><span class="dot" aria-hidden="true"></span>No devices</span>
+              <span class="status-pill off"><span class="dot" aria-hidden="true"></span>Device-based</span>
+            </div>
             <p class="pane-subtext">On iPhone or iPad, add this site to the Home Screen before enabling notifications.</p>
             <div class="form-actions form-actions-compact channel-primary-actions">
               <button type="button" id="enable-web-push-btn" class="btn btn-secondary">Enable on this device</button>
@@ -393,25 +415,31 @@
             </label>
           </div>
           <div class="channel-card-body compact-channel-body">
-            <span id="webhook-credentials-status" class="status-badge muted" role="status">Loading…</span>
+            <div class="channel-status-pills" aria-live="polite">
+              <span id="webhook-enabled-pill" class="status-pill off"><span class="dot" aria-hidden="true"></span>Disabled</span>
+              <span id="webhook-credentials-status" class="status-badge status-pill off muted" role="status">No credentials</span>
+            </div>
             <p class="pane-subtext">One HTTPS destination. Requests are HMAC-signed.</p>
-            <form id="webhook-credentials-form" novalidate>
-              <div class="settings-field-grid">
-                <div class="form-group">
-                  <label for="webhook-url">Webhook URL</label>
-                  <input id="webhook-url" class="form-input" type="url" autocomplete="off" placeholder="https://example.com/hooks/sunsethue">
+            <details class="credential-editor accordion">
+              <summary>Edit webhook <span class="material-symbols-outlined" aria-hidden="true">expand_more</span></summary>
+              <form id="webhook-credentials-form" class="accordion-content" novalidate>
+                <div class="settings-field-grid">
+                  <div class="form-group">
+                    <label for="webhook-url">Webhook URL</label>
+                    <input id="webhook-url" class="form-input" type="url" autocomplete="off" placeholder="https://example.com/hooks/sunsethue">
+                  </div>
+                  <div class="form-group">
+                    <label for="webhook-signing-secret">Signing secret</label>
+                    <input id="webhook-signing-secret" class="form-input" type="password" autocomplete="new-password" placeholder="Leave blank to generate">
+                  </div>
                 </div>
-                <div class="form-group">
-                  <label for="webhook-signing-secret">Signing secret</label>
-                  <input id="webhook-signing-secret" class="form-input" type="password" autocomplete="new-password" placeholder="Leave blank to generate">
+                <div class="form-actions form-actions-compact channel-primary-actions">
+                  <button type="submit" class="btn btn-primary">Save webhook</button>
+                  <button type="button" id="test-webhook-btn" class="btn btn-secondary">Send test webhook</button>
+                  <button type="button" id="remove-webhook-btn" class="btn btn-secondary">Remove webhook</button>
                 </div>
-              </div>
-              <div class="form-actions form-actions-compact channel-primary-actions">
-                <button type="submit" class="btn btn-primary">Save webhook</button>
-                <button type="button" id="test-webhook-btn" class="btn btn-secondary">Send test webhook</button>
-                <button type="button" id="remove-webhook-btn" class="btn btn-secondary">Remove webhook</button>
-              </div>
-            </form>
+              </form>
+            </details>
           </div>
           <h3 id="webhook-title" class="visually-hidden">Webhook</h3>
         </section>

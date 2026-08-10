@@ -103,11 +103,13 @@ export function initSchedule({ api, showSuccess, showError, onSettingsUpdate, ca
     const quota = document.getElementById("quota-estimator");
     if (quota && data.quota) {
       const q = data.quota;
-      quota.innerHTML = `<strong>Estimated Sunsethue usage</strong><br>
-        ${q.scheduledRunsPerDay} runs/day × ${q.activeLocations} locations = ${q.estimatedRequestsPerDay} requests/day
-        (~${q.estimatedRequestsPer30Days}/30 days).
-        ${q.remainingCredits != null ? ` Remaining credits: ${q.remainingCredits}.` : ""}
-        <br><small>Channels, thresholds, and delivery retries do not add forecast quota. Manual reports are not included.</small>`;
+      const used = Number(q.estimatedRequestsPer30Days) || 0;
+      const credits = q.remainingCredits != null
+        ? ` · ${Number(q.remainingCredits)} credits remaining`
+        : "";
+      quota.innerHTML = `
+        <p class="quota-label">~${used} forecast requests / 30 days${credits}</p>
+        <small class="quota-footnote">${q.scheduledRunsPerDay} runs/day × ${q.activeLocations} locations = ${q.estimatedRequestsPerDay}/day. Channels and manual reports do not add forecast quota.</small>`;
     }
 
     if (typeof onSettingsUpdate === "function") {

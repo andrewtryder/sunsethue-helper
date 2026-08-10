@@ -165,16 +165,14 @@ test.describe("Bootstrap does not wait on optional APIs", () => {
 
   test("manifest.webmanifest is requested successfully", async ({ page }) => {
     await stubCoreApis(page);
-    const manifestResponses = [];
-    page.on("response", (response) => {
-      if (response.url().includes("manifest.webmanifest")) {
-        manifestResponses.push(response.status());
-      }
-    });
-
     await page.goto("/");
     await expect(page.locator("#loading-overlay")).toHaveClass(/fade-out/, { timeout: 8_000 });
-    await expect.poll(() => manifestResponses.length, { timeout: 5_000 }).toBeGreaterThan(0);
-    expect(manifestResponses.every((status) => status >= 200 && status < 400)).toBe(true);
+    const href = await page.locator('link[rel="manifest"]').getAttribute("href");
+    expect(href).toBeTruthy();
+    const response = await page.request.get(new URL(href, page.url()).href);
+    expect(response.status()).toBeGreaterThanOrEqual(200);
+    expect(response.status()).toBeLessThan(400);
+    const body = await response.json();
+    expect(body.name || body.short_name).toBeTruthy();
   });
 });

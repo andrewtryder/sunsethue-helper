@@ -122,8 +122,19 @@ const emailModal = initEmailSuccessModal();
 
 // ── Location Drawer ──────────────────────────────────────────────────
 
-function openLocationDrawer() {
+let locationDrawerReturnFocus = null;
+
+function syncDeleteLocationDrawerButton() {
+  const deleteBtn = document.getElementById("delete-location-drawer-btn");
+  if (!deleteBtn) return;
+  const editing = Boolean(locationIdInput?.value);
+  deleteBtn.hidden = !editing;
+  deleteBtn.disabled = !editing || !capabilities.mutations;
+}
+
+function openLocationDrawer({ returnFocus = null } = {}) {
   if (!locationDrawer) return;
+  locationDrawerReturnFocus = returnFocus || document.activeElement;
   locationDrawer.classList.add("open");
   locationDrawer.setAttribute("aria-hidden", "false");
   if (locationDrawerOverlay) {
@@ -131,6 +142,7 @@ function openLocationDrawer() {
     locationDrawerOverlay.classList.add("open");
   }
   document.body.classList.add("drawer-open");
+  syncDeleteLocationDrawerButton();
   locationNameInput?.focus();
 }
 
@@ -143,12 +155,25 @@ function closeLocationDrawer() {
     locationDrawerOverlay.hidden = true;
   }
   document.body.classList.remove("drawer-open");
+  clearDrawerHosts?.();
   resetForm();
+  syncDeleteLocationDrawerButton();
+  const returnTo = locationDrawerReturnFocus;
+  locationDrawerReturnFocus = null;
+  if (returnTo && typeof returnTo.focus === "function" && document.contains(returnTo)) {
+    returnTo.focus();
+  } else {
+    openLocationDrawerBtn?.focus();
+  }
+  void refreshLocationConfiguration?.();
 }
 
 openLocationDrawerBtn?.addEventListener("click", () => {
   resetForm();
-  openLocationDrawer();
+  clearDrawerHosts?.();
+  const title = document.getElementById("form-title");
+  if (title) title.textContent = "Add Location";
+  openLocationDrawer({ returnFocus: openLocationDrawerBtn });
 });
 closeLocationDrawerBtn?.addEventListener("click", closeLocationDrawer);
 locationDrawerOverlay?.addEventListener("click", closeLocationDrawer);
@@ -166,17 +191,6 @@ async function fetchNotificationDeliveries() {
 
 // ── Feature wiring ───────────────────────────────────────────────────
 
-const { fetchNotificationSettings, fetchProviderCredentials } = initNotifications({
-  api, 
-  showBanner, 
-  showSuccess, 
-  showError, 
-  DEMO_READ_ONLY,
-  capabilities,
-  CREDENTIAL_ADMIN_HEADER,
-  fetchDeliveries: () => fetchNotificationDeliveries()
-});
-
 let globalScheduleTimes = ["06:00", "12:00", "18:00"];
 
 const { fetchApplicationSettings } = initSchedule({
@@ -193,7 +207,13 @@ const { fetchApplicationSettings } = initSchedule({
   }
 });
 
-const { fetchLocationRules } = initThresholds({
+const {
+  fetchLocationRules,
+  clearDrawerHosts,
+  renderDrawerLocationConfig,
+  refreshLocationConfiguration,
+  applyNotificationSettings
+} = initThresholds({
   api,
   showSuccess,
   showError,
@@ -202,13 +222,28 @@ const { fetchLocationRules } = initThresholds({
   capabilities,
   getLocationsList: () => locationsList,
   getGlobalScheduleTimes: () => globalScheduleTimes,
-  refreshLocations: () => fetchLocations()
+  refreshLocations: () => fetchLocations(),
+  setDrawerReturnFocus: (el) => {
+    locationDrawerReturnFocus = el;
+  }
+});
+
+const { fetchNotificationSettings, fetchProviderCredentials } = initNotifications({
+  api,
+  showBanner,
+  showSuccess,
+  showError,
+  DEMO_READ_ONLY,
+  capabilities,
+  CREDENTIAL_ADMIN_HEADER,
+  fetchDeliveries: () => fetchNotificationDeliveries(),
+  onSettingsLoaded: applyNotificationSettings
 });
 
 initWebhook({
-  api, 
-  showSuccess, 
-  showError, 
+  api,
+  showSuccess,
+  showError,
   DEMO_READ_ONLY,
   capabilities,
   CREDENTIAL_ADMIN_HEADER,
@@ -500,21 +535,34 @@ function formatForecastColumnDate(isoTime) {
   return `(${formatted})`;
 }
 
-function buildForecastEventColumnHtml({ timeText, badgeHtml, mobileLabel, errorHtml, emptyHtml }) {
+function buildForecastEventColumnHtml({ timeText, badgeHtml, mobileLabel, errorHtml, emptyHtml, eventIcon }) {
+  const icon = eventIcon
+    ? `<span class="forecast-event-icon" aria-hidden="true">${eventIcon}</span>`
+    : "";
+
   if (errorHtml) {
-    return `<div class="forecast-event-col">${errorHtml}</div>`;
+    return `<div class="forecast-event-col">${icon}<div class="forecast-event-body">${errorHtml}</div></div>`;
   }
   if (emptyHtml) {
-    return `<div class="forecast-event-col">${emptyHtml}</div>`;
+    return `<div class="forecast-event-col">${icon}<div class="forecast-event-body"><span class="forecast-event-mobile-label">${mobileLabel || ""}</span>${emptyHtml}</div></div>`;
   }
 
   return `
     <div class="forecast-event-col">
-      <span class="forecast-event-mobile-label">${mobileLabel}:</span>
-      <span class="forecast-event-time">${timeText}</span>
-      ${badgeHtml}
+      ${icon}
+      <div class="forecast-event-body">
+        <span class="forecast-event-mobile-label">${mobileLabel}</span>
+        <span class="forecast-event-time">${timeText}</span>
+      </div>
+      <div class="forecast-event-quality">${badgeHtml}</div>
     </div>
   `;
+}
+
+function setForecastRowsLoading(isLoading) {
+  document.querySelectorAll(".forecast-table-row").forEach((row) => {
+    row.classList.toggle("is-loading", Boolean(isLoading));
+  });
 }
 
 function renderForecastDashboard() {
@@ -584,22 +632,24 @@ function renderForecastDashboard() {
 
       if (location.forecastError) {
         const errHtml = `<span class="forecast-error-text">⚠️ ${escapeHtml(location.forecastError)}</span>`;
-        sunriseColHtml = buildForecastEventColumnHtml({ errorHtml: errHtml });
-        sunsetColHtml = buildForecastEventColumnHtml({ errorHtml: errHtml });
+        sunriseColHtml = buildForecastEventColumnHtml({ errorHtml: errHtml, eventIcon: "🌅", mobileLabel: "Sunrise" });
+        sunsetColHtml = buildForecastEventColumnHtml({ errorHtml: errHtml, eventIcon: "🌇", mobileLabel: "Sunset" });
       } else if (!hasForecast) {
         const emptyHtml = `<span class="forecast-no-data">No forecast cached yet</span>`;
-        sunriseColHtml = buildForecastEventColumnHtml({ emptyHtml });
-        sunsetColHtml = buildForecastEventColumnHtml({ emptyHtml });
+        sunriseColHtml = buildForecastEventColumnHtml({ emptyHtml, eventIcon: "🌅", mobileLabel: "Sunrise" });
+        sunsetColHtml = buildForecastEventColumnHtml({ emptyHtml, eventIcon: "🌇", mobileLabel: "Sunset" });
       } else {
         sunriseColHtml = buildForecastEventColumnHtml({
           timeText: sunriseTimeText,
           badgeHtml: sunriseBadge,
-          mobileLabel: "Sunrise"
+          mobileLabel: "Sunrise",
+          eventIcon: "🌅"
         });
         sunsetColHtml = buildForecastEventColumnHtml({
           timeText: sunsetTimeText,
           badgeHtml: sunsetBadge,
-          mobileLabel: "Sunset"
+          mobileLabel: "Sunset",
+          eventIcon: "🌇"
         });
       }
 
@@ -772,16 +822,24 @@ async function deleteLocation(id) {
         throw new Error(await response.text());
       }
       showBanner(dbSuccessBanner, `Location "${loc.name}" deleted.`);
-      if (locationIdInput.value === id) {
-        resetForm();
+      const drawerWasOpen = locationDrawer?.classList.contains("open");
+      if (locationIdInput.value === id || drawerWasOpen) {
+        closeLocationDrawer();
+      } else {
+        await fetchLocations();
+        await refreshLocationConfiguration?.();
       }
-      await fetchLocations();
     } catch (error) {
       console.error(error);
       showBanner(dbErrorBanner, "Delete failed: " + error.message);
     }
   }
 }
+
+document.getElementById("delete-location-drawer-btn")?.addEventListener("click", () => {
+  const id = locationIdInput?.value;
+  if (id) void deleteLocation(id);
+});
 
 // ── Trigger Report ───────────────────────────────────────────────────
 
@@ -800,6 +858,7 @@ triggerTestBtn.addEventListener("click", async () => {
     triggerStatus.classList.remove("hidden");
     triggerStatus.setAttribute("aria-hidden", "false");
     if (triggerStatusText) triggerStatusText.textContent = "Sending…";
+    setForecastRowsLoading(true);
 
     const reportResponse = await api.send("/api/triggerReport", {
       method: "POST"
@@ -824,6 +883,7 @@ triggerTestBtn.addEventListener("click", async () => {
     triggerTestBtn.disabled = false;
     triggerStatus.classList.add("hidden");
     triggerStatus.setAttribute("aria-hidden", "true");
+    setForecastRowsLoading(false);
   }
 });
 
@@ -1125,8 +1185,13 @@ function buildActivityListItem({
   expandable = false
 }) {
   const isExpanded = expandable && expandedActivityIds.has(itemKey);
+  const statusTone = badgeClass === "failure"
+    ? "err"
+    : badgeClass === "warning"
+      ? "pending"
+      : "ok";
   const logItem = document.createElement("div");
-  logItem.className = "log-item" + (isExpanded ? " expanded" : "") + (expandable ? " is-expandable" : "");
+  logItem.className = `log-item ${statusTone}` + (isExpanded ? " expanded" : "") + (expandable ? " is-expandable" : "");
   logItem.setAttribute("data-activity-key", itemKey);
   if (expandable) {
     logItem.setAttribute("role", "button");
@@ -1286,17 +1351,20 @@ function switchTab(targetTab) {
   allNavButtons.forEach(b => {
     const tab = b.getAttribute("data-tab");
     const isActive = tab === targetTab;
+    const isTabRole = b.getAttribute("role") === "tab";
     if (b.classList.contains("bottom-nav-item") && targetTab === "settings") {
       b.classList.remove("active");
-      b.setAttribute("aria-selected", "false");
+      if (isTabRole) b.setAttribute("aria-selected", "false");
       return;
     }
     if (isActive) {
       b.classList.add("active");
-      b.setAttribute("aria-selected", "true");
+      if (isTabRole) b.setAttribute("aria-selected", "true");
+      else b.setAttribute("aria-current", "page");
     } else {
       b.classList.remove("active");
-      b.setAttribute("aria-selected", "false");
+      if (isTabRole) b.setAttribute("aria-selected", "false");
+      else b.removeAttribute("aria-current");
     }
   });
   tabPanes.forEach(p => p.classList.remove("active"));

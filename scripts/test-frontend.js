@@ -152,13 +152,43 @@ test("Frontend File Structure & Integrity Checks", () => {
   );
   assert.match(
     htmlContent,
-    /<details class="credential-editor">[\s\S]*id="gmail-credentials-form"/,
+    /<details class="credential-editor accordion">[\s\S]*id="gmail-credentials-form"/,
     "Gmail credential editor should be collapsed by default"
   );
   assert.match(
     htmlContent,
-    /<details class="credential-editor">[\s\S]*id="pushover-credentials-form"/,
+    /<details class="credential-editor accordion">[\s\S]*id="pushover-credentials-form"/,
     "Pushover credential editor should be collapsed by default"
+  );
+  assert.match(
+    htmlContent,
+    /id="location-drawer-schedule-host"/,
+    "Location drawer should host per-location schedule editor"
+  );
+  assert.match(
+    htmlContent,
+    /id="location-drawer-rules-host"/,
+    "Location drawer should host per-location notification rules"
+  );
+  assert.match(
+    htmlContent,
+    /id="email-enabled-pill"/,
+    "Settings channel cards should expose enabled status pills"
+  );
+  assert.match(
+    htmlContent,
+    /id="delete-location-drawer-btn"/,
+    "Location drawer should expose a destructive delete action"
+  );
+  assert.match(
+    htmlContent,
+    /id="cancel-edit-btn"[^>]*>Close</,
+    "Location drawer footer should label Close instead of Cancel"
+  );
+  assert.match(
+    htmlContent,
+    /Saved automatically/,
+    "Schedule and Notifications should advertise auto-save"
   );
 
   // 4. Verify CSS design system tokens and key selectors are defined
@@ -184,6 +214,11 @@ test("Frontend File Structure & Integrity Checks", () => {
     ".credential-editor",
     ".quality-indicator",
     ".quality-meter",
+    ".loc-rule-card",
+    ".quota-label",
+    ".status-pill",
+    ".quality-stack",
+    ".btn-danger-text",
   ];
 
   requiredCssSelectors.forEach(selector => {

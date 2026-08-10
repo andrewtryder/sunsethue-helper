@@ -18,15 +18,19 @@ import {
 test("frontend helpers escape and render forecast badges", () => {
   assert.match(getForecastBadgeHtml(0.85, "Great"), /quality-meter/);
   assert.match(getForecastBadgeHtml(0.85, "Great"), /quality-badge/);
+  assert.match(getForecastBadgeHtml(0.85, "Great"), /q-great/);
   assert.match(getForecastBadgeHtml(0.85, "Great"), /85%/);
   assert.match(getForecastBadgeHtml(0.85, "Great"), /Great/);
   assert.match(getForecastBadgeHtml(0.45, "Fair"), /quality-meter-fill/);
+  assert.match(getForecastBadgeHtml(0.45, "Fair"), /q-fair/);
   assert.match(getForecastBadgeHtml(0.45, "Fair"), /width:45%/);
   assert.match(getForecastBadgeHtml(0.1, "Low"), /Low/);
+  assert.match(getForecastBadgeHtml(0.1, "Low"), /q-poor/);
   assert.match(getForecastBadgeHtml(0.35, "Fair"), /35%/);
   assert.match(getForecastBadgeHtml(35, "Fair"), /35%/);
-  assert.match(getForecastBadgeHtml(0.35, "35%"), /Fair/);
+  assert.match(getForecastBadgeHtml(0.35, "35%"), /Poor/);
   assert.match(getForecastBadgeHtml(0.7), /70%/);
+  assert.match(getForecastBadgeHtml(0.7), /q-good/);
   assert.match(getForecastBadgeHtml(null), /N\/A/);
   assert.strictEqual(escapeHtml('<img onerror="x">'), "&lt;img onerror=&quot;x&quot;&gt;");
 });

@@ -58,7 +58,7 @@
     "prepare": "husky"
   },
   "dependencies": {
-    "jose": "6.2.5",
+    "jose": "6.2.8",
     "worker-mailer": "1.2.1"
   },
   "devDependencies": {

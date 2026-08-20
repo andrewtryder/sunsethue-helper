@@ -4,6 +4,23 @@ All notable changes to this project are documented in this file.
 
 This changelog follows [Conventional Commits](https://www.conventionalcommits.org/) and is maintained by [release-please](https://github.com/googleapis/release-please). Release sections group changes by commit type (`feat`, `fix`, etc.). Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.24.0](https://github.com/andrewtryder/sunsethue-helper/compare/v1.23.1...v1.24.0) (2026-08-20)
+
+
+### Features
+
+* **frontend:** redesign forecast, locations, and settings ui ([#107](https://github.com/andrewtryder/sunsethue-helper/issues/107)) ([27826fc](https://github.com/andrewtryder/sunsethue-helper/commit/27826fc9da52b2b678d744de5c1bcd5f18a35755))
+
+
+### Bug Fixes
+
+* **frontend:** refine forecast spacing and time settings ([#111](https://github.com/andrewtryder/sunsethue-helper/issues/111)) ([0ffe4ab](https://github.com/andrewtryder/sunsethue-helper/commit/0ffe4ab70e857c78ac0d9a5ccf00ba0897912bc9))
+
+
+### Reverts
+
+* **frontend:** roll back forecast pane polish ([#105](https://github.com/andrewtryder/sunsethue-helper/issues/105)) ([d3900b0](https://github.com/andrewtryder/sunsethue-helper/commit/d3900b052a3463540776f2c2f2243878d6a0e2e6))
+
 ## [1.23.1](https://github.com/andrewtryder/sunsethue-helper/compare/v1.23.0...v1.23.1) (2026-08-08)
 
 

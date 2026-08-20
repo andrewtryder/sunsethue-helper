@@ -214,10 +214,10 @@ export async function createRunAndOutbox(env, run, jobs) {
       return env.DB.prepare(
         `INSERT INTO notification_outbox
           (id, runId, channel, deliveryTargetId, status, payload, attempts, nextAttemptAt, lockedUntil, leaseToken, providerMessageId, lastErrorCode, createdAt, sentAt,
-           deliveryEmailTo, deliveryPushoverDevice, deliveryPushoverPriority, deliveryPushoverSound,
+           deliveryEmailTo, deliveryPushoverDevice, deliveryPushoverPriority, deliveryPushoverSound, deliveryPurpose,
            manualAttempts, lastManualRetryAt)
          VALUES (?, ?, ?, ?, ?, ?, 0, ?, NULL, NULL, NULL, ?, ?, NULL,
-                 ?, ?, ?, ?,
+                 ?, ?, ?, ?, ?,
                  0, NULL)`
       ).bind(
         job.id,
@@ -232,7 +232,8 @@ export async function createRunAndOutbox(env, run, jobs) {
         job.deliveryEmailTo ?? null,
         job.deliveryPushoverDevice ?? null,
         job.deliveryPushoverPriority ?? null,
-        job.deliveryPushoverSound ?? null
+        job.deliveryPushoverSound ?? null,
+        job.deliveryPurpose ?? null
       );
     })
   ];
@@ -297,12 +298,42 @@ export async function failOutboxJob(env, id, leaseToken, { attempts, nextAttempt
   return result.meta?.changes === 1;
 }
 
+export function normalizeDeliveryPurpose(row) {
+  const explicit = row?.deliveryPurpose;
+  if (
+    explicit === "scheduled_report"
+    || explicit === "quality_alert"
+    || explicit === "test"
+    || explicit === "self_test"
+  ) {
+    return explicit;
+  }
+  const triggerType = row?.triggerType;
+  if (triggerType === "WEEKLY_SELF_TEST") return "self_test";
+  if (triggerType === "TEST" || triggerType === "Manual Test") return "test";
+  return "quality_alert";
+}
+
 export async function getNotificationDeliveries(env, limit = 30) {
   const { results } = await env.DB.prepare(
-    `SELECT id, runId, channel, deliveryTargetId, status, attempts, createdAt, sentAt, lastErrorCode
-     FROM notification_outbox ORDER BY createdAt DESC LIMIT ?`
+    `SELECT o.id, o.runId, o.channel, o.deliveryTargetId, o.status, o.attempts, o.createdAt, o.sentAt,
+            o.lastErrorCode, o.deliveryPurpose, r.triggerType
+     FROM notification_outbox o
+     LEFT JOIN runs r ON r.id = o.runId
+     ORDER BY o.createdAt DESC LIMIT ?`
   ).bind(limit).all();
-  return results;
+  return (results || []).map((row) => ({
+    id: row.id,
+    runId: row.runId,
+    channel: row.channel,
+    deliveryTargetId: row.deliveryTargetId,
+    status: row.status,
+    attempts: row.attempts,
+    createdAt: row.createdAt,
+    sentAt: row.sentAt,
+    lastErrorCode: row.lastErrorCode,
+    deliveryPurpose: normalizeDeliveryPurpose(row)
+  }));
 }
 
 /**

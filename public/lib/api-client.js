@@ -59,6 +59,7 @@ export function createDemoClient(fixtures) {
     if (path.startsWith("/api/notification-settings")) return fixtures.notificationSettings;
     if (path.startsWith("/api/locations")) return fixtures.locations;
     if (path.startsWith("/api/runs")) return fixtures.runs;
+    if (path.startsWith("/api/notification-deliveries")) return fixtures.deliveries || [];
     if (path.startsWith("/api/location-notification-rules")) return fixtures.rules;
     if (path.startsWith("/api/getApiCredits")) return fixtures.credits;
     if (path.startsWith("/api/provider-credentials")) return fixtures.providerCredentials;

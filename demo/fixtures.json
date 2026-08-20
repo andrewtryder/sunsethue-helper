@@ -12,6 +12,19 @@
       "latestSunsetText": "Great",
       "latestSunsetTime": "2026-08-01T00:45:00.000Z",
       "lastForecastUpdate": 1754040000000
+    },
+    {
+      "id": "demo-loc-2",
+      "name": "Demo Ridge",
+      "latitude": 41.1,
+      "longitude": -73.8,
+      "latestSunriseQuality": 0.45,
+      "latestSunriseText": "Fair",
+      "latestSunriseTime": "2026-08-01T10:20:00.000Z",
+      "latestSunsetQuality": 0.62,
+      "latestSunsetText": "Good",
+      "latestSunsetTime": "2026-08-01T00:50:00.000Z",
+      "lastForecastUpdate": 1754040000000
     }
   ],
   "runs": [
@@ -20,12 +33,22 @@
       "timestamp": 1754040000000,
       "triggerType": "SCHEDULED:06:00",
       "status": "success",
-      "locationsCount": 1,
+      "locationsCount": 2,
       "results": [
-        {
-          "name": "Demo Harbor",
-          "status": "success"
-        }
+        { "name": "Demo Harbor", "status": "success" },
+        { "name": "Demo Ridge", "status": "success" }
+      ],
+      "error": null
+    },
+    {
+      "id": "demo-run-2",
+      "timestamp": 1754061600000,
+      "triggerType": "SCHEDULED:12:00",
+      "status": "success",
+      "locationsCount": 2,
+      "results": [
+        { "name": "Demo Harbor", "status": "success" },
+        { "name": "Demo Ridge", "status": "success" }
       ],
       "error": null
     }
@@ -42,20 +65,19 @@
     "scheduleTimezone": "America/New_York",
     "displayTimezoneMode": "schedule",
     "displayTimezone": null,
-    "scheduleTimes": [
-      "06:00",
-      "12:00",
-      "18:00"
-    ],
+    "scheduleTimes": ["06:00", "12:00", "18:00"],
     "weeklySelfTestEnabled": true,
     "weeklySelfTestMode": "passive",
     "weeklySelfTestDay": 0,
     "weeklySelfTestTime": "10:00",
+    "scheduledReportsEnabled": true,
+    "scheduledReportTimes": ["06:00", "18:00"],
+    "scheduledReportChannels": ["email", "pushover"],
     "quota": {
       "scheduledRunsPerDay": 3,
-      "activeLocations": 1,
-      "estimatedRequestsPerDay": 3,
-      "estimatedRequestsPer30Days": 90,
+      "activeLocations": 2,
+      "estimatedRequestsPerDay": 6,
+      "estimatedRequestsPer30Days": 180,
       "remainingCredits": null
     }
   },
@@ -65,11 +87,67 @@
         "locationId": "demo-loc-1",
         "channel": "email",
         "enabled": true,
+        "thresholdPercent": 70,
+        "eventScope": "either"
+      },
+      {
+        "locationId": "demo-loc-1",
+        "channel": "pushover",
+        "enabled": true,
+        "thresholdPercent": 70,
+        "eventScope": "either"
+      },
+      {
+        "locationId": "demo-loc-2",
+        "channel": "email",
+        "enabled": true,
         "thresholdPercent": 50,
+        "eventScope": "either"
+      },
+      {
+        "locationId": "demo-loc-2",
+        "channel": "pushover",
+        "enabled": true,
+        "thresholdPercent": 70,
         "eventScope": "either"
       }
     ]
   },
+  "deliveries": [
+    {
+      "id": "demo-delivery-1",
+      "runId": "demo-run-1",
+      "channel": "email",
+      "status": "sent",
+      "attempts": 1,
+      "createdAt": "2026-08-01T10:00:05.000Z",
+      "sentAt": "2026-08-01T10:00:05.000Z",
+      "lastErrorCode": null,
+      "deliveryPurpose": "scheduled_report"
+    },
+    {
+      "id": "demo-delivery-2",
+      "runId": "demo-run-1",
+      "channel": "pushover",
+      "status": "sent",
+      "attempts": 1,
+      "createdAt": "2026-08-01T10:00:06.000Z",
+      "sentAt": "2026-08-01T10:00:06.000Z",
+      "lastErrorCode": null,
+      "deliveryPurpose": "quality_alert"
+    },
+    {
+      "id": "demo-delivery-3",
+      "runId": "demo-run-2",
+      "channel": "email",
+      "status": "skipped",
+      "attempts": 0,
+      "createdAt": "2026-08-01T16:00:05.000Z",
+      "sentAt": null,
+      "lastErrorCode": "NO_LOCATION_ABOVE_THRESHOLD",
+      "deliveryPurpose": "quality_alert"
+    }
+  ],
   "credits": {
     "remaining": 1000,
     "limit": 2000
@@ -88,10 +166,23 @@
   "notificationHealth": {
     "state": "healthy",
     "lastReportAt": "2026-08-01T10:00:00.000Z",
+    "lastForecastCheckAt": "2026-08-01T10:00:00.000Z",
     "lastReportAgeSeconds": 3600,
+    "lastForecastCheckAgeSeconds": 3600,
+    "lastScheduledReportAt": "2026-08-01T10:00:05.000Z",
+    "lastQualityAlertAt": "2026-08-01T10:00:06.000Z",
     "nextScheduled": {
       "slot": "12:00",
       "timeZone": "America/New_York"
+    },
+    "nextForecastCheck": {
+      "slot": "12:00",
+      "timeZone": "America/New_York"
+    },
+    "scheduledReports": {
+      "enabled": true,
+      "times": ["06:00", "18:00"],
+      "channels": ["email", "pushover"]
     },
     "channels": [
       {
@@ -99,7 +190,7 @@
         "enabled": true,
         "configured": true,
         "transport": "secrets_store",
-        "qualifyingLocationCount": 1,
+        "qualifyingLocationCount": 2,
         "pending": 0,
         "failed": 0,
         "lastSuccessAt": "2026-08-01T10:00:05.000Z",
@@ -110,7 +201,7 @@
         "enabled": true,
         "configured": true,
         "transport": "secrets_store",
-        "qualifyingLocationCount": 1,
+        "qualifyingLocationCount": 2,
         "pending": 0,
         "failed": 0
       },
@@ -137,19 +228,22 @@
     ],
     "schedule": {
       "timeZone": "America/New_York",
-      "times": [
-        "06:00",
-        "12:00",
-        "18:00"
-      ],
+      "times": ["06:00", "12:00", "18:00"],
       "quota": {
         "scheduledRunsPerDay": 3,
-        "activeLocations": 1,
-        "estimatedRequestsPerDay": 3,
-        "estimatedRequestsPer30Days": 90
+        "activeLocations": 2,
+        "estimatedRequestsPerDay": 6,
+        "estimatedRequestsPer30Days": 180
       }
     },
-    "skips": [],
+    "skips": [
+      {
+        "id": "demo-delivery-3",
+        "channel": "email",
+        "createdAt": "2026-08-01T16:00:05.000Z",
+        "code": "NO_LOCATION_ABOVE_THRESHOLD"
+      }
+    ],
     "selfTest": {
       "checkType": "weekly_passive",
       "status": "pass",

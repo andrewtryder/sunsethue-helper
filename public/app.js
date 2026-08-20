@@ -192,13 +192,15 @@ async function fetchNotificationDeliveries() {
 // ── Feature wiring ───────────────────────────────────────────────────
 
 let globalScheduleTimes = ["06:00", "12:00", "18:00"];
+let channelAvailability = { email: true, pushover: true, webpush: true, webhook: true };
 
-const { fetchApplicationSettings } = initSchedule({
+const { fetchApplicationSettings, refreshScheduledReportChannelHints } = initSchedule({
   api,
   showSuccess,
   showError,
   DEMO_READ_ONLY,
   capabilities,
+  getChannelAvailability: () => channelAvailability,
   onSettingsUpdate: (data) => {
     if (Array.isArray(data?.scheduleTimes)) {
       globalScheduleTimes = data.scheduleTimes;
@@ -237,7 +239,18 @@ const { fetchNotificationSettings, fetchProviderCredentials } = initNotification
   capabilities,
   CREDENTIAL_ADMIN_HEADER,
   fetchDeliveries: () => fetchNotificationDeliveries(),
-  onSettingsLoaded: applyNotificationSettings
+  onSettingsLoaded: (settings) => {
+    channelAvailability = {
+      email: Boolean(settings?.emailEnabled),
+      pushover: Boolean(settings?.pushoverEnabled),
+      webpush: true,
+      webhook: Boolean(settings?.webhookEnabled)
+    };
+    applyNotificationSettings(settings);
+    if (typeof refreshScheduledReportChannelHints === "function") {
+      refreshScheduledReportChannelHints();
+    }
+  }
 });
 
 initWebhook({
@@ -1236,6 +1249,26 @@ function buildActivityListItem({
   return logItem;
 }
 
+function deliveryPurposeLabel(purpose) {
+  switch (purpose) {
+    case "scheduled_report": return "Scheduled report";
+    case "quality_alert": return "Quality alert";
+    case "self_test": return "Self-test";
+    case "test": return "Test";
+    default: return "Quality alert";
+  }
+}
+
+function channelDisplayName(channel) {
+  switch (String(channel || "").toLowerCase()) {
+    case "email": return "Email";
+    case "pushover": return "Pushover";
+    case "webpush": return "Browser Push";
+    case "webhook": return "Webhook";
+    default: return channel || "—";
+  }
+}
+
 function renderActivityList() {
   if (!logsListContainer) return;
   logsListContainer.innerHTML = "";
@@ -1256,17 +1289,29 @@ function renderActivityList() {
       const status = String(delivery.status || "unknown").toLowerCase();
       const badgeClass = status.includes("fail") || status.includes("error")
         ? "failure"
-        : status.includes("warn") || status.includes("pending") || status.includes("retry")
+        : status.includes("warn") || status.includes("pending") || status.includes("retry") || status.includes("skip")
           ? "warning"
           : "success";
-      const timeText = delivery.updatedAt || delivery.createdAt
-        ? formatDateTimeMediumWithZone(Date.parse(delivery.updatedAt || delivery.createdAt), currentDisplayTimeZone)
+      const timeText = delivery.updatedAt || delivery.createdAt || delivery.sentAt
+        ? formatDateTimeMediumWithZone(
+          Date.parse(delivery.updatedAt || delivery.sentAt || delivery.createdAt),
+          currentDisplayTimeZone
+        )
         : "—";
+      const purpose = deliveryPurposeLabel(delivery.deliveryPurpose);
+      const channel = channelDisplayName(delivery.channel);
+      const statusLabel = status === "skipped"
+        ? (delivery.lastErrorCode === "NO_LOCATION_ABOVE_THRESHOLD"
+          ? "Skipped · No location met its threshold"
+          : `Skipped${delivery.lastErrorCode ? ` · ${delivery.lastErrorCode}` : ""}`)
+        : status === "sent"
+          ? "Sent"
+          : String(delivery.status || "UNKNOWN");
       const itemKey = `delivery:${delivery.id || index}`;
-      const hasDetails = Boolean(delivery.lastErrorCode);
+      const hasDetails = Boolean(delivery.lastErrorCode) && status !== "skipped";
       fragment.appendChild(buildActivityListItem({
         itemKey,
-        summaryText: `${timeText} · ${escapeHtml(delivery.channel || "—")} · ${delivery.attempts ?? 0} attempts`,
+        summaryText: `${escapeHtml(purpose)} · ${escapeHtml(channel)}<br><span class="activity-delivery-meta">${escapeHtml(statusLabel)} · ${escapeHtml(timeText)}</span>`,
         badgeClass,
         badgeText: escapeHtml(String(delivery.status || "UNKNOWN").toUpperCase()),
         expandable: hasDetails,

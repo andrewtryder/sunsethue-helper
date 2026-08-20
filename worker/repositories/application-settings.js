@@ -6,8 +6,9 @@ export async function upsertApplicationSettings(env, settings) {
   await env.DB.prepare(
     `INSERT INTO application_settings (
       id, scheduleTimezone, displayTimezoneMode, displayTimezone, scheduleTimes,
-      weeklySelfTestEnabled, weeklySelfTestMode, weeklySelfTestDay, weeklySelfTestTime, updatedAt
-    ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      weeklySelfTestEnabled, weeklySelfTestMode, weeklySelfTestDay, weeklySelfTestTime,
+      scheduledReportsEnabled, scheduledReportTimes, scheduledReportChannels, updatedAt
+    ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
       scheduleTimezone = excluded.scheduleTimezone,
       displayTimezoneMode = excluded.displayTimezoneMode,
@@ -17,6 +18,9 @@ export async function upsertApplicationSettings(env, settings) {
       weeklySelfTestMode = excluded.weeklySelfTestMode,
       weeklySelfTestDay = excluded.weeklySelfTestDay,
       weeklySelfTestTime = excluded.weeklySelfTestTime,
+      scheduledReportsEnabled = excluded.scheduledReportsEnabled,
+      scheduledReportTimes = excluded.scheduledReportTimes,
+      scheduledReportChannels = excluded.scheduledReportChannels,
       updatedAt = excluded.updatedAt`
   ).bind(
     settings.scheduleTimezone,
@@ -29,6 +33,13 @@ export async function upsertApplicationSettings(env, settings) {
     settings.weeklySelfTestMode,
     settings.weeklySelfTestDay,
     settings.weeklySelfTestTime,
+    settings.scheduledReportsEnabled ? 1 : 0,
+    typeof settings.scheduledReportTimes === "string"
+      ? settings.scheduledReportTimes
+      : JSON.stringify(settings.scheduledReportTimes || []),
+    typeof settings.scheduledReportChannels === "string"
+      ? settings.scheduledReportChannels
+      : JSON.stringify(settings.scheduledReportChannels || []),
     settings.updatedAt
   ).run();
 }

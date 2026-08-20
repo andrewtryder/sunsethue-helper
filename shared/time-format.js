@@ -9,6 +9,8 @@ import {
   MAX_SCHEDULE_SLOTS
 } from "./schema-manifest.js";
 
+export { DEFAULT_SCHEDULE_TIMEZONE, DEFAULT_SCHEDULE_TIMES, MAX_SCHEDULE_SLOTS };
+
 const WHOLE_HOUR = /^([01]\d|2[0-3]):00$/;
 
 /**
@@ -203,6 +205,19 @@ export function formatTimeOnlyWithZone(value, timeZone) {
   });
 }
 
+/**
+ * Medium date and short time (e.g. "Oct 16, 2023, 8:12 PM").
+ */
+export function formatDateTimeMediumWithZone(value, timeZone) {
+  return formatInstantWithZone(value, timeZone, {
+    dateStyle: "medium",
+    timeStyle: "short",
+    hour: undefined,
+    minute: undefined,
+    timeZoneName: undefined
+  });
+}
+
 export function defaultApplicationSettings(now = Date.now()) {
   return {
     scheduleTimezone: DEFAULT_SCHEDULE_TIMEZONE,
@@ -213,6 +228,9 @@ export function defaultApplicationSettings(now = Date.now()) {
     weeklySelfTestMode: "passive",
     weeklySelfTestDay: 0,
     weeklySelfTestTime: "10:00",
+    scheduledReportsEnabled: false,
+    scheduledReportTimes: [],
+    scheduledReportChannels: [],
     updatedAt: now
   };
 }

@@ -46,12 +46,19 @@ export function buildWebhookPayload(job, deliveryId, generatedAtIso) {
   } catch {
     throw new NotificationError("INVALID_NOTIFICATION_PAYLOAD", { retryable: false });
   }
+  const deliveryPurpose = parsed.deliveryPurpose
+    || (parsed.triggerType === "WEEKLY_SELF_TEST"
+      ? "self_test"
+      : parsed.triggerType === "TEST" || parsed.triggerType === "Manual Test"
+        ? "test"
+        : "quality_alert");
   return {
     version: 1,
     event: "forecast.notification",
     deliveryId,
     generatedAt: generatedAtIso,
     triggerType: parsed.triggerType,
+    deliveryPurpose,
     locations: (parsed.locations || []).map((loc) => ({
       id: loc.id || null,
       name: loc.name,
@@ -102,6 +109,7 @@ export async function sendWebhook(job, env, deps = {}) {
       headers: {
         "Content-Type": "application/json",
         "X-Sunsethue-Event": "forecast.notification",
+        "X-Sunsethue-Purpose": bodyObj.deliveryPurpose || "quality_alert",
         "X-Sunsethue-Delivery": deliveryId,
         "X-Sunsethue-Timestamp": String(timestamp),
         "X-Sunsethue-Signature": `v1=${signature}`

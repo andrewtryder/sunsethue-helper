@@ -9,6 +9,7 @@ import { dispatchPendingNotifications } from "../notifications/dispatcher.js";
 import { buildNotificationPayload } from "../notifications/payload.js";
 import { NotificationError } from "../notifications/errors.js";
 import { getSettings } from "../notifications/settings.js";
+import { getApplicationSettings } from "../notifications/application-settings.js";
 import { filterResultsForChannel } from "../notifications/rules.js";
 import { hasWebhookTransportAsync } from "../notifications/webhook.js";
 import { listLocationNotificationRules } from "../repositories/notification-rules.js";
@@ -85,6 +86,20 @@ export async function generateReport(triggerType, env, deps = {}) {
   };
 }
 
+function parseScheduledSlot(triggerType) {
+  const match = typeof triggerType === "string" ? /^SCHEDULED:(\d{2}:00)$/.exec(triggerType) : null;
+  return match ? match[1] : null;
+}
+
+function withTriggeredEvents(results, filteredLocations) {
+  return results.map((result) => {
+    const match = filteredLocations.find(
+      (loc) => loc.locationId === result.locationId || loc.name === result.name
+    );
+    return { ...result, triggeredEvents: match?.triggeredEvents || [] };
+  });
+}
+
 function channelJobsForTargets({
   channel,
   model,
@@ -92,13 +107,16 @@ function channelJobsForTargets({
   settings,
   targets,
   status,
-  lastErrorCode
+  lastErrorCode,
+  deliveryPurpose
 }) {
   const payloadModel = {
     ...model,
+    deliveryPurpose,
     displayTimezone: resolveDisplayTimeZone(settings, null),
     results: filtered.locations.map((loc) => ({
       name: loc.name,
+      locationId: loc.locationId,
       sunrise: loc.sunrise,
       sunset: loc.sunset,
       error: loc.error,
@@ -113,6 +131,7 @@ function channelJobsForTargets({
     deliveryTargetId: targetId,
     status: status || "pending",
     lastErrorCode: lastErrorCode || null,
+    deliveryPurpose,
     payload,
     nextAttemptAt: model.generatedAt,
     createdAt: model.generatedAt,
@@ -127,9 +146,15 @@ function channelJobsForTargets({
  * Persist the run and its enabled notification jobs together, snapshotting the
  * current delivery preferences into each job so a later settings change cannot
  * redirect a pending notification.
+ *
+ * Delivery policy (Model A):
+ * - scheduled report (when due): full run, ignores quality gating for send eligibility
+ * - quality alert: threshold-filtered locations only
+ * - if both due for the same channel: one scheduled_report job (no duplicate)
  */
 export async function enqueueNotifications(model, env, deps = {}) {
   const settings = deps.settings || await getSettings(env);
+  const applicationSettings = deps.applicationSettings || await getApplicationSettings(env);
   const allRules = deps.rules || await listLocationNotificationRules(env);
   const jobs = [];
 
@@ -144,8 +169,26 @@ export async function enqueueNotifications(model, env, deps = {}) {
     channelPlan.push({ channel: "webpush", targets: pushSubs.map((s) => s.id) });
   }
 
+  const isSelfTest = model.triggerType === "WEEKLY_SELF_TEST";
+  const isThresholdBypass = model.triggerType === "TEST" || isSelfTest;
+  const isManualTest = model.triggerType === "Manual Test";
+  const scheduledSlot = parseScheduledSlot(model.triggerType);
+  const scheduledReportsEnabled = applicationSettings.scheduledReportsEnabled === true;
+  const scheduledReportTimes = Array.isArray(applicationSettings.scheduledReportTimes)
+    ? applicationSettings.scheduledReportTimes
+    : [];
+  const scheduledReportChannels = new Set(
+    Array.isArray(applicationSettings.scheduledReportChannels)
+      ? applicationSettings.scheduledReportChannels
+      : []
+  );
+  const scheduledReportDue = !isThresholdBypass
+    && !isManualTest
+    && Boolean(scheduledSlot)
+    && scheduledReportsEnabled
+    && scheduledReportTimes.includes(scheduledSlot);
+
   for (const plan of channelPlan) {
-    const isTest = model.triggerType === "TEST" || model.triggerType === "WEEKLY_SELF_TEST";
     const rulesForChannel = allRules
       .filter((r) => r.channel === plan.channel)
       .map((r) => ({
@@ -162,9 +205,38 @@ export async function enqueueNotifications(model, env, deps = {}) {
         thresholdPercent: null,
         eventScope: "either"
       }));
-    const filtered = isTest || model.results.length === 0
+
+    const filtered = isThresholdBypass || model.results.length === 0
       ? { locations: model.results, qualifies: true }
       : filterResultsForChannel(model.results, effectiveRules);
+
+    if (isThresholdBypass) {
+      jobs.push(...channelJobsForTargets({
+        channel: plan.channel,
+        model,
+        filtered: { locations: model.results },
+        settings,
+        targets: plan.targets,
+        status: "pending",
+        deliveryPurpose: isSelfTest ? "self_test" : "test"
+      }));
+      continue;
+    }
+
+    const channelScheduled = scheduledReportDue && scheduledReportChannels.has(plan.channel);
+    if (channelScheduled) {
+      jobs.push(...channelJobsForTargets({
+        channel: plan.channel,
+        model,
+        filtered: { locations: withTriggeredEvents(model.results, filtered.locations) },
+        settings,
+        targets: plan.targets,
+        status: "pending",
+        deliveryPurpose: "scheduled_report"
+      }));
+      continue;
+    }
+
     if (!filtered.qualifies) {
       jobs.push(...channelJobsForTargets({
         channel: plan.channel,
@@ -173,24 +245,20 @@ export async function enqueueNotifications(model, env, deps = {}) {
         settings,
         targets: [null],
         status: "skipped",
-        lastErrorCode: "NO_LOCATION_ABOVE_THRESHOLD"
+        lastErrorCode: "NO_LOCATION_ABOVE_THRESHOLD",
+        deliveryPurpose: "quality_alert"
       }));
       continue;
     }
-    // Email includes the full run for context; other channels send qualifying locations only.
-    const payloadLocations = plan.channel === "email"
-      ? model.results.map((result) => {
-        const match = filtered.locations.find((loc) => loc.locationId === result.locationId || loc.name === result.name);
-        return { ...result, triggeredEvents: match?.triggeredEvents || [] };
-      })
-      : filtered.locations;
+
     jobs.push(...channelJobsForTargets({
       channel: plan.channel,
       model,
-      filtered: { locations: payloadLocations },
+      filtered: { locations: filtered.locations },
       settings,
       targets: plan.targets,
-      status: "pending"
+      status: "pending",
+      deliveryPurpose: isManualTest ? "test" : "quality_alert"
     }));
   }
 
@@ -208,7 +276,8 @@ export async function enqueueNotifications(model, env, deps = {}) {
     channel: job.channel,
     deliveryTargetId: job.deliveryTargetId ?? null,
     status: job.status || "pending",
-    lastErrorCode: job.lastErrorCode || null
+    lastErrorCode: job.lastErrorCode || null,
+    deliveryPurpose: job.deliveryPurpose || null
   }));
 }
 
@@ -218,6 +287,9 @@ export async function enqueueNotifications(model, env, deps = {}) {
  * Holds a singleton execution lock across the forecast fan-out so a cron
  * trigger and a concurrent manual trigger can never both call the upstream API
  * for the same set of locations.
+ *
+ * Manual / on-demand triggers are not treated as scheduled reports even when
+ * scheduled reports are enabled.
  */
 export async function runAndSendReport(triggerType, env, deps = {}) {
   const now = deps.now ?? Date.now();

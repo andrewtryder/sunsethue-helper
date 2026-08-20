@@ -10,10 +10,13 @@ import {
   parseScheduleTimes,
   validateScheduleTimes
 } from "../../shared/time-format.js";
+import { NOTIFICATION_CHANNELS } from "../../shared/schema-manifest.js";
 
 const DISPLAY_MODES = new Set(["schedule", "device", "selected"]);
 const SELF_TEST_MODES = new Set(["passive", "active"]);
-const APP_FIELDS = new Set([
+const SCHEDULED_REPORT_CHANNELS = new Set(NOTIFICATION_CHANNELS);
+
+const CORE_FIELDS = new Set([
   "scheduleTimezone",
   "displayTimezoneMode",
   "displayTimezone",
@@ -24,13 +27,83 @@ const APP_FIELDS = new Set([
   "weeklySelfTestTime"
 ]);
 
+const SCHEDULED_REPORT_FIELDS = new Set([
+  "scheduledReportsEnabled",
+  "scheduledReportTimes",
+  "scheduledReportChannels"
+]);
+
+const APP_FIELDS = new Set([...CORE_FIELDS, ...SCHEDULED_REPORT_FIELDS]);
+
+function parseJsonStringArray(value, fallback = []) {
+  if (Array.isArray(value)) return value;
+  if (typeof value !== "string" || value.trim() === "") return [...fallback];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [...fallback];
+  } catch {
+    return [...fallback];
+  }
+}
+
+function validateScheduledReportChannels(channels) {
+  if (!Array.isArray(channels)) {
+    throw new NotificationError("INVALID_SCHEDULED_REPORT_CHANNEL");
+  }
+  const normalized = [];
+  const seen = new Set();
+  for (const channel of channels) {
+    if (typeof channel !== "string" || !SCHEDULED_REPORT_CHANNELS.has(channel)) {
+      throw new NotificationError("INVALID_SCHEDULED_REPORT_CHANNEL");
+    }
+    if (seen.has(channel)) continue;
+    seen.add(channel);
+    normalized.push(channel);
+  }
+  return normalized;
+}
+
+function validateScheduledReportTimes(times, scheduleTimes) {
+  if (!Array.isArray(times)) {
+    throw new NotificationError("INVALID_SCHEDULED_REPORT_TIME");
+  }
+  if (times.length === 0) return [];
+  const timesResult = validateScheduleTimes(times);
+  if (!timesResult.ok) throw new NotificationError(timesResult.code);
+  const allowed = new Set(scheduleTimes);
+  for (const slot of timesResult.times) {
+    if (!allowed.has(slot)) {
+      throw new NotificationError("INVALID_SCHEDULED_REPORT_TIME");
+    }
+  }
+  return timesResult.times;
+}
+
+function parseStoredScheduleSlots(value) {
+  const raw = parseJsonStringArray(value, []);
+  if (raw.length === 0) return [];
+  const parsed = validateScheduleTimes(raw);
+  return parsed.ok ? parsed.times : [];
+}
+
+function parseStoredChannels(value) {
+  try {
+    return validateScheduledReportChannels(parseJsonStringArray(value, []));
+  } catch {
+    return [];
+  }
+}
+
 function rowToPublic(row) {
   const defaults = defaultApplicationSettings(row?.updatedAt || Date.now());
   if (!row) {
     return {
       ...defaults,
       scheduleTimes: [...defaults.scheduleTimes],
-      weeklySelfTestEnabled: true
+      weeklySelfTestEnabled: true,
+      scheduledReportsEnabled: false,
+      scheduledReportTimes: [],
+      scheduledReportChannels: []
     };
   }
   return {
@@ -42,6 +115,9 @@ function rowToPublic(row) {
     weeklySelfTestMode: row.weeklySelfTestMode || "passive",
     weeklySelfTestDay: Number(row.weeklySelfTestDay ?? 0),
     weeklySelfTestTime: row.weeklySelfTestTime || "10:00",
+    scheduledReportsEnabled: Number(row.scheduledReportsEnabled) === 1,
+    scheduledReportTimes: parseStoredScheduleSlots(row.scheduledReportTimes),
+    scheduledReportChannels: parseStoredChannels(row.scheduledReportChannels),
     updatedAt: row.updatedAt
   };
 }
@@ -51,16 +127,36 @@ export async function getApplicationSettings(env) {
   return rowToPublic(row);
 }
 
-export function validateApplicationSettingsInput(input) {
+/**
+ * @param {object} input
+ * @param {{ existing?: object|null }} [opts]
+ */
+export function validateApplicationSettingsInput(input, opts = {}) {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
     throw new NotificationError("INVALID_SETTINGS");
   }
   for (const key of Object.keys(input)) {
     if (!APP_FIELDS.has(key)) throw new NotificationError("UNKNOWN_SETTINGS_FIELD");
   }
-  for (const key of APP_FIELDS) {
+  for (const key of CORE_FIELDS) {
     if (!(key in input)) throw new NotificationError("INVALID_SETTINGS");
   }
+
+  const existing = opts.existing || null;
+  const scheduledReportsEnabled = SCHEDULED_REPORT_FIELDS.has("scheduledReportsEnabled") && "scheduledReportsEnabled" in input
+    ? input.scheduledReportsEnabled
+    : existing?.scheduledReportsEnabled ?? false;
+  const scheduledReportTimesInput = "scheduledReportTimes" in input
+    ? input.scheduledReportTimes
+    : existing?.scheduledReportTimes ?? [];
+  const scheduledReportChannelsInput = "scheduledReportChannels" in input
+    ? input.scheduledReportChannels
+    : existing?.scheduledReportChannels ?? [];
+
+  if (typeof scheduledReportsEnabled !== "boolean") {
+    throw new NotificationError("INVALID_SETTINGS");
+  }
+
   if (!isValidIanaTimeZone(input.scheduleTimezone)) {
     throw new NotificationError("INVALID_TIMEZONE");
   }
@@ -92,6 +188,30 @@ export function validateApplicationSettingsInput(input) {
   if (typeof input.weeklySelfTestTime !== "string" || !/^([01]\d|2[0-3]):00$/.test(input.weeklySelfTestTime)) {
     throw new NotificationError("INVALID_SELF_TEST_TIME");
   }
+
+  let scheduledReportTimes;
+  try {
+    if ("scheduledReportTimes" in input) {
+      scheduledReportTimes = validateScheduledReportTimes(scheduledReportTimesInput, timesResult.times);
+    } else {
+      // When forecast-check times shrink, drop orphaned scheduled-report slots
+      // rather than rejecting a core-settings save that omitted the new fields.
+      const allowed = new Set(timesResult.times);
+      const inherited = Array.isArray(scheduledReportTimesInput) ? scheduledReportTimesInput : [];
+      scheduledReportTimes = inherited.filter((slot) => allowed.has(slot));
+    }
+  } catch (error) {
+    if (error instanceof NotificationError) throw error;
+    throw new NotificationError("INVALID_SCHEDULED_REPORT_TIME");
+  }
+  const scheduledReportChannels = validateScheduledReportChannels(scheduledReportChannelsInput);
+
+  if (scheduledReportsEnabled) {
+    if (scheduledReportTimes.length === 0 || scheduledReportChannels.length === 0) {
+      throw new NotificationError("INVALID_SCHEDULED_REPORT_CONFIGURATION");
+    }
+  }
+
   return {
     scheduleTimezone: input.scheduleTimezone,
     displayTimezoneMode: input.displayTimezoneMode,
@@ -100,12 +220,16 @@ export function validateApplicationSettingsInput(input) {
     weeklySelfTestEnabled: input.weeklySelfTestEnabled,
     weeklySelfTestMode: input.weeklySelfTestMode,
     weeklySelfTestDay: day,
-    weeklySelfTestTime: input.weeklySelfTestTime
+    weeklySelfTestTime: input.weeklySelfTestTime,
+    scheduledReportsEnabled,
+    scheduledReportTimes,
+    scheduledReportChannels
   };
 }
 
 export async function saveApplicationSettings(env, input, now = Date.now()) {
-  const settings = validateApplicationSettingsInput(input);
+  const existing = await getApplicationSettings(env);
+  const settings = validateApplicationSettingsInput(input, { existing });
   await upsertApplicationSettings(env, { ...settings, updatedAt: now });
   return settings;
 }
@@ -151,3 +275,12 @@ export function estimateForecastQuota({
     estimatedDaysUntilExhaustion: estimatedDaysRemaining
   };
 }
+
+export {
+  APP_FIELDS,
+  CORE_FIELDS,
+  SCHEDULED_REPORT_FIELDS,
+  parseJsonStringArray,
+  validateScheduledReportChannels,
+  validateScheduledReportTimes
+};

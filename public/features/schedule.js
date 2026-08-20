@@ -5,6 +5,12 @@ import {
 } from "../lib/time-format.js";
 
 const MAX_SCHEDULE_SLOTS = 8;
+const SCHEDULED_REPORT_CHANNELS = [
+  { id: "email", label: "Email" },
+  { id: "pushover", label: "Pushover" },
+  { id: "webpush", label: "Browser Push" },
+  { id: "webhook", label: "Webhook" }
+];
 
 function formatHourLabel(slot) {
   const labelHour = Number(String(slot).slice(0, 2));
@@ -14,7 +20,14 @@ function formatHourLabel(slot) {
   return `${labelHour - 12}:00 PM`;
 }
 
-export function initSchedule({ api, showSuccess, showError, onSettingsUpdate, capabilities }) {
+export function initSchedule({
+  api,
+  showSuccess,
+  showError,
+  onSettingsUpdate,
+  capabilities,
+  getChannelAvailability = () => ({ email: true, pushover: true, webpush: true, webhook: true })
+}) {
   const HOUR_OPTIONS = Array.from({ length: 24 }, (_, hour) => `${String(hour).padStart(2, "0")}:00`);
   const SCHEDULE_PRESETS = {
     once: ["06:00"],
@@ -24,6 +37,9 @@ export function initSchedule({ api, showSuccess, showError, onSettingsUpdate, ca
   };
 
   let selectedTimes = ["06:00", "12:00", "18:00"];
+  let scheduledReportsEnabled = false;
+  let scheduledReportTimes = [];
+  let scheduledReportChannels = [];
 
   function populateTimezoneSelect(selectedValue) {
     const select = document.getElementById("schedule-timezone");
@@ -47,11 +63,99 @@ export function initSchedule({ api, showSuccess, showError, onSettingsUpdate, ca
     return [...selectedTimes].sort();
   }
 
+  function reconcileScheduledReportTimes(checkTimes = selectedTimes) {
+    const allowed = new Set(checkTimes);
+    scheduledReportTimes = scheduledReportTimes.filter((slot) => allowed.has(slot));
+  }
+
+  function renderScheduledReportOptions() {
+    const options = document.getElementById("scheduled-reports-options");
+    const enabledInput = document.getElementById("scheduled-reports-enabled");
+    if (enabledInput) enabledInput.checked = scheduledReportsEnabled;
+    if (options) options.hidden = !scheduledReportsEnabled;
+
+    const timesHost = document.getElementById("scheduled-report-times");
+    if (timesHost) {
+      const checkSet = new Set(selectedTimes);
+      const selectedSet = new Set(scheduledReportTimes.filter((slot) => checkSet.has(slot)));
+      timesHost.innerHTML = selectedTimes.length
+        ? selectedTimes.map((slot) => `
+            <label>
+              <input type="checkbox" data-scheduled-report-time="${slot}" ${selectedSet.has(slot) ? "checked" : ""} ${!capabilities?.mutations ? "disabled" : ""}>
+              ${formatHourLabel(slot)}
+            </label>`).join("")
+        : "<p class=\"pane-subtext\">Add default forecast check times first.</p>";
+
+      timesHost.querySelectorAll("[data-scheduled-report-time]").forEach((input) => {
+        input.addEventListener("change", () => {
+          const slot = input.getAttribute("data-scheduled-report-time");
+          if (input.checked) {
+            if (!scheduledReportTimes.includes(slot)) scheduledReportTimes.push(slot);
+          } else {
+            scheduledReportTimes = scheduledReportTimes.filter((t) => t !== slot);
+          }
+          scheduledReportTimes.sort();
+          updateScheduledReportsHelp();
+        });
+      });
+    }
+
+    const availability = getChannelAvailability() || {};
+    const channelHints = [];
+    document.querySelectorAll("[data-scheduled-report-channel]").forEach((input) => {
+      const channel = input.getAttribute("data-scheduled-report-channel");
+      const globallyAvailable = availability[channel] !== false;
+      input.checked = scheduledReportChannels.includes(channel);
+      input.disabled = !capabilities?.mutations;
+      const label = input.closest("label");
+      if (label) {
+        const base = SCHEDULED_REPORT_CHANNELS.find((c) => c.id === channel)?.label || channel;
+        label.lastChild.textContent = globallyAvailable
+          ? ` ${base}`
+          : ` ${base} — enable this channel above first`;
+      }
+      if (!globallyAvailable) {
+        channelHints.push(`${SCHEDULED_REPORT_CHANNELS.find((c) => c.id === channel)?.label || channel} is globally disabled`);
+      }
+      input.onchange = () => {
+        if (input.checked) {
+          if (!scheduledReportChannels.includes(channel)) scheduledReportChannels.push(channel);
+        } else {
+          scheduledReportChannels = scheduledReportChannels.filter((c) => c !== channel);
+        }
+        updateScheduledReportsHelp();
+      };
+    });
+
+    const hints = document.getElementById("scheduled-report-channel-hints");
+    if (hints) {
+      hints.textContent = channelHints.length
+        ? channelHints.join(". ") + ". Selection is kept and used when the channel is re-enabled."
+        : "";
+    }
+    updateScheduledReportsHelp();
+  }
+
+  function updateScheduledReportsHelp() {
+    const help = document.getElementById("scheduled-reports-help");
+    if (!help) return;
+    if (!scheduledReportsEnabled) {
+      help.textContent = "";
+      return;
+    }
+    if (scheduledReportTimes.length === 0 || scheduledReportChannels.length === 0) {
+      help.textContent = "Enable at least one report time and one delivery channel before saving.";
+      return;
+    }
+    help.textContent = "";
+  }
+
   function renderSchedulePills(selected) {
     selectedTimes = [...new Set(selected || [])]
       .filter((slot) => HOUR_OPTIONS.includes(slot))
       .sort()
       .slice(0, MAX_SCHEDULE_SLOTS);
+    reconcileScheduledReportTimes(selectedTimes);
 
     const host = document.getElementById("schedule-times-pills")
       || document.getElementById("schedule-times-checkboxes");
@@ -87,6 +191,8 @@ export function initSchedule({ api, showSuccess, showError, onSettingsUpdate, ca
       addSelect.innerHTML = `<option value="">${atMax ? "Maximum 8 times" : "Add time…"}</option>`
         + available.map((slot) => `<option value="${slot}">${formatHourLabel(slot)}</option>`).join("");
     }
+
+    renderScheduledReportOptions();
   }
 
   const renderScheduleCheckboxes = renderSchedulePills;
@@ -99,6 +205,9 @@ export function initSchedule({ api, showSuccess, showError, onSettingsUpdate, ca
     populateTimezoneSelect(tz);
     const label = document.getElementById("schedule-timezone-label");
     if (label) label.textContent = `Timezone: ${tz}`;
+    scheduledReportsEnabled = data.scheduledReportsEnabled === true;
+    scheduledReportTimes = Array.isArray(data.scheduledReportTimes) ? [...data.scheduledReportTimes] : [];
+    scheduledReportChannels = Array.isArray(data.scheduledReportChannels) ? [...data.scheduledReportChannels] : [];
     renderSchedulePills(data.scheduleTimes || ["06:00", "12:00", "18:00"]);
     const selfEnabled = document.getElementById("weekly-self-test-enabled");
     if (selfEnabled) selfEnabled.checked = data.weeklySelfTestEnabled !== false;
@@ -117,7 +226,7 @@ export function initSchedule({ api, showSuccess, showError, onSettingsUpdate, ca
         : "";
       quota.innerHTML = `
         <p class="quota-label">~${used} forecast requests / 30 days${credits}</p>
-        <small class="quota-footnote">${q.scheduledRunsPerDay} runs/day × ${q.activeLocations} locations = ${q.estimatedRequestsPerDay}/day. Channels and manual reports do not add forecast quota.</small>`;
+        <small class="quota-footnote">Forecast API usage is based on forecast checks × locations. Scheduled reports and quality-alert channels reuse those forecast results and do not add forecast API calls. Manual forecast refreshes are excluded from this estimate. ${q.scheduledRunsPerDay} checks/day × ${q.activeLocations} locations = ${q.estimatedRequestsPerDay}/day.</small>`;
     }
 
     if (typeof onSettingsUpdate === "function") {
@@ -131,6 +240,11 @@ export function initSchedule({ api, showSuccess, showError, onSettingsUpdate, ca
     return data;
   }
 
+  document.getElementById("scheduled-reports-enabled")?.addEventListener("change", (event) => {
+    scheduledReportsEnabled = Boolean(event.target.checked);
+    renderScheduledReportOptions();
+  });
+
   document.getElementById("application-settings-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
     if (!capabilities?.mutations) {
@@ -142,6 +256,12 @@ export function initSchedule({ api, showSuccess, showError, onSettingsUpdate, ca
       showError("Choose a valid IANA timezone before saving.");
       return;
     }
+    reconcileScheduledReportTimes();
+    if (scheduledReportsEnabled && (scheduledReportTimes.length === 0 || scheduledReportChannels.length === 0)) {
+      showError("Scheduled reports need at least one report time and one delivery channel.");
+      updateScheduledReportsHelp();
+      return;
+    }
     const body = {
       scheduleTimezone,
       displayTimezoneMode: "schedule",
@@ -150,7 +270,10 @@ export function initSchedule({ api, showSuccess, showError, onSettingsUpdate, ca
       weeklySelfTestEnabled: document.getElementById("weekly-self-test-enabled")?.checked !== false,
       weeklySelfTestMode: document.getElementById("weekly-self-test-mode")?.value || "passive",
       weeklySelfTestDay: Number(document.getElementById("weekly-self-test-day")?.value || 0),
-      weeklySelfTestTime: document.getElementById("weekly-self-test-time")?.value || "10:00"
+      weeklySelfTestTime: document.getElementById("weekly-self-test-time")?.value || "10:00",
+      scheduledReportsEnabled,
+      scheduledReportTimes: [...scheduledReportTimes].sort(),
+      scheduledReportChannels: [...scheduledReportChannels]
     };
     try {
       const response = await api.send("/api/application-settings", {
@@ -158,8 +281,11 @@ export function initSchedule({ api, showSuccess, showError, onSettingsUpdate, ca
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body)
       });
-      if (!response.ok) throw new Error("Schedule settings were not accepted.");
-      showSuccess("General settings saved.");
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.error?.message || payload?.error?.code || "Schedule settings were not accepted.");
+      }
+      showSuccess("Settings saved.");
       await fetchApplicationSettings();
     } catch (error) {
       showError(error.message);
@@ -194,9 +320,17 @@ export function initSchedule({ api, showSuccess, showError, onSettingsUpdate, ca
       tzSelect.disabled = true;
       tzSelect.title = "Changing timezone is disabled in the static demo.";
     }
+    const enabledToggle = document.getElementById("scheduled-reports-enabled");
+    if (enabledToggle) enabledToggle.disabled = true;
   }
 
   populateTimezoneSelect(DEFAULT_SCHEDULE_TIMEZONE);
+  renderScheduledReportOptions();
 
-  return { fetchApplicationSettings, renderScheduleCheckboxes, selectedScheduleSlots };
+  return {
+    fetchApplicationSettings,
+    renderScheduleCheckboxes,
+    selectedScheduleSlots,
+    refreshScheduledReportChannelHints: renderScheduledReportOptions
+  };
 }

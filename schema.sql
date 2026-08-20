@@ -50,6 +50,9 @@ CREATE TABLE IF NOT EXISTS application_settings (
     CHECK (weeklySelfTestMode IN ('passive', 'active')),
   weeklySelfTestDay INTEGER NOT NULL DEFAULT 0 CHECK (weeklySelfTestDay BETWEEN 0 AND 6),
   weeklySelfTestTime TEXT NOT NULL DEFAULT '10:00',
+  scheduledReportsEnabled INTEGER NOT NULL DEFAULT 0 CHECK (scheduledReportsEnabled IN (0, 1)),
+  scheduledReportTimes TEXT NOT NULL DEFAULT '[]',
+  scheduledReportChannels TEXT NOT NULL DEFAULT '[]',
   updatedAt INTEGER NOT NULL
 );
 
@@ -114,6 +117,16 @@ CREATE TABLE IF NOT EXISTS notification_outbox (
   deliveryPushoverDevice TEXT,
   deliveryPushoverPriority INTEGER,
   deliveryPushoverSound TEXT,
+  deliveryPurpose TEXT
+    CHECK (
+      deliveryPurpose IS NULL
+      OR deliveryPurpose IN (
+        'scheduled_report',
+        'quality_alert',
+        'test',
+        'self_test'
+      )
+    ),
   manualAttempts INTEGER NOT NULL DEFAULT 0,
   lastManualRetryAt INTEGER,
   FOREIGN KEY (runId) REFERENCES runs(id)

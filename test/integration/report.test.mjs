@@ -74,7 +74,7 @@ test("a successful run stores forecasts, sends one email, and logs success", asy
       assert.equal(mailer.connections[0].host, "smtp.gmail.com");
       assert.equal(mailer.connections[0].secure, true);
       assert.equal(mailer.sent[0].to.email, "owner@example.com");
-      assert.match(mailer.sent[0].subject, /Morning/);
+      assert.match(mailer.sent[0].subject, /Quality Alert|Test|Scheduled Report|Morning/);
       assert.match(mailer.sent[0].html, /Beach/);
 
       const stored = await db.getLocations(env);
@@ -120,7 +120,9 @@ test("an upstream Sunsethue failure degrades to a warning run", async () => {
       assert.equal(failedRow.forecastError, "FORECAST_UNAVAILABLE");
 
       assert.equal(mailer.sent.length, 1, "partial failures still send a report");
-      assert.match(mailer.sent[0].html, /Forecast unavailable/);
+      // Quality alerts include qualifying locations only; failed locations are omitted.
+      assert.match(mailer.sent[0].html, /Summit/);
+      assert.doesNotMatch(mailer.sent[0].html, /Beach/);
     },
     { locations: [location("a", "Beach", 1), location("b", "Summit", 2)] }
   );

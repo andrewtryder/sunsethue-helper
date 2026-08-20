@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { verifyD1ColumnsSync, verifyD1TablesSync } from "../../scripts/lib/cloudflare.mjs";
 import { checkD1Columns } from "../../scripts/lib/doctor-checks.mjs";
+import { summarizeD1Checks } from "../../scripts/prepare-deployment.mjs";
 import { REQUIRED_D1_COLUMNS } from "../../shared/schema-manifest.js";
 
 test("verifyD1TablesSync skips when remote credentials are missing", () => {
@@ -84,5 +85,45 @@ test("checkD1Columns formats doctor output", () => {
   assert.equal(
     checkD1Columns({ missing: [], skipped: false }, REQUIRED_D1_COLUMNS).ok,
     true
+  );
+});
+
+test("summarizeD1Checks reports all-present when nothing is missing", () => {
+  assert.equal(
+    summarizeD1Checks({ missing: [], skipped: false }, { missing: [], skipped: false }),
+    "all required tables and columns present"
+  );
+});
+
+test("summarizeD1Checks is informational — never blocking — when a required column is missing", () => {
+  // Simulates the next release that intentionally declares a new required
+  // column the pre-deploy database does not yet have. Prepare must not block;
+  // the downstream schema job applies the column and db:schema:verify gates.
+  const summary = summarizeD1Checks(
+    { missing: [], skipped: false },
+    { missing: ["notification_outbox.deliveryPurpose"], skipped: false }
+  );
+  assert.match(summary, /^informational — /);
+  assert.match(summary, /columns missing: notification_outbox\.deliveryPurpose/);
+  assert.match(summary, /schema job will apply/);
+});
+
+test("summarizeD1Checks reports missing tables informationally", () => {
+  const summary = summarizeD1Checks(
+    { missing: ["notification_outbox"], skipped: false },
+    { missing: [], skipped: false }
+  );
+  assert.match(summary, /tables missing: notification_outbox/);
+  assert.doesNotMatch(summary, /schema job will apply/);
+});
+
+test("summarizeD1Checks skips when Cloudflare credentials are absent", () => {
+  assert.equal(
+    summarizeD1Checks({ missing: [], skipped: true, reason: "no token" }, { missing: [], skipped: false }),
+    "skipped (no Cloudflare credentials)"
+  );
+  assert.equal(
+    summarizeD1Checks({ missing: [], skipped: false }, { missing: [], skipped: true, reason: "no token" }),
+    "skipped (no Cloudflare credentials)"
   );
 });

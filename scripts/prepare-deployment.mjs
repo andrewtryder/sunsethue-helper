@@ -18,9 +18,11 @@ import {
   setOutputs,
   shortId,
   summarizePagesDeployment,
+  verifyD1ColumnsSync,
   verifyD1TablesSync,
   verifyToken
 } from "./lib/cloudflare.mjs";
+import { summarizeD1Checks } from "./lib/deployment-preflight.mjs";
 
 function assertContext() {
   const repository = process.env.GITHUB_REPOSITORY;
@@ -87,15 +89,14 @@ async function main() {
     );
   }
 
-  // Fail-closed D1 preflight. Confirm every table the Worker touches already
-  // exists in production D1; a fresh table lands via `npm run db:schema:remote`,
-  // never as part of this deploy pipeline.
+  // D1 schema preflight is informational here. The dedicated `schema` job
+  // (after prepare) applies additive schema via `npm run db:schema:remote`
+  // and fail-closes on `npm run db:schema:verify`. If prepare rejected missing
+  // schema, a release that intentionally adds a required column/table could
+  // never reach the apply step. `doctor` and `db:schema:verify` stay strict.
   const d1Check = verifyD1TablesSync();
-  if (!d1Check.skipped && d1Check.missing.length > 0) {
-    problems.push(
-      `Production D1 is missing required table${d1Check.missing.length === 1 ? "" : "s"}: ${d1Check.missing.join(", ")}. Run "npm run db:schema:remote" before deploying.`
-    );
-  }
+  const d1ColumnCheck = verifyD1ColumnsSync();
+  const d1Summary = summarizeD1Checks(d1Check, d1ColumnCheck);
 
   const previousPages = summarizePagesDeployment(deployments[0]);
 
@@ -106,7 +107,7 @@ async function main() {
     `| Pages deployment commit | \`${(previousPages?.commit ?? "unknown").slice(0, 12)}\` |`,
     `| Cron triggers | \`${cronExpressions.join(", ") || "none"}\` |`,
     `| Worker bindings | ${bindingNamesOnly.length} present (names only) |`,
-    `| D1 schema preflight | ${d1Check.skipped ? "skipped (no Cloudflare credentials)" : d1Check.missing.length === 0 ? "all required tables present" : `missing: ${d1Check.missing.join(", ")}`} |`
+    `| D1 schema preflight | ${d1Summary} |`
   ];
 
   await appendJobSummary(

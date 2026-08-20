@@ -70,6 +70,11 @@ export function initHealth({ api, formatDateTime = (v) => v, capabilities }) {
     } catch {
       if (summary) summary.textContent = "Unable to load notification health.";
       if (selfTestHost) selfTestHost.textContent = "Unable to load self-test status.";
+      for (const id of new Set(Object.values(CHANNEL_SUBTITLE_IDS))) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = "Status temporarily unavailable";
+      }
+      if (skipsHost) skipsHost.innerHTML = "";
     }
   }
 

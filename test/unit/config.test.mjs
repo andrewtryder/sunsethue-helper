@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { generateWranglerConfig } from "../../scripts/generate-wrangler-config.mjs";
 import { PROJECT } from "../../scripts/lib/cloudflare.mjs";
-import { REQUIRED_D1_TABLES } from "../../shared/schema-manifest.js";
+import { REQUIRED_D1_COLUMNS, REQUIRED_D1_TABLES } from "../../shared/schema-manifest.js";
 
 const ROOT = new URL("../../", import.meta.url);
 const ROOT_PATH = fileURLToPath(ROOT);
@@ -25,6 +25,17 @@ test("deployment preflight uses the shared D1 table manifest", () => {
   assert.ok(REQUIRED_D1_TABLES.includes("web_push_subscriptions"));
   assert.ok(REQUIRED_D1_TABLES.includes("health_check_runs"));
   assert.ok(REQUIRED_D1_TABLES.includes("admin_audit_events"));
+});
+
+test("deployment preflight requires additive D1 columns from the schema manifest", () => {
+  assert.equal(PROJECT.requiredD1Columns, REQUIRED_D1_COLUMNS);
+  assert.deepEqual(REQUIRED_D1_COLUMNS.locations, ["scheduleTimes"]);
+  assert.deepEqual(REQUIRED_D1_COLUMNS.application_settings, [
+    "scheduledReportsEnabled",
+    "scheduledReportTimes",
+    "scheduledReportChannels"
+  ]);
+  assert.deepEqual(REQUIRED_D1_COLUMNS.notification_outbox, ["deliveryPurpose"]);
 });
 
 test("the Worker template keeps the Worker private with a cron and D1 binding", async () => {

@@ -56,17 +56,68 @@ test("production deploys on main pushes and manual dispatch, serialized and neve
   assert.deepEqual(production.permissions, { contents: "read" });
 });
 
-test("production job order enforces validate, prepare, worker, pages, verify, release", () => {
+test("production job order enforces validate, prepare, schema, worker, pages, verify, release", () => {
   const production = workflow("production.yml");
   const jobs = production.jobs;
 
   assert.equal(jobs.validate.uses, "./.github/workflows/validate.yml");
   assert.deepEqual([].concat(jobs.prepare.needs), ["validate"]);
-  assert.equal(jobs.migrate, undefined, "D1 migrations are not part of the pipeline");
-  assert.deepEqual([].concat(jobs["deploy-worker"].needs), ["prepare"]);
+  assert.equal(jobs.migrate, undefined, "versioned D1 migrations are not a separate pipeline job");
+  assert.deepEqual([].concat(jobs.schema.needs), ["prepare"]);
+  assert.deepEqual([].concat(jobs["deploy-worker"].needs).sort(), ["prepare", "schema"]);
   assert.ok([].concat(jobs["deploy-pages"].needs).includes("deploy-worker"));
   assert.ok([].concat(jobs.verify.needs).includes("deploy-pages"));
   assert.deepEqual([].concat(jobs.release.needs), ["verify"]);
+});
+
+test("the schema job applies and verifies D1 schema before Worker deploy", () => {
+  const production = workflow("production.yml");
+  const schemaSteps = production.jobs.schema.steps.map((step) => step.name);
+  const applyIdx = schemaSteps.indexOf("Apply D1 schema");
+  const verifyIdx = schemaSteps.indexOf("Verify required D1 columns");
+
+  assert.ok(applyIdx >= 0, "Apply D1 schema step must exist in the schema job");
+  assert.ok(verifyIdx >= 0, "Verify required D1 columns step must exist in the schema job");
+  assert.ok(applyIdx < verifyIdx, "schema apply must run before column verify");
+  assert.equal(production.jobs.schema.steps[applyIdx].run, "npm run db:schema:remote");
+  assert.equal(production.jobs.schema.steps[verifyIdx].run, "npm run db:schema:verify");
+
+  const workerSteps = production.jobs["deploy-worker"].steps.map((step) => step.name);
+  assert.equal(
+    workerSteps.indexOf("Apply D1 schema"),
+    -1,
+    "deploy-worker must not apply schema (moved to the schema job)"
+  );
+  assert.equal(
+    workerSteps.indexOf("Verify required D1 columns"),
+    -1,
+    "deploy-worker must not verify schema (moved to the schema job)"
+  );
+});
+
+test("schema and deploy-worker are skipped on dry-run dispatch", () => {
+  const production = workflow("production.yml");
+  assert.equal(
+    production.jobs.schema.if,
+    "${{ inputs.dry_run != true }}",
+    "schema must be skipped on dry-run"
+  );
+  assert.equal(
+    production.jobs["deploy-worker"].if,
+    "${{ inputs.dry_run != true }}",
+    "deploy-worker must be skipped on dry-run"
+  );
+});
+
+test("a failed schema job blocks Worker deployment by dependency", () => {
+  const production = workflow("production.yml");
+  // GitHub Actions skips a downstream job when any `needs` entry fails or is
+  // skipped. deploy-worker needs schema, so a failed apply/verify prevents
+  // Worker deploy without any extra guard.
+  assert.ok(
+    [].concat(production.jobs["deploy-worker"].needs).includes("schema"),
+    "deploy-worker must depend on the schema job"
+  );
 });
 
 test("only the release job holds write permissions, and only what Release Please needs", () => {
@@ -84,7 +135,7 @@ test("only the release job holds write permissions, and only what Release Please
 
 test("every production job that touches Cloudflare uses the production environment", () => {
   const production = workflow("production.yml");
-  const cloudflareJobs = ["prepare", "deploy-worker", "deploy-pages", "verify"];
+  const cloudflareJobs = ["prepare", "schema", "deploy-worker", "deploy-pages", "verify"];
   for (const name of cloudflareJobs) {
     assert.equal(
       production.jobs[name].environment?.name,

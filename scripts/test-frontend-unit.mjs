@@ -14,6 +14,7 @@ import {
   shouldSearchAutocomplete,
   mapGeolocationError
 } from "../public/lib/helpers.js";
+import { initHealth } from "../public/features/health.js";
 
 test("frontend helpers escape and render forecast badges", () => {
   assert.match(getForecastBadgeHtml(0.85, "Great"), /quality-meter/);
@@ -80,4 +81,44 @@ test("frontend helpers map geolocation errors", () => {
   assert.match(mapGeolocationError(1, geolocationErrors), /permission denied/i);
   assert.match(mapGeolocationError(2, geolocationErrors), /unavailable/i);
   assert.match(mapGeolocationError(3, geolocationErrors), /timed out/i);
+});
+
+test("health fetch failure clears stuck Loading… channel subtitles", async () => {
+  const elements = {
+    "notification-health-summary": { textContent: "", innerHTML: "" },
+    "notification-health-skips": { textContent: "", innerHTML: "<p>prior</p>" },
+    "notification-health-selftest": { textContent: "", innerHTML: "" },
+    "email-channel-subtitle": { textContent: "Loading…", innerHTML: "" },
+    "pushover-channel-subtitle": { textContent: "Loading…", innerHTML: "" },
+    "webpush-channel-subtitle": { textContent: "Loading…", innerHTML: "" },
+    "webhook-channel-subtitle": { textContent: "Loading…", innerHTML: "" }
+  };
+  const previousDocument = globalThis.document;
+  globalThis.document = {
+    getElementById(id) {
+      return elements[id] || null;
+    }
+  };
+
+  try {
+    const { fetchOperationalStatus } = initHealth({
+      api: {
+        async get() {
+          throw new Error("health unavailable");
+        }
+      }
+    });
+    await fetchOperationalStatus();
+
+    assert.equal(elements["notification-health-summary"].textContent, "Unable to load notification health.");
+    assert.equal(elements["notification-health-selftest"].textContent, "Unable to load self-test status.");
+    assert.equal(elements["email-channel-subtitle"].textContent, "Status temporarily unavailable");
+    assert.equal(elements["pushover-channel-subtitle"].textContent, "Status temporarily unavailable");
+    assert.equal(elements["webpush-channel-subtitle"].textContent, "Status temporarily unavailable");
+    assert.equal(elements["webhook-channel-subtitle"].textContent, "Status temporarily unavailable");
+    assert.equal(elements["notification-health-skips"].innerHTML, "");
+  } finally {
+    if (previousDocument === undefined) delete globalThis.document;
+    else globalThis.document = previousDocument;
+  }
 });

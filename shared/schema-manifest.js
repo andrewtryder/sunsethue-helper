@@ -17,6 +17,21 @@ export const REQUIRED_D1_TABLES = Object.freeze([
   "admin_audit_events"
 ]);
 
+/**
+ * Additive columns that CREATE TABLE IF NOT EXISTS cannot guarantee.
+ * Kept in sync with scripts/lib/apply-schema-alters.mjs.
+ * Keys are table names; values are required column names.
+ */
+export const REQUIRED_D1_COLUMNS = Object.freeze({
+  locations: Object.freeze(["scheduleTimes"]),
+  application_settings: Object.freeze([
+    "scheduledReportsEnabled",
+    "scheduledReportTimes",
+    "scheduledReportChannels"
+  ]),
+  notification_outbox: Object.freeze(["deliveryPurpose"])
+});
+
 /** Channels validated in application code (not a DB CHECK enum). */
 export const NOTIFICATION_CHANNELS = Object.freeze([
   "email",

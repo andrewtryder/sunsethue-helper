@@ -117,6 +117,7 @@ export function formatUtcOffsetLabel(timeZone, at = Date.now()) {
       normalized = "UTC+00:00";
     }
     normalized = normalized.replace(/UTC([+-])(\d)(?=:)/, (_, sign, hour) => `UTC${sign}0${hour}`);
+    normalized = normalized.replace(/UTC([+-])(\d)$/, (_, sign, hour) => `UTC${sign}0${hour}:00`);
     normalized = normalized.replace(/UTC([+-])(\d{2})$/, (_, sign, hour) => `UTC${sign}${hour}:00`);
     return normalized.replace(/-/g, "−");
   } catch {

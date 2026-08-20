@@ -156,21 +156,15 @@ export function buildOccurrenceKey(scheduleTimezone, parts) {
 
 /**
  * Resolve which IANA zone to use when formatting times for display.
+ * Application timezone (`scheduleTimezone`) is authoritative; legacy
+ * displayTimezoneMode / displayTimezone fields are ignored.
  * @param {{ displayTimezoneMode?: string, displayTimezone?: string|null, scheduleTimezone?: string }} settings
- * @param {string|null|undefined} deviceTimeZone
+ * @param {string|null|undefined} _deviceTimeZone unused compatibility arg
  */
-export function resolveDisplayTimeZone(settings, deviceTimeZone) {
-  const scheduleTz = settings?.scheduleTimezone && isValidIanaTimeZone(settings.scheduleTimezone)
+export function resolveDisplayTimeZone(settings, _deviceTimeZone) {
+  return settings?.scheduleTimezone && isValidIanaTimeZone(settings.scheduleTimezone)
     ? settings.scheduleTimezone
     : DEFAULT_SCHEDULE_TIMEZONE;
-  const mode = settings?.displayTimezoneMode || "schedule";
-  if (mode === "device" && deviceTimeZone && isValidIanaTimeZone(deviceTimeZone)) {
-    return deviceTimeZone;
-  }
-  if (mode === "selected" && settings?.displayTimezone && isValidIanaTimeZone(settings.displayTimezone)) {
-    return settings.displayTimezone;
-  }
-  return scheduleTz;
 }
 
 /**

@@ -18,6 +18,7 @@ import {
   setOutputs,
   shortId,
   summarizePagesDeployment,
+  verifyD1ColumnsSync,
   verifyD1TablesSync,
   verifyToken
 } from "./lib/cloudflare.mjs";
@@ -87,9 +88,9 @@ async function main() {
     );
   }
 
-  // Fail-closed D1 preflight. Confirm every table the Worker touches already
-  // exists in production D1; a fresh table lands via `npm run db:schema:remote`,
-  // never as part of this deploy pipeline.
+  // Fail-closed D1 preflight. Confirm every table and additive column the Worker
+  // touches already exists in production D1. Fresh schema lands via
+  // `npm run db:schema:remote` (also applied in deploy-worker before Workers ship).
   const d1Check = verifyD1TablesSync();
   if (!d1Check.skipped && d1Check.missing.length > 0) {
     problems.push(
@@ -97,7 +98,25 @@ async function main() {
     );
   }
 
+  const d1ColumnCheck = verifyD1ColumnsSync();
+  if (!d1ColumnCheck.skipped && d1ColumnCheck.missing.length > 0) {
+    problems.push(
+      `Production D1 is missing required column${d1ColumnCheck.missing.length === 1 ? "" : "s"}: ${d1ColumnCheck.missing.join(", ")}. Run "npm run db:schema:remote" before deploying.`
+    );
+  }
+
   const previousPages = summarizePagesDeployment(deployments[0]);
+
+  const d1TableSummary = d1Check.skipped
+    ? "skipped (no Cloudflare credentials)"
+    : d1Check.missing.length === 0
+      ? "all required tables present"
+      : `missing: ${d1Check.missing.join(", ")}`;
+  const d1ColumnSummary = d1ColumnCheck.skipped
+    ? "skipped (no Cloudflare credentials)"
+    : d1ColumnCheck.missing.length === 0
+      ? "all required columns present"
+      : `missing: ${d1ColumnCheck.missing.join(", ")}`;
 
   const rows = [
     `| Commit | \`${commitSha.slice(0, 12)}\` |`,
@@ -106,7 +125,7 @@ async function main() {
     `| Pages deployment commit | \`${(previousPages?.commit ?? "unknown").slice(0, 12)}\` |`,
     `| Cron triggers | \`${cronExpressions.join(", ") || "none"}\` |`,
     `| Worker bindings | ${bindingNamesOnly.length} present (names only) |`,
-    `| D1 schema preflight | ${d1Check.skipped ? "skipped (no Cloudflare credentials)" : d1Check.missing.length === 0 ? "all required tables present" : `missing: ${d1Check.missing.join(", ")}`} |`
+    `| D1 schema preflight | ${d1TableSummary}; ${d1ColumnSummary} |`
   ];
 
   await appendJobSummary(

@@ -7,7 +7,7 @@
  */
 import { appendFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
-import { REQUIRED_D1_TABLES } from "../../shared/schema-manifest.js";
+import { REQUIRED_D1_COLUMNS, REQUIRED_D1_TABLES } from "../../shared/schema-manifest.js";
 import { resolveProject } from "./project-config.mjs";
 
 const API_BASE = "https://api.cloudflare.com/client/v4";
@@ -31,7 +31,8 @@ export const PROJECT = {
     "CONTACT_EMAIL"
   ],
   requiredAdminSecretNames: ["CLOUDFLARE_API_TOKEN"],
-  requiredD1Tables: REQUIRED_D1_TABLES
+  requiredD1Tables: REQUIRED_D1_TABLES,
+  requiredD1Columns: REQUIRED_D1_COLUMNS
 };
 
 export function requireEnv(name) {
@@ -230,12 +231,67 @@ export function verifyD1TablesSync({
     };
   }
 
-  const names = extractTableNames(result.stdout);
+  const names = extractNamedFields(result.stdout);
   const missing = required.filter((table) => !names.has(table));
   return { missing, skipped: false };
 }
 
-function extractTableNames(stdout) {
+/**
+ * Confirm additive columns from REQUIRED_D1_COLUMNS exist via PRAGMA table_info.
+ * Never mutates D1. Returns missing entries as "table.column".
+ *
+ * @returns {{ missing: string[], skipped: boolean, reason?: string }}
+ */
+export function verifyD1ColumnsSync({
+  configPath = "wrangler.worker.toml",
+  cwd = process.cwd(),
+  required = PROJECT.requiredD1Columns,
+  spawn = spawnSync,
+  environment = "remote"
+} = {}) {
+  if (environment === "remote" && (!process.env.CLOUDFLARE_API_TOKEN || !process.env.CLOUDFLARE_ACCOUNT_ID)) {
+    return { missing: [], skipped: true, reason: "CLOUDFLARE_API_TOKEN or CLOUDFLARE_ACCOUNT_ID is not set" };
+  }
+
+  const missing = [];
+  for (const [table, columns] of Object.entries(required)) {
+    const result = spawn(
+      "npx",
+      [
+        "--no",
+        "wrangler",
+        "d1",
+        "execute",
+        PROJECT.d1Name,
+        "--config",
+        configPath,
+        environment === "remote" ? "--remote" : "--local",
+        "--json",
+        "--command",
+        `PRAGMA table_info(${table});`
+      ],
+      { cwd, encoding: "utf8", shell: false }
+    );
+
+    if (result.status !== 0) {
+      for (const column of columns) {
+        missing.push(`${table}.${column}`);
+      }
+      continue;
+    }
+
+    const present = extractNamedFields(result.stdout);
+    for (const column of columns) {
+      if (!present.has(column)) {
+        missing.push(`${table}.${column}`);
+      }
+    }
+  }
+
+  return { missing, skipped: false };
+}
+
+function extractNamedFields(stdout) {
   const found = new Set();
   if (!stdout) return found;
   try {
@@ -256,7 +312,7 @@ function extractTableNames(stdout) {
     };
     walk(parsed);
   } catch {
-    // Fall back to matching bare table-name lines wrangler prints in text mode.
+    // Fall back to matching bare name fields wrangler prints in text mode.
     for (const line of stdout.split(/\r?\n/)) {
       const match = /"name"\s*:\s*"([^"]+)"/.exec(line);
       if (match) found.add(match[1]);

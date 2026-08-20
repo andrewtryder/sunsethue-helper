@@ -39,6 +39,7 @@
     "ci": "npm run lint && npm run audit && npm run lint:shell && npm run lint:workflows && npm run validate:wrangler && npm run test:coverage",
     "db:schema:local": "node scripts/db-schema-local.mjs",
     "db:schema:remote": "node scripts/db-schema-remote.mjs",
+    "db:schema:verify": "node scripts/verify-d1-schema.mjs",
     "doctor": "node scripts/doctor.mjs",
     "setup": "node scripts/setup.mjs",
     "demo:build": "node scripts/build-demo.mjs",

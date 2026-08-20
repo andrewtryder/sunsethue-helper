@@ -31,6 +31,21 @@ export function checkD1Tables(result, required) {
   };
 }
 
+export function checkD1Columns(result, required) {
+  if (result?.skipped) {
+    return { name: "D1 required columns", ok: false, detail: result.reason || "skipped", skipped: true };
+  }
+  const expected = Object.entries(required || {}).flatMap(([table, columns]) =>
+    columns.map((column) => `${table}.${column}`)
+  );
+  const missing = result?.missing || expected;
+  return {
+    name: "D1 required columns",
+    ok: missing.length === 0,
+    detail: missing.length ? `missing ${missing.join(", ")}` : "all present"
+  };
+}
+
 export function checkSecretsStore(preflight) {
   return {
     name: "Secrets Store provider documents",

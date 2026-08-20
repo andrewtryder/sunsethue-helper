@@ -62,11 +62,31 @@ test("production job order enforces validate, prepare, worker, pages, verify, re
 
   assert.equal(jobs.validate.uses, "./.github/workflows/validate.yml");
   assert.deepEqual([].concat(jobs.prepare.needs), ["validate"]);
-  assert.equal(jobs.migrate, undefined, "D1 migrations are not part of the pipeline");
+  assert.equal(jobs.migrate, undefined, "versioned D1 migrations are not a separate pipeline job");
   assert.deepEqual([].concat(jobs["deploy-worker"].needs), ["prepare"]);
   assert.ok([].concat(jobs["deploy-pages"].needs).includes("deploy-worker"));
   assert.ok([].concat(jobs.verify.needs).includes("deploy-pages"));
   assert.deepEqual([].concat(jobs.release.needs), ["verify"]);
+});
+
+test("deploy-worker applies and verifies D1 schema before Worker deploys", () => {
+  const production = workflow("production.yml");
+  const steps = production.jobs["deploy-worker"].steps.map((step) => step.name);
+  const applyIdx = steps.indexOf("Apply D1 schema");
+  const verifyIdx = steps.indexOf("Verify required D1 columns");
+  const adminIdx = steps.indexOf("Deploy credential-admin Worker");
+  const mainIdx = steps.indexOf("Deploy main Worker");
+
+  assert.ok(applyIdx >= 0, "Apply D1 schema step must exist");
+  assert.ok(verifyIdx >= 0, "Verify required D1 columns step must exist");
+  assert.ok(applyIdx < verifyIdx, "schema apply must run before column verify");
+  assert.ok(verifyIdx < adminIdx, "column verify must run before credential-admin deploy");
+  assert.ok(adminIdx < mainIdx, "credential-admin must deploy before main Worker");
+
+  const applyStep = production.jobs["deploy-worker"].steps[applyIdx];
+  const verifyStep = production.jobs["deploy-worker"].steps[verifyIdx];
+  assert.equal(applyStep.run, "npm run db:schema:remote");
+  assert.equal(verifyStep.run, "npm run db:schema:verify");
 });
 
 test("only the release job holds write permissions, and only what Release Please needs", () => {

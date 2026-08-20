@@ -24,7 +24,7 @@ validate
 | --- | --- |
 | `validate` | Calls the reusable `validate.yml` workflow. Lint, audit, tests, coverage, Wrangler dry-run with placeholder configs. No production secrets. |
 | `prepare` | Generates Wrangler configs from GitHub environment values (`config:generate:strict`), then records the commit SHA, current Worker version, and current Pages production deployment. Confirms the repository, branch, account, project, bindings, and cron. Writes a sanitized job summary. |
-| `deploy-worker` | Regenerates Wrangler configs, then deploys the Worker first. Must stay backward compatible with the still-running previous Pages frontend. |
+| `deploy-worker` | Regenerates Wrangler configs, applies additive D1 schema (`db:schema:remote`) and verifies required columns, then deploys the Workers. Must stay backward compatible with the still-running previous Pages frontend. |
 | `deploy-pages` | Regenerates Wrangler configs, then deploys the Pages frontend and the `/api/*` Function with the `API_SERVICE` binding. |
 | `verify` | Unauthenticated negative checks (Access gate, workers.dev bypass, Pages commit, bindings, cron). Records exact rollback identifiers. |
 | `release` | Runs Release Please **after** verification, so a GitHub release cannot be published ahead of a working deployment. |
@@ -39,8 +39,11 @@ First-time operators can run `npm run setup` (interactive) and later `npm run do
 For any change that adds tables, columns, or indexes:
 
 1. Snapshot production D1 with Cloudflare **Time Travel** first.
-2. Run `npm run db:schema:remote` locally (or from a trusted environment with `CLOUDFLARE_API_TOKEN`) to apply the new `schema.sql` and any additive alters (for example `locations.scheduleTimes`). The script is idempotent and never drops or mutates existing rows.
-3. Trigger the `Production` workflow. The preflight check confirms the required tables exist before Wrangler ships Worker code that would depend on them.
+2. Land the additive change in `schema.sql` / `scripts/lib/apply-schema-alters.mjs` and list any new columns in `REQUIRED_D1_COLUMNS` (`shared/schema-manifest.js`).
+3. Merge to `main`. The `Production` workflow's `deploy-worker` job runs `npm run db:schema:remote` and `npm run db:schema:verify` before Workers deploy, so additive schema is applied and checked in the same run.
+4. `prepare` also fail-closes on missing required tables/columns on the next release (intentional if someone skips schema outside the pipeline).
+
+Operators can still run `npm run db:schema:remote` locally with `CLOUDFLARE_API_TOKEN` for emergency repair; the script is idempotent and never drops or mutates existing rows.
 
 Access (Zero Trust) setup is also outside this pipeline; use the local `access:*` scripts.
 
@@ -97,7 +100,7 @@ Automated verification asserts:
 6. The cron trigger is still configured.
 7. No response body discloses a credential-shaped value.
 
-Production deploy order: Secrets Store preflight → upload main + credential-admin secrets → deploy credential-admin Worker → deploy main Worker → Pages.
+Production deploy order: Apply D1 schema → verify required columns → Secrets Store preflight → upload main + credential-admin secrets → deploy credential-admin Worker → deploy main Worker → Pages.
 
 Authenticated browser verification remains a documented manual step. CI never holds a human Access cookie or a real Access JWT.
 

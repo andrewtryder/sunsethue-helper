@@ -7,15 +7,17 @@ import {
   getPagesProject,
   getWorkerSchedules,
   getWorkerSubdomain,
+  verifyD1ColumnsSync,
   verifyD1TablesSync,
   verifyToken,
   looksLikeSecret
 } from "./lib/cloudflare.mjs";
 import { preflightSecretsStore } from "./lib/secrets-store.mjs";
-import { REQUIRED_D1_TABLES } from "../shared/schema-manifest.js";
+import { REQUIRED_D1_COLUMNS, REQUIRED_D1_TABLES } from "../shared/schema-manifest.js";
 import {
   checkAccessRedirect,
   checkCron,
+  checkD1Columns,
   checkD1Tables,
   checkEnvPresent,
   checkPagesBinding,
@@ -79,6 +81,7 @@ async function main() {
   }
 
   results.push(checkD1Tables(verifyD1TablesSync({ required: REQUIRED_D1_TABLES }), REQUIRED_D1_TABLES));
+  results.push(checkD1Columns(verifyD1ColumnsSync({ required: REQUIRED_D1_COLUMNS }), REQUIRED_D1_COLUMNS));
 
   try {
     await preflightSecretsStore(process.env.SECRETS_STORE_ID);

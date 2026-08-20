@@ -134,6 +134,24 @@ test("scheduled reports default disabled and inherit missing fields on save", as
   });
 });
 
+test("stale client zero-overlap disables scheduled reports instead of rejecting", async () => {
+  await withEnv(async (env) => {
+    await saveApplicationSettings(env, {
+      ...coreSettings(),
+      scheduledReportsEnabled: true,
+      scheduledReportTimes: ["06:00", "18:00"],
+      scheduledReportChannels: ["email"]
+    }, NOW);
+
+    const reconciled = await saveApplicationSettings(env, coreSettings({
+      scheduleTimes: ["09:00", "12:00"]
+    }), NOW + 1);
+    assert.equal(reconciled.scheduledReportsEnabled, false);
+    assert.deepEqual(reconciled.scheduledReportTimes, []);
+    assert.deepEqual(reconciled.scheduledReportChannels, ["email"]);
+  });
+});
+
 test("scheduled report times must be a subset of forecast-check times", () => {
   assert.throws(
     () => validateApplicationSettingsInput({
@@ -329,6 +347,61 @@ test("TEST and WEEKLY_SELF_TEST bypass thresholds and set deliveryPurpose", asyn
       }]
     }), env);
     assert.equal(selfJobs[0].deliveryPurpose, "self_test");
+  });
+});
+
+test("below-threshold Manual Test skips with deliveryPurpose test", async () => {
+  await withEnv(async (env) => {
+    await enableChannels(env, { pushover: false });
+    await setRule(env, "loc-sandown", "email", 90);
+    await setRule(env, "loc-portland", "email", 90);
+
+    const jobs = await enqueueNotifications(forecastModel({
+      runId: "run-manual-skip",
+      triggerType: "Manual Test",
+      locations: [{
+        locationId: "loc-sandown",
+        name: "Sandown",
+        sunrise: { time: "2026-07-15T09:00:00Z", quality: 0.2, quality_text: "Poor" },
+        sunset: { time: "2026-07-15T23:00:00Z", quality: 0.3, quality_text: "Poor" },
+        error: null
+      }]
+    }), env);
+
+    assert.equal(jobs.length, 1);
+    assert.equal(jobs[0].channel, "email");
+    assert.equal(jobs[0].status, "skipped");
+    assert.equal(jobs[0].lastErrorCode, "NO_LOCATION_ABOVE_THRESHOLD");
+    assert.equal(jobs[0].deliveryPurpose, "test");
+  });
+});
+
+test("enqueue plans webhook and webpush channels when configured", async () => {
+  await withEnv(async (env) => {
+    await saveApplicationSettings(env, {
+      ...coreSettings(),
+      scheduledReportsEnabled: true,
+      scheduledReportTimes: ["06:00"],
+      scheduledReportChannels: ["webhook", "webpush"]
+    }, NOW);
+
+    const jobs = await enqueueNotifications(forecastModel({ runId: "run-multi-channel" }), env, {
+      webhookConfigured: true,
+      webPushSubscriptions: [{ id: "sub-1" }, { id: "sub-2" }],
+      applicationSettings: await getApplicationSettings(env),
+      settings: {
+        emailEnabled: 0,
+        pushoverEnabled: 0,
+        webhookEnabled: 1
+      }
+    });
+
+    const webhook = jobs.filter((job) => job.channel === "webhook");
+    const webpush = jobs.filter((job) => job.channel === "webpush");
+    assert.equal(webhook.length, 1);
+    assert.equal(webhook[0].deliveryPurpose, "scheduled_report");
+    assert.equal(webpush.length, 2);
+    assert.ok(webpush.every((job) => job.deliveryPurpose === "scheduled_report"));
   });
 });
 

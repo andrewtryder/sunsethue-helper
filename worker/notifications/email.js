@@ -1,9 +1,14 @@
-import { escapeHtml, formatColumnDateET, getQualityBadge } from "../helpers.js";
+import { escapeHtml, getQualityBadge } from "../helpers.js";
 import { NotificationError } from "./errors.js";
 import { inferDeliveryPurpose, parseNotificationPayload } from "./payload.js";
 import { resolveEmailTransport } from "./resolve-email-transport.js";
 import { validateEmailAddress } from "./settings.js";
-import { formatDateTimeMediumWithZone, isValidIanaTimeZone, DEFAULT_SCHEDULE_TIMEZONE } from "../../shared/time-format.js";
+import {
+  formatColumnDateWithZone,
+  formatDateTimeMediumWithZone,
+  isValidIanaTimeZone,
+  DEFAULT_SCHEDULE_TIMEZONE
+} from "../../shared/time-format.js";
 
 const SMTP_TIMEOUT_MS = 30_000;
 
@@ -65,8 +70,15 @@ export function buildHtmlEmail(results, payloadOrTrigger, reportTimeText, dashbo
   const purpose = inferDeliveryPurpose(payload.triggerType, payload.deliveryPurpose ?? null);
   const sunsetFirst = payload.triggerType === "AM" || payload.triggerType === "NOON";
   const headers = headerTimes(results);
-  const firstHeader = sunsetFirst ? `Next Sunset ${formatColumnDateET(headers.sunset)}` : `Next Sunrise ${formatColumnDateET(headers.sunrise)}`;
-  const secondHeader = sunsetFirst ? `Next Sunrise ${formatColumnDateET(headers.sunrise)}` : `Next Sunset ${formatColumnDateET(headers.sunset)}`;
+  const columnZone = isValidIanaTimeZone(payload.displayTimezone)
+    ? payload.displayTimezone
+    : DEFAULT_SCHEDULE_TIMEZONE;
+  const firstHeader = sunsetFirst
+    ? `Next Sunset ${formatColumnDateWithZone(headers.sunset, columnZone)}`
+    : `Next Sunrise ${formatColumnDateWithZone(headers.sunrise, columnZone)}`;
+  const secondHeader = sunsetFirst
+    ? `Next Sunrise ${formatColumnDateWithZone(headers.sunrise, columnZone)}`
+    : `Next Sunset ${formatColumnDateWithZone(headers.sunset, columnZone)}`;
   const rows = results.map((result) => {
     if (result.error) {
       return `<tr><td style="padding:14px 8px;border-bottom:1px solid #e5e7eb;font-size:16px;font-weight:600;">${escapeHtml(result.name)}</td><td colspan="2" style="padding:14px 8px;border-bottom:1px solid #e5e7eb;color:#dc2626;">Forecast unavailable</td></tr>`;

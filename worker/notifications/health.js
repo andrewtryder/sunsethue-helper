@@ -119,9 +119,18 @@ export async function getNotificationHealth(env, deps = {}) {
      ORDER BY COALESCE(sentAt, createdAt) DESC LIMIT 1`
   ).first();
   const lastQualityAlert = await env.DB.prepare(
-    `SELECT sentAt, createdAt FROM notification_outbox
-     WHERE deliveryPurpose = 'quality_alert' AND status = 'sent'
-     ORDER BY COALESCE(sentAt, createdAt) DESC LIMIT 1`
+    `SELECT o.sentAt, o.createdAt
+     FROM notification_outbox o
+     LEFT JOIN runs r ON r.id = o.runId
+     WHERE o.status = 'sent'
+       AND (
+         o.deliveryPurpose = 'quality_alert'
+         OR (
+           o.deliveryPurpose IS NULL
+           AND COALESCE(r.triggerType, '') NOT IN ('TEST', 'Manual Test', 'WEEKLY_SELF_TEST')
+         )
+       )
+     ORDER BY COALESCE(o.sentAt, o.createdAt) DESC LIMIT 1`
   ).first();
   const lastScheduledReportAt = lastScheduledReport
     ? Number(lastScheduledReport.sentAt ?? lastScheduledReport.createdAt)

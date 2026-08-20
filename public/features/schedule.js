@@ -110,12 +110,20 @@ export function initSchedule({
       const label = input.closest("label");
       if (label) {
         const base = SCHEDULED_REPORT_CHANNELS.find((c) => c.id === channel)?.label || channel;
-        label.lastChild.textContent = globallyAvailable
-          ? ` ${base}`
-          : ` ${base} — enable this channel above first`;
+        let hintSuffix = "";
+        if (!globallyAvailable) {
+          hintSuffix = channel === "webpush"
+            ? " — register a device first"
+            : " — enable this channel above first";
+        }
+        label.lastChild.textContent = ` ${base}${hintSuffix}`;
       }
       if (!globallyAvailable) {
-        channelHints.push(`${SCHEDULED_REPORT_CHANNELS.find((c) => c.id === channel)?.label || channel} is globally disabled`);
+        channelHints.push(
+          channel === "webpush"
+            ? "Browser Push has no enabled devices"
+            : `${SCHEDULED_REPORT_CHANNELS.find((c) => c.id === channel)?.label || channel} is globally disabled`
+        );
       }
       input.onchange = () => {
         if (input.checked) {

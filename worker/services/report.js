@@ -246,7 +246,7 @@ export async function enqueueNotifications(model, env, deps = {}) {
         targets: [null],
         status: "skipped",
         lastErrorCode: "NO_LOCATION_ABOVE_THRESHOLD",
-        deliveryPurpose: "quality_alert"
+        deliveryPurpose: isManualTest ? "test" : "quality_alert"
       }));
       continue;
     }

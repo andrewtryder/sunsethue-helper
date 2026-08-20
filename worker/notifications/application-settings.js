@@ -143,7 +143,7 @@ export function validateApplicationSettingsInput(input, opts = {}) {
   }
 
   const existing = opts.existing || null;
-  const scheduledReportsEnabled = SCHEDULED_REPORT_FIELDS.has("scheduledReportsEnabled") && "scheduledReportsEnabled" in input
+  let scheduledReportsEnabled = SCHEDULED_REPORT_FIELDS.has("scheduledReportsEnabled") && "scheduledReportsEnabled" in input
     ? input.scheduledReportsEnabled
     : existing?.scheduledReportsEnabled ?? false;
   const scheduledReportTimesInput = "scheduledReportTimes" in input
@@ -199,6 +199,15 @@ export function validateApplicationSettingsInput(input, opts = {}) {
       const allowed = new Set(timesResult.times);
       const inherited = Array.isArray(scheduledReportTimesInput) ? scheduledReportTimesInput : [];
       scheduledReportTimes = inherited.filter((slot) => allowed.has(slot));
+      // Stale clients that omit scheduled-report fields must not fail when
+      // shrinking check times leaves zero overlapping report times.
+      if (
+        !("scheduledReportsEnabled" in input)
+        && scheduledReportTimes.length === 0
+        && scheduledReportsEnabled === true
+      ) {
+        scheduledReportsEnabled = false;
+      }
     }
   } catch (error) {
     if (error instanceof NotificationError) throw error;

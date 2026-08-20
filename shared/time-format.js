@@ -218,6 +218,28 @@ export function formatDateTimeMediumWithZone(value, timeZone) {
   });
 }
 
+/**
+ * Compact weekday+date for email column headings, e.g. "(Thu, Aug 20)".
+ * Falls back to the application default timezone when the zone is invalid.
+ */
+export function formatColumnDateWithZone(utcString, timeZone) {
+  if (!utcString) return "";
+  const ms = Date.parse(utcString);
+  if (!Number.isFinite(ms)) return "";
+  const tz = isValidIanaTimeZone(timeZone) ? timeZone : DEFAULT_SCHEDULE_TIMEZONE;
+  try {
+    const formatted = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz,
+      weekday: "short",
+      month: "short",
+      day: "numeric"
+    }).format(new Date(ms));
+    return `(${formatted})`;
+  } catch {
+    return "";
+  }
+}
+
 export function defaultApplicationSettings(now = Date.now()) {
   return {
     scheduleTimezone: DEFAULT_SCHEDULE_TIMEZONE,

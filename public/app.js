@@ -192,7 +192,7 @@ async function fetchNotificationDeliveries() {
 // ── Feature wiring ───────────────────────────────────────────────────
 
 let globalScheduleTimes = ["06:00", "12:00", "18:00"];
-let channelAvailability = { email: true, pushover: true, webpush: true, webhook: true };
+let channelAvailability = { email: true, pushover: true, webpush: false, webhook: true };
 
 const { fetchApplicationSettings, refreshScheduledReportChannelHints } = initSchedule({
   api,
@@ -243,7 +243,7 @@ const { fetchNotificationSettings, fetchProviderCredentials } = initNotification
     channelAvailability = {
       email: Boolean(settings?.emailEnabled),
       pushover: Boolean(settings?.pushoverEnabled),
-      webpush: true,
+      webpush: channelAvailability.webpush,
       webhook: Boolean(settings?.webhookEnabled)
     };
     applyNotificationSettings(settings);
@@ -331,6 +331,19 @@ async function loadSettingsState() {
       fetchLocationRules(),
       browserNotifications.fetchWebPushDevices()
     ]);
+    const pushOutcome = outcomes[6];
+    if (pushOutcome.status === "fulfilled") {
+      const enabledCount = Number(pushOutcome.value?.enabledCount || 0);
+      channelAvailability = { ...channelAvailability, webpush: enabledCount > 0 };
+      if (typeof refreshScheduledReportChannelHints === "function") {
+        refreshScheduledReportChannelHints();
+      }
+    } else {
+      channelAvailability = { ...channelAvailability, webpush: false };
+      if (typeof refreshScheduledReportChannelHints === "function") {
+        refreshScheduledReportChannelHints();
+      }
+    }
     for (const outcome of outcomes) {
       if (outcome.status === "rejected") {
         console.warn("Settings panel failed to load:", outcome.reason);

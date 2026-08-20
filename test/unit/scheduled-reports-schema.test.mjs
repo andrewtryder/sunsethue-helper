@@ -8,15 +8,38 @@ import { getApplicationSettings } from "../../worker/notifications/application-s
 import { normalizeDeliveryPurpose } from "../../worker/db.js";
 
 const ALTERS = [
-  "ALTER TABLE application_settings ADD COLUMN scheduledReportsEnabled INTEGER NOT NULL DEFAULT 0",
+  "ALTER TABLE application_settings ADD COLUMN scheduledReportsEnabled INTEGER NOT NULL DEFAULT 0 CHECK (scheduledReportsEnabled IN (0, 1))",
   "ALTER TABLE application_settings ADD COLUMN scheduledReportTimes TEXT NOT NULL DEFAULT '[]'",
   "ALTER TABLE application_settings ADD COLUMN scheduledReportChannels TEXT NOT NULL DEFAULT '[]'",
-  "ALTER TABLE notification_outbox ADD COLUMN deliveryPurpose TEXT"
+  `ALTER TABLE notification_outbox ADD COLUMN deliveryPurpose TEXT CHECK (
+    deliveryPurpose IS NULL
+    OR deliveryPurpose IN (
+      'scheduled_report',
+      'quality_alert',
+      'test',
+      'self_test'
+    )
+  )`
 ];
 
 function isIgnorableAlterError(error) {
   const text = String(error?.message || error || "").toLowerCase();
   return text.includes("duplicate column") || text.includes("already exists");
+}
+
+function assertRejectsInvalidValues(database) {
+  assert.throws(
+    () => database.prepare(
+      `UPDATE application_settings SET scheduledReportsEnabled = 2 WHERE id = 1`
+    ).run(),
+    /constraint/i
+  );
+  assert.throws(
+    () => database.prepare(
+      `UPDATE notification_outbox SET deliveryPurpose = 'bogus' WHERE id = 'legacy'`
+    ).run(),
+    /constraint/i
+  );
 }
 
 test("clean schema install includes scheduled-report defaults", async () => {
@@ -33,7 +56,6 @@ test("clean schema install includes scheduled-report defaults", async () => {
 
 test("additive alters are safe to rerun on an existing DB", async () => {
   const database = new DatabaseSync(":memory:");
-  // Minimal pre-feature application_settings / outbox shape.
   database.exec(`
     CREATE TABLE application_settings (
       id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -92,16 +114,38 @@ test("additive alters are safe to rerun on an existing DB", async () => {
   const outbox = database.prepare("SELECT deliveryPurpose FROM notification_outbox WHERE id = 'legacy'").get();
   assert.equal(outbox.deliveryPurpose, null);
   assert.equal(normalizeDeliveryPurpose({ deliveryPurpose: null, triggerType: "SCHEDULED:06:00" }), "quality_alert");
+
+  assertRejectsInvalidValues(database);
   database.close();
 });
 
-test("full schema.sql installs and exposes deliveryPurpose column", async () => {
+test("full schema.sql installs and rejects invalid scheduled-report values", async () => {
   const schema = await readFile(fileURLToPath(new URL("../../schema.sql", import.meta.url)), "utf8");
   const database = new DatabaseSync(":memory:");
   database.exec(schema);
+  database.exec(`
+    INSERT INTO application_settings (
+      id, scheduleTimezone, displayTimezoneMode, displayTimezone, scheduleTimes,
+      weeklySelfTestEnabled, weeklySelfTestMode, weeklySelfTestDay, weeklySelfTestTime,
+      scheduledReportsEnabled, scheduledReportTimes, scheduledReportChannels, updatedAt
+    ) VALUES (
+      1, 'America/New_York', 'schedule', NULL, '["06:00"]',
+      1, 'passive', 0, '10:00', 0, '[]', '[]', 1
+    );
+    INSERT INTO runs (id, timestamp, triggerType, status, locationsCount, results, error)
+    VALUES ('run-legacy', 1, 'SCHEDULED:06:00', 'success', 0, '[]', NULL);
+    INSERT INTO notification_outbox (
+      id, runId, channel, deliveryTargetId, status, payload, attempts, createdAt, nextAttemptAt, deliveryPurpose
+    ) VALUES (
+      'legacy', 'run-legacy', 'email', NULL, 'sent', '{}', 1, 1, 1, NULL
+    );
+  `);
+
   const cols = database.prepare("PRAGMA table_info(notification_outbox)").all();
   assert.ok(cols.some((col) => col.name === "deliveryPurpose"));
   const appCols = database.prepare("PRAGMA table_info(application_settings)").all();
   assert.ok(appCols.some((col) => col.name === "scheduledReportsEnabled"));
+
+  assertRejectsInvalidValues(database);
   database.close();
 });

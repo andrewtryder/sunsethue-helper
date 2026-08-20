@@ -1,3 +1,9 @@
+import {
+  DEFAULT_SCHEDULE_TIMEZONE,
+  buildTimezoneSelectHtml,
+  isValidIanaTimeZone
+} from "../lib/time-format.js";
+
 const MAX_SCHEDULE_SLOTS = 8;
 
 function formatHourLabel(slot) {
@@ -19,12 +25,22 @@ export function initSchedule({ api, showSuccess, showError, onSettingsUpdate, ca
 
   let selectedTimes = ["06:00", "12:00", "18:00"];
 
-  function populateTimezoneDatalist() {
-    const list = document.getElementById("iana-timezone-list");
-    if (!list || typeof Intl.supportedValuesOf !== "function") return;
-    list.innerHTML = Intl.supportedValuesOf("timeZone")
-      .map((tz) => `<option value="${tz}"></option>`)
-      .join("");
+  function populateTimezoneSelect(selectedValue) {
+    const select = document.getElementById("schedule-timezone");
+    if (!select) return;
+    const value = selectedValue && isValidIanaTimeZone(selectedValue)
+      ? selectedValue
+      : DEFAULT_SCHEDULE_TIMEZONE;
+    select.innerHTML = buildTimezoneSelectHtml(value);
+    select.value = value;
+    if (select.value !== value && isValidIanaTimeZone(value)) {
+      const option = document.createElement("option");
+      option.value = value;
+      option.selected = true;
+      option.textContent = value;
+      select.appendChild(option);
+      select.value = value;
+    }
   }
 
   function selectedScheduleSlots() {
@@ -56,7 +72,6 @@ export function initSchedule({ api, showSuccess, showError, onSettingsUpdate, ca
         });
       });
     } else {
-      // Legacy checkbox host fallback
       const set = new Set(selectedTimes);
       host.innerHTML = HOUR_OPTIONS.map((slot) => {
         const ampm = formatHourLabel(slot);
@@ -74,23 +89,16 @@ export function initSchedule({ api, showSuccess, showError, onSettingsUpdate, ca
     }
   }
 
-  // Back-compat alias used by older call sites / tests
   const renderScheduleCheckboxes = renderSchedulePills;
 
   async function fetchApplicationSettings() {
     const data = await api.get("/api/application-settings");
-    const tzInput = document.getElementById("schedule-timezone");
-    if (tzInput) tzInput.value = data.scheduleTimezone || "America/New_York";
+    const tz = data.scheduleTimezone && isValidIanaTimeZone(data.scheduleTimezone)
+      ? data.scheduleTimezone
+      : DEFAULT_SCHEDULE_TIMEZONE;
+    populateTimezoneSelect(tz);
     const label = document.getElementById("schedule-timezone-label");
-    if (label) label.textContent = `Timezone: ${data.scheduleTimezone || "America/New_York"}`;
-    for (const radio of document.querySelectorAll('input[name="display-timezone-mode"]')) {
-      radio.checked = radio.value === (data.displayTimezoneMode || "schedule");
-    }
-    const displayTz = document.getElementById("display-timezone");
-    if (displayTz) {
-      displayTz.value = data.displayTimezone || "";
-      displayTz.hidden = data.displayTimezoneMode !== "selected";
-    }
+    if (label) label.textContent = `Timezone: ${tz}`;
     renderSchedulePills(data.scheduleTimes || ["06:00", "12:00", "18:00"]);
     const selfEnabled = document.getElementById("weekly-self-test-enabled");
     if (selfEnabled) selfEnabled.checked = data.weeklySelfTestEnabled !== false;
@@ -113,7 +121,12 @@ export function initSchedule({ api, showSuccess, showError, onSettingsUpdate, ca
     }
 
     if (typeof onSettingsUpdate === "function") {
-      onSettingsUpdate(data);
+      onSettingsUpdate({
+        ...data,
+        scheduleTimezone: tz,
+        displayTimezoneMode: "schedule",
+        displayTimezone: null
+      });
     }
     return data;
   }
@@ -124,11 +137,15 @@ export function initSchedule({ api, showSuccess, showError, onSettingsUpdate, ca
       showError("Saving application settings is disabled in the static demo.");
       return;
     }
-    const mode = document.querySelector('input[name="display-timezone-mode"]:checked')?.value || "schedule";
+    const scheduleTimezone = document.getElementById("schedule-timezone")?.value?.trim() || "";
+    if (!scheduleTimezone || !isValidIanaTimeZone(scheduleTimezone)) {
+      showError("Choose a valid IANA timezone before saving.");
+      return;
+    }
     const body = {
-      scheduleTimezone: document.getElementById("schedule-timezone")?.value || "America/New_York",
-      displayTimezoneMode: mode,
-      displayTimezone: document.getElementById("display-timezone")?.value || null,
+      scheduleTimezone,
+      displayTimezoneMode: "schedule",
+      displayTimezone: null,
       scheduleTimes: selectedScheduleSlots(),
       weeklySelfTestEnabled: document.getElementById("weekly-self-test-enabled")?.checked !== false,
       weeklySelfTestMode: document.getElementById("weekly-self-test-mode")?.value || "passive",
@@ -142,7 +159,7 @@ export function initSchedule({ api, showSuccess, showError, onSettingsUpdate, ca
         body: JSON.stringify(body)
       });
       if (!response.ok) throw new Error("Schedule settings were not accepted.");
-      showSuccess("Schedule settings saved.");
+      showSuccess("General settings saved.");
       await fetchApplicationSettings();
     } catch (error) {
       showError(error.message);
@@ -163,17 +180,6 @@ export function initSchedule({ api, showSuccess, showError, onSettingsUpdate, ca
     event.target.value = "";
   });
 
-  document.getElementById("save-check-times-btn")?.addEventListener("click", () => {
-    document.getElementById("application-settings-form")?.requestSubmit();
-  });
-  if (!capabilities?.mutations) {
-    const saveTimesBtn = document.getElementById("save-check-times-btn");
-    if (saveTimesBtn) {
-      saveTimesBtn.disabled = true;
-      saveTimesBtn.title = "Saving schedule settings is disabled in the static demo.";
-    }
-  }
-
   document.querySelectorAll("[data-schedule-preset]").forEach((btn) => {
     btn.addEventListener("click", () => {
       if (!capabilities?.mutations) return;
@@ -182,16 +188,15 @@ export function initSchedule({ api, showSuccess, showError, onSettingsUpdate, ca
     });
   });
 
-  document.querySelectorAll('input[name="display-timezone-mode"]').forEach((radio) => {
-    radio.addEventListener("change", () => {
-      const displayTz = document.getElementById("display-timezone");
-      if (displayTz) {
-        displayTz.hidden = document.querySelector('input[name="display-timezone-mode"]:checked')?.value !== "selected";
-      }
-    });
-  });
+  if (!capabilities?.mutations) {
+    const tzSelect = document.getElementById("schedule-timezone");
+    if (tzSelect) {
+      tzSelect.disabled = true;
+      tzSelect.title = "Changing timezone is disabled in the static demo.";
+    }
+  }
 
-  populateTimezoneDatalist();
+  populateTimezoneSelect(DEFAULT_SCHEDULE_TIMEZONE);
 
   return { fetchApplicationSettings, renderScheduleCheckboxes, selectedScheduleSlots };
 }

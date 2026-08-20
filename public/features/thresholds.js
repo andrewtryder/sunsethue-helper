@@ -322,7 +322,8 @@ export function initThresholds({
       const channelDots = CHANNELS.map((channel) => {
         const rule = locRules.find((item) => item.channel === channel);
         const on = ruleValue(rule) !== "off" && getGlobalChannelEnabled(channel);
-        return `<span class="channel-dot${on ? " on" : ""}" title="${CHANNEL_LABELS[channel]}${on ? " on" : " off"}">
+        const state = on ? "on" : "off";
+        return `<span class="channel-dot${on ? " on" : ""}" title="${CHANNEL_LABELS[channel]} ${state}" aria-label="${CHANNEL_LABELS[channel]} ${state}">
           <span class="material-symbols-outlined" aria-hidden="true">${CHANNEL_ICONS[channel]}</span>
         </span>`;
       }).join("");
@@ -331,25 +332,24 @@ export function initThresholds({
       const custom = locationUsesCustomSchedule(loc);
 
       return `<article class="loc-rule-card" data-location-id="${loc.id}">
-        <div class="loc-rule-top">
+        <div class="loc-rule-identity">
           <div class="loc-rule-name">
-            <span class="pin" aria-hidden="true">🌅</span>
             <div>
-              ${escapeHtml(loc.name)}
+              <span class="loc-rule-title">${escapeHtml(loc.name)}</span>
               <span class="coords">${escapeHtml(formatCoords(loc.latitude, loc.longitude))}</span>
             </div>
           </div>
-          <button type="button" class="icon-btn" data-location-edit="${loc.id}" aria-label="Edit ${escapeHtml(loc.name)}" ${!capabilities?.mutations ? "disabled" : ""}>
-            <span class="material-symbols-outlined" aria-hidden="true">edit</span>
-          </button>
-        </div>
-        <div class="loc-rule-meta-row">
-          <div class="channel-dots">${channelDots}</div>
-          <span class="hint-text loc-rule-threshold-line">${escapeHtml(thresholdLine)}</span>
         </div>
         <div class="hint-text loc-rule-schedule-line${custom ? " is-custom" : ""}">
           <span class="material-symbols-outlined" aria-hidden="true">schedule</span>
           ${escapeHtml(scheduleSummaryLabel(loc))}
+        </div>
+        <div class="loc-rule-notify">
+          <div class="channel-dots">${channelDots}</div>
+          <span class="hint-text loc-rule-threshold-line">${escapeHtml(thresholdLine)}</span>
+        </div>
+        <div class="loc-rule-actions">
+          <button type="button" class="btn btn-secondary loc-rule-edit-btn" data-location-edit="${loc.id}" aria-label="Edit ${escapeHtml(loc.name)}" ${!capabilities?.mutations ? "disabled" : ""}>Edit</button>
         </div>
       </article>`;
     }).join("");

@@ -26,6 +26,25 @@ test.describe("Static Demo", () => {
     await expect(harborText).toBeAttached();
   });
 
+  test("settings shows timezone select and default check times", async ({ page, baseURL }) => {
+    await page.goto(`${baseURL}${SUBPATH}`);
+    await page.locator("#nav-settings").click();
+    await expect(page.locator("#schedule-timezone")).toBeVisible();
+    await expect(page.locator("#schedule-timezone")).toHaveJSProperty("tagName", "SELECT");
+    await expect(page.locator("#schedule-timezone")).toBeDisabled();
+    await expect(page.locator("#check-times-block")).toBeVisible();
+    await expect(page.locator("#schedule-times-pills")).toBeVisible();
+    await expect(page.locator('input[name="display-timezone-mode"]')).toHaveCount(0);
+  });
+
+  test("locations list is primary content without global schedule editor", async ({ page, baseURL }) => {
+    await page.goto(`${baseURL}${SUBPATH}`);
+    await page.locator('[data-tab="locations"]:visible').first().click();
+    await expect(page.locator("#pane-locations")).toBeVisible();
+    await expect(page.locator("#check-times-locations-section")).toHaveCount(0);
+    await expect(page.locator("#location-rules-grid .loc-rule-card").first()).toBeVisible();
+  });
+
   test("blocks mutations", async ({ page, baseURL }) => {
     await page.goto(`${baseURL}${SUBPATH}`);
 

@@ -30,9 +30,15 @@ test.describe("Horizon app smoke", () => {
 
     await page.locator('[data-tab="locations"]:visible').first().click();
     await expect(page.locator("#pane-locations")).toBeVisible();
-    await expect(page.locator("#check-times-locations-section")).toBeVisible();
-    await expect(page.locator("#schedule-times-pills")).toBeVisible();
+    await expect(page.locator("#check-times-locations-section")).toHaveCount(0);
+    await expect(page.locator("#pane-locations #check-times-block")).toHaveCount(0);
+    await expect(page.locator("#location-rules-grid")).toBeVisible();
     await expect(page.locator("#location-rules-grid .location-config-empty, #location-rules-grid .loc-rule-card").first()).toBeVisible();
+    const locationsHeading = page.locator("#pane-locations h2");
+    await expect(locationsHeading).toBeVisible();
+    const headingBox = await locationsHeading.boundingBox();
+    const listBox = await page.locator("#location-rules-grid").boundingBox();
+    expect(headingBox && listBox && listBox.y > headingBox.y).toBeTruthy();
 
     await page.locator('[data-tab="activity"]:visible').first().click();
     await expect(page.locator("#pane-activity")).toBeVisible();
@@ -45,7 +51,149 @@ test.describe("Horizon app smoke", () => {
     await expect(page.locator("#channel-card-pushover")).toBeVisible();
     await expect(page.locator("#channel-card-webpush")).toBeVisible();
     await expect(page.locator("#channel-card-webhook")).toBeVisible();
-    await expect(page.locator("#check-times-locations-section")).toBeHidden();
+    await expect(page.locator("#pane-settings #check-times-block")).toBeVisible();
+    await expect(page.locator("#schedule-times-pills")).toBeVisible();
+    await expect(page.locator("#schedule-timezone")).toBeVisible();
+    await expect(page.locator("#schedule-timezone")).toHaveJSProperty("tagName", "SELECT");
+    await expect(page.locator('input[name="display-timezone-mode"]')).toHaveCount(0);
+    await expect(page.locator("#display-timezone")).toHaveCount(0);
+    await expect(page.locator("#iana-timezone-list")).toHaveCount(0);
+    await expect(page.locator("#schedule-timezone")).toHaveValue("America/New_York");
+    const optionLabels = await page.locator("#schedule-timezone option").allTextContents();
+    expect(optionLabels.some((label) => /America\/New_York \(UTC[−+-]/.test(label))).toBeTruthy();
+    expect(optionLabels.some((label) => label.includes("Europe/London"))).toBeTruthy();
+    expect(optionLabels.some((label) => label.includes("Asia/Tokyo"))).toBeTruthy();
+    const groupLabels = await page.locator("#schedule-timezone optgroup").evaluateAll((nodes) =>
+      nodes.map((node) => node.getAttribute("label"))
+    );
+    expect(groupLabels[0]).toBe("United States");
+    expect(groupLabels[1]).toBe("Europe");
+    expect(groupLabels[2]).toBe("Other time zones");
+  });
+
+  test("settings timezone select validates before PUT", async ({ page }) => {
+    let putCount = 0;
+    let lastBody = null;
+    await page.route("**/api/application-settings", async (route) => {
+      if (route.request().method() === "GET") {
+        await fulfillJson(route, {
+          scheduleTimezone: "America/New_York",
+          displayTimezoneMode: "schedule",
+          displayTimezone: null,
+          scheduleTimes: ["06:00", "12:00", "18:00"],
+          weeklySelfTestEnabled: true,
+          weeklySelfTestMode: "passive",
+          weeklySelfTestDay: 0,
+          weeklySelfTestTime: "10:00",
+          quota: {
+            estimatedRequestsPer30Days: 540,
+            scheduledRunsPerDay: 3,
+            activeLocations: 6,
+            estimatedRequestsPerDay: 18
+          }
+        });
+        return;
+      }
+      if (route.request().method() === "PUT") {
+        putCount += 1;
+        lastBody = route.request().postDataJSON();
+        await fulfillJson(route, lastBody);
+        return;
+      }
+      await fulfillJson(route, {});
+    });
+
+    await page.goto("/");
+    await expect(page.locator("#app-container")).toBeVisible({ timeout: 30_000 });
+    await page.locator("#nav-settings").click();
+    await expect(page.locator("#schedule-timezone")).toBeVisible();
+
+    await page.evaluate(() => {
+      const select = document.getElementById("schedule-timezone");
+      select.innerHTML = '<option value="">Select…</option>';
+      select.value = "";
+    });
+    await page.locator("#save-application-settings-btn").click();
+    await expect(page.locator("#db-error-banner")).toBeVisible();
+    expect(putCount).toBe(0);
+
+    await page.evaluate(() => {
+      const select = document.getElementById("schedule-timezone");
+      select.innerHTML = '<option value="Europe/Berlin">Europe/Berlin (UTC+01:00)</option>';
+      select.value = "Europe/Berlin";
+    });
+    await page.locator("#save-application-settings-btn").click();
+    await expect.poll(() => putCount).toBe(1);
+    expect(lastBody).toMatchObject({
+      scheduleTimezone: "Europe/Berlin",
+      displayTimezoneMode: "schedule",
+      displayTimezone: null
+    });
+  });
+
+  test("desktop locations render as full-width rows", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "desktop", "desktop layout only");
+    const location = {
+      id: "loc-row-1",
+      name: "Sandown",
+      latitude: 42.9287,
+      longitude: -71.187,
+      scheduleTimes: null
+    };
+    await page.route("**/api/locations", (route) => fulfillJson(route, [location]));
+    await page.route("**/api/location-notification-rules", (route) => fulfillJson(route, { rules: [] }));
+    await page.goto("/");
+    await expect(page.locator("#app-container")).toBeVisible({ timeout: 30_000 });
+    await page.locator('[data-tab="locations"]:visible').first().click();
+    const card = page.locator(".loc-rule-card").first();
+    await expect(card).toBeVisible();
+    const gridCols = await card.evaluate((el) => getComputedStyle(el).gridTemplateColumns);
+    expect(gridCols.split(" ").length).toBeGreaterThanOrEqual(4);
+    await expect(card.locator(".loc-rule-edit-btn")).toBeVisible();
+  });
+
+  test("forecast desktop columns share spaced grid", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "desktop", "desktop layout only");
+    await page.route("**/api/locations", (route) => fulfillJson(route, [{
+      id: "loc-forecast-1",
+      name: "Harbor",
+      latitude: 40.7,
+      longitude: -74.0,
+      scheduleTimes: null,
+      latestSunriseQuality: 0.7,
+      latestSunriseText: "Good",
+      latestSunriseTime: "2026-08-09T10:00:00.000Z",
+      latestSunsetQuality: 0.8,
+      latestSunsetText: "Great",
+      latestSunsetTime: "2026-08-09T23:00:00.000Z"
+    }]));
+    await page.goto("/");
+    await expect(page.locator("#app-container")).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator(".forecast-table-row").first()).toBeVisible({ timeout: 30_000 });
+    const metrics = await page.evaluate(() => {
+      const header = document.querySelector(".forecast-table-header");
+      const row = document.querySelector(".forecast-table-row");
+      if (!header || !row) return null;
+      const hs = getComputedStyle(header);
+      const rs = getComputedStyle(row);
+      return {
+        headerDisplay: hs.display,
+        rowDisplay: rs.display,
+        headerGap: hs.columnGap,
+        rowGap: rs.columnGap,
+        headerTrackCount: hs.gridTemplateColumns.trim().split(/\s+/).length,
+        rowTrackCount: rs.gridTemplateColumns.trim().split(/\s+/).length,
+        overflowX: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1
+      };
+    });
+    expect(metrics).toBeTruthy();
+    expect(metrics.headerDisplay).toBe("grid");
+    expect(metrics.rowDisplay).toBe("grid");
+    expect(metrics.headerTrackCount).toBe(3);
+    expect(metrics.rowTrackCount).toBe(3);
+    expect(Number.parseFloat(metrics.headerGap)).toBeGreaterThanOrEqual(40);
+    expect(Number.parseFloat(metrics.rowGap)).toBeGreaterThanOrEqual(40);
+    expect(metrics.overflowX).toBeFalsy();
   });
 
   test("location drawer opens and closes with focus restore", async ({ page }) => {
@@ -221,8 +369,9 @@ test.describe("Horizon app smoke", () => {
       ]) {
         await page.locator(tab).first().click();
         await expect(page.locator(pane)).toBeVisible();
-        if (pane === "#pane-locations") {
+        if (pane === "#pane-settings") {
           await expect(page.locator("#quota-estimator .quota-label, #quota-estimator .quota-footnote").first()).toBeVisible();
+          await expect(page.locator("#schedule-timezone")).toBeVisible();
         }
         await expect(page.locator(pane)).toHaveScreenshot(`${pane.slice(1)}.png`, {
           maxDiffPixelRatio: 0.08
@@ -234,7 +383,7 @@ test.describe("Horizon app smoke", () => {
     test.skip(testInfo.project.name !== "mobile", "mobile Locations visual only");
     await page.locator('[data-tab="locations"]:visible').first().click();
     await expect(page.locator("#pane-locations")).toBeVisible();
-    await expect(page.locator("#quota-estimator .quota-label, #quota-estimator .quota-footnote").first()).toBeVisible();
+    await expect(page.locator("#location-rules-grid")).toBeVisible();
     await expect(page.locator("#pane-locations")).toHaveScreenshot("pane-locations-mobile.png", {
       maxDiffPixelRatio: 0.08
     });

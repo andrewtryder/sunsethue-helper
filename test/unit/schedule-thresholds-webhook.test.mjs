@@ -82,6 +82,26 @@ test("quota estimator sums per-location effective schedules", () => {
   assert.equal(estimate.activeLocations, 3);
 });
 
+test("resolveDisplayTimeZone ignores legacy display modes", async () => {
+  const { resolveDisplayTimeZone } = await import("../../shared/time-format.js");
+  assert.equal(
+    resolveDisplayTimeZone({
+      scheduleTimezone: "Europe/Paris",
+      displayTimezoneMode: "device",
+      displayTimezone: "Asia/Tokyo"
+    }, "America/Denver"),
+    "Europe/Paris"
+  );
+  assert.equal(
+    resolveDisplayTimeZone({
+      scheduleTimezone: "bogus",
+      displayTimezoneMode: "selected",
+      displayTimezone: "Europe/London"
+    }, "UTC"),
+    "America/New_York"
+  );
+});
+
 test("webhook URL SSRF guards", () => {
   assert.throws(() => assertSafeWebhookUrl("http://example.com/hook"), CredentialError);
   assert.throws(() => assertSafeWebhookUrl("https://127.0.0.1/hook"), CredentialError);

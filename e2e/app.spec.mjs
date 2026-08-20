@@ -268,6 +268,53 @@ test.describe("Horizon app smoke", () => {
     await expect(page.locator("#location-drawer-rules-host")).not.toContainText("Off globally");
   });
 
+  test("locations still loads rules when notification-settings fails", async ({ page }) => {
+    const location = {
+      id: "loc-e2e-settings-fail",
+      name: "Fault Harbor",
+      latitude: 41.2,
+      longitude: -73.9,
+      scheduleTimes: null
+    };
+    await page.route("**/api/notification-settings", async (route) => {
+      if (route.request().method() === "GET") {
+        await route.fulfill({
+          status: 500,
+          contentType: "application/json",
+          body: JSON.stringify({ error: { code: "INTERNAL", message: "settings boom" } })
+        });
+        return;
+      }
+      await fulfillJson(route, {});
+    });
+    await page.route("**/api/locations", (route) => fulfillJson(route, [location]));
+    await page.route("**/api/location-notification-rules", (route) => {
+      if (route.request().method() === "GET") {
+        return fulfillJson(route, {
+          rules: [
+            { locationId: location.id, channel: "email", enabled: true, thresholdPercent: 60, eventScope: "either" },
+            { locationId: location.id, channel: "pushover", enabled: true, thresholdPercent: 50, eventScope: "either" },
+            { locationId: location.id, channel: "webpush", enabled: true, thresholdPercent: null, eventScope: "either" },
+            { locationId: location.id, channel: "webhook", enabled: true, thresholdPercent: 40, eventScope: "either" }
+          ]
+        });
+      }
+      return fulfillJson(route, {});
+    });
+
+    await page.goto("/");
+    await expect(page.locator("#app-container")).toBeVisible({ timeout: 30_000 });
+    await page.locator('[data-tab="locations"]:visible').first().click();
+    await expect(page.locator(".loc-rule-card").first()).toBeVisible();
+    await expect(page.locator(".loc-rule-threshold-line").first()).toContainText("Email ≥60%");
+    await expect(page.getByText(/Channel enablement status unavailable/i)).toBeVisible();
+
+    await page.locator(`[data-location-edit="${location.id}"]`).click();
+    await expect(page.locator("#location-drawer")).toBeVisible();
+    await expect(page.locator("#location-drawer-rules-host .rule-control")).toHaveCount(4);
+    await expect(page.locator("#location-drawer-rules-host")).not.toContainText("Off globally");
+  });
+
   test("settings keeps provider credentials collapsed by default", async ({ page }) => {
     await page.goto("/");
     await expect(page.locator("#app-container")).toBeVisible({ timeout: 30_000 });

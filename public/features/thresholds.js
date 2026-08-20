@@ -127,9 +127,8 @@ export function initThresholds({
     if (badge) badge.textContent = `${count} of 10`;
   }
 
-  async function fetchLocationRules() {
-    const data = await api.get("/api/location-notification-rules");
-    cachedRules = data.rules || [];
+  function commitRules(data) {
+    cachedRules = data?.rules || [];
     rulesLoaded = true;
     renderLocationRules(cachedRules);
     if (drawerLocationId) {
@@ -138,16 +137,41 @@ export function initThresholds({
     }
   }
 
+  async function fetchLocationRules() {
+    const data = await api.get("/api/location-notification-rules");
+    commitRules(data);
+  }
+
   async function refreshLocationConfiguration() {
     try {
       await refreshLocations();
-      const settings = await api.get("/api/notification-settings");
-      applyNotificationSettings(settings);
-      await fetchLocationRules();
     } catch (error) {
+      showError(error.message || "Unable to load locations.");
+    }
+
+    const [settingsResult, rulesResult] = await Promise.allSettled([
+      api.get("/api/notification-settings"),
+      api.get("/api/location-notification-rules")
+    ]);
+
+    if (settingsResult.status === "fulfilled") {
+      applyNotificationSettings(settingsResult.value);
+    } else {
+      // unknown → controls stay available
+      showError("Channel enablement status unavailable.");
+    }
+
+    if (rulesResult.status === "fulfilled") {
+      commitRules(rulesResult.value);
+    } else {
       rulesLoaded = true;
       renderLocationRules(cachedRules);
-      showError(error.message || "Unable to load location notification settings.");
+      if (drawerLocationId) {
+        const loc = getLocationsList().find((item) => item.id === drawerLocationId);
+        if (loc) renderDrawerLocationConfig(loc);
+      }
+      const reason = rulesResult.reason;
+      showError(reason?.message || "Unable to load location notification rules.");
     }
   }
 

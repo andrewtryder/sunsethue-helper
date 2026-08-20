@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { verifyD1ColumnsSync, verifyD1TablesSync } from "../../scripts/lib/cloudflare.mjs";
 import { checkD1Columns } from "../../scripts/lib/doctor-checks.mjs";
-import { summarizeD1Checks } from "../../scripts/prepare-deployment.mjs";
+import { summarizeD1Checks } from "../../scripts/lib/deployment-preflight.mjs";
 import { REQUIRED_D1_COLUMNS } from "../../shared/schema-manifest.js";
 
 test("verifyD1TablesSync skips when remote credentials are missing", () => {

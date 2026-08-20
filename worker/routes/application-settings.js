@@ -37,6 +37,8 @@ export async function tryHandle(ctx) {
       }),
       quotaNotes: {
         channelsDoNotAffectForecastQuota: true,
+        scheduledReportsReuseForecastChecks: true,
+        qualityAlertsReuseForecastChecks: true,
         manualReportsExcluded: true,
         retriesReuseStoredPayload: true,
         perLocationSchedulesCounted: true

@@ -5,7 +5,19 @@
 import { spawnSync } from "node:child_process";
 
 const ALTERS = [
-  "ALTER TABLE locations ADD COLUMN scheduleTimes TEXT"
+  "ALTER TABLE locations ADD COLUMN scheduleTimes TEXT",
+  "ALTER TABLE application_settings ADD COLUMN scheduledReportsEnabled INTEGER NOT NULL DEFAULT 0 CHECK (scheduledReportsEnabled IN (0, 1))",
+  "ALTER TABLE application_settings ADD COLUMN scheduledReportTimes TEXT NOT NULL DEFAULT '[]'",
+  "ALTER TABLE application_settings ADD COLUMN scheduledReportChannels TEXT NOT NULL DEFAULT '[]'",
+  `ALTER TABLE notification_outbox ADD COLUMN deliveryPurpose TEXT CHECK (
+    deliveryPurpose IS NULL
+    OR deliveryPurpose IN (
+      'scheduled_report',
+      'quality_alert',
+      'test',
+      'self_test'
+    )
+  )`
 ];
 
 function isIgnorableAlterError(output) {

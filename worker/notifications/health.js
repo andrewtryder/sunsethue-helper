@@ -104,17 +104,47 @@ export async function getNotificationHealth(env, deps = {}) {
     stalePushDevices: pushStale.length
   });
 
-  const lastReport = await env.DB.prepare(
+  const lastForecastCheck = await env.DB.prepare(
     `SELECT timestamp FROM runs
      WHERE triggerType LIKE 'SCHEDULED:%' OR triggerType IN ('AM', 'NOON', 'PM')
      ORDER BY timestamp DESC LIMIT 1`
   ).first();
-  const lastReportAt = lastReport && lastReport.timestamp ? Number(lastReport.timestamp) : null;
+  const lastReportAt = lastForecastCheck && lastForecastCheck.timestamp
+    ? Number(lastForecastCheck.timestamp)
+    : null;
+
+  const lastScheduledReport = await env.DB.prepare(
+    `SELECT sentAt, createdAt FROM notification_outbox
+     WHERE deliveryPurpose = 'scheduled_report' AND status = 'sent'
+     ORDER BY COALESCE(sentAt, createdAt) DESC LIMIT 1`
+  ).first();
+  const lastQualityAlert = await env.DB.prepare(
+    `SELECT o.sentAt, o.createdAt
+     FROM notification_outbox o
+     LEFT JOIN runs r ON r.id = o.runId
+     WHERE o.status = 'sent'
+       AND (
+         o.deliveryPurpose = 'quality_alert'
+         OR (
+           o.deliveryPurpose IS NULL
+           AND COALESCE(r.triggerType, '') NOT IN ('TEST', 'Manual Test', 'WEEKLY_SELF_TEST')
+         )
+       )
+     ORDER BY COALESCE(o.sentAt, o.createdAt) DESC LIMIT 1`
+  ).first();
+  const lastScheduledReportAt = lastScheduledReport
+    ? Number(lastScheduledReport.sentAt ?? lastScheduledReport.createdAt)
+    : null;
+  const lastQualityAlertAt = lastQualityAlert
+    ? Number(lastQualityAlert.sentAt ?? lastQualityAlert.createdAt)
+    : null;
 
   const skips = await env.DB.prepare(
     `SELECT id, channel, createdAt, lastErrorCode
      FROM notification_outbox
-     WHERE status = 'skipped' AND lastErrorCode = 'NO_LOCATION_ABOVE_THRESHOLD'
+     WHERE status = 'skipped'
+       AND lastErrorCode = 'NO_LOCATION_ABOVE_THRESHOLD'
+       AND (deliveryPurpose IS NULL OR deliveryPurpose = 'quality_alert')
      ORDER BY createdAt DESC LIMIT 8`
   ).all();
 
@@ -165,11 +195,24 @@ export async function getNotificationHealth(env, deps = {}) {
     }
   ];
 
+  const nextForecastCheck = nextScheduleSlot(settings, new Date(now));
+
   return {
     state,
+    // Compatibility aliases — prefer lastForecastCheckAt / nextForecastCheck in new clients.
     lastReportAt: isoOrNull(lastReportAt),
     lastReportAgeSeconds: lastReportAt == null ? null : Math.max(0, Math.floor((now - lastReportAt) / 1000)),
-    nextScheduled: nextScheduleSlot(settings, new Date(now)),
+    lastForecastCheckAt: isoOrNull(lastReportAt),
+    lastForecastCheckAgeSeconds: lastReportAt == null ? null : Math.max(0, Math.floor((now - lastReportAt) / 1000)),
+    nextScheduled: nextForecastCheck,
+    nextForecastCheck,
+    lastScheduledReportAt: isoOrNull(lastScheduledReportAt),
+    lastQualityAlertAt: isoOrNull(lastQualityAlertAt),
+    scheduledReports: {
+      enabled: settings.scheduledReportsEnabled === true,
+      times: Array.isArray(settings.scheduledReportTimes) ? settings.scheduledReportTimes : [],
+      channels: Array.isArray(settings.scheduledReportChannels) ? settings.scheduledReportChannels : []
+    },
     channels,
     schedule: {
       timeZone: settings.scheduleTimezone,

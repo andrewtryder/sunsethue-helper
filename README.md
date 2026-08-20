@@ -9,9 +9,22 @@ Sunsethue Helper checks sunrise and sunset photo-quality forecasts for the place
 ## What it does
 
 - Save the locations you want to watch
-- Run scheduled forecast checks for upcoming sunrises and sunsets (with dynamic scheduling and thresholds)
-- Notify you by email, browser push, webhook, and Pushover when quality looks worth shooting
-- Keep an activity log of past runs and run self-tests to ensure health
+- Run **forecast checks** on a schedule (these drive Sunsethue API quota)
+- Optionally send **scheduled reports** at selected check times regardless of quality
+- Send **quality alerts** when a location/channel meets its configured threshold
+- Keep an activity log of forecast checks and deliveries, plus weekly self-tests
+
+### Forecast checks, scheduled reports, and quality alerts
+
+**Forecast checks** determine when Sunsethue fetches forecasts and therefore drive API quota. Global default check times (and optional per-location custom schedules) remain the source of truth.
+
+**Scheduled reports** are routine digests sent at selected forecast-check times regardless of quality. They reuse the forecast already fetched for that check and never create extra Sunsethue API calls. Scheduled report times must be a subset of the default forecast-check schedule.
+
+**Quality alerts** are location/channel notifications sent when sunrise or sunset meets the configured quality threshold. Alerts are evaluated on every forecast check and are not edge-triggered in this release — a forecast that stays above threshold may alert on each eligible check.
+
+If a scheduled report and a quality alert are due for the same channel from the same forecast check, Sunsethue sends **one scheduled report** and highlights the qualifying events. It does not send a second quality-alert job for that channel.
+
+Notification payloads and webhooks include `deliveryPurpose` (`scheduled_report`, `quality_alert`, `test`, or `self_test`). Webhooks also send `X-Sunsethue-Purpose`. Browser Push remains payload-less today — Activity still records the correct purpose even though the OS notification body stays generic.
 
 **[View static demo](https://andrewtryder.github.io/sunsethue-helper/)** · **[View screenshots](docs/assets/forecast-dashboard.png)** · **[Deploy your own instance](#for-developers)**
 

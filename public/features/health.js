@@ -43,8 +43,9 @@ export function initHealth({ api, formatDateTime = (v) => v, capabilities }) {
         action_required: "Action required",
         disabled: "Disabled"
       }[health.state] || health.state;
-      const lastReportText = health.lastReportAt ? formatDateTime(health.lastReportAt) : "never";
-      const summaryText = `${stateLabel} · last report ${lastReportText}`;
+      const lastCheckAt = health.lastForecastCheckAt || health.lastReportAt;
+      const lastReportText = lastCheckAt ? formatDateTime(lastCheckAt) : "never";
+      const summaryText = `${stateLabel} · last forecast check ${lastReportText}`;
       if (summary) summary.textContent = summaryText;
 
       for (const ch of health.channels || []) {
@@ -57,8 +58,8 @@ export function initHealth({ api, formatDateTime = (v) => v, capabilities }) {
       if (skipsHost) {
         const skips = health.skips || [];
         skipsHost.innerHTML = skips.length
-          ? `<strong>Recent threshold skips</strong><ul>${skips.map((s) => `<li>${escapeHtml(s.channel)} · ${escapeHtml(s.code)} · ${escapeHtml(s.createdAt ? formatDateTime(s.createdAt) : s.createdAt)}</li>`).join("")}</ul>`
-          : "<p class=\"pane-subtext\">No recent threshold skips.</p>";
+          ? `<strong>Recent quality-alert skips</strong><ul>${skips.map((s) => `<li>${escapeHtml(s.channel)} · ${escapeHtml(s.code)} · ${escapeHtml(s.createdAt ? formatDateTime(s.createdAt) : s.createdAt)}</li>`).join("")}</ul>`
+          : "<p class=\"pane-subtext\">No recent quality-alert skips.</p>";
       }
       if (selfTestHost) {
         selfTestHost.textContent = health.selfTest

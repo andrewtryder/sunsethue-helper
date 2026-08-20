@@ -519,7 +519,7 @@ test("POST /api/triggerReport runs a manual report through the faked mailer", as
       assert.equal(mailer.sent.length, 1);
       const runs = await db.getRuns(env);
       assert.equal(runs[0].triggerType, "Manual Test");
-      assert.match(mailer.sent[0].subject, /On-Demand Test/);
+      assert.match(mailer.sent[0].subject, /Sunsethue Test/);
     },
     {
       locations: [{ id: LOCATION_ID_A, name: "Beach", latitude: 1, longitude: 2, createdAt: 1 }],

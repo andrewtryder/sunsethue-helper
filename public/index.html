@@ -86,7 +86,7 @@
             <div class="section-header locations-page-header">
               <div>
                 <h2>Locations</h2>
-                <p class="pane-subtext">Choose when each place is checked and which channels should notify you.</p>
+                <p class="pane-subtext">Customize forecast checks and quality alerts for each location.</p>
               </div>
               <div class="section-header-actions">
                 <span class="location-counter" id="locations-count-badge">0 of 10</span>
@@ -97,8 +97,13 @@
             <div class="location-rules-heading">
               <h3 id="location-rules-title">Your locations</h3>
               <div class="form-actions form-actions-compact location-rules-bulk-actions">
-                <button type="button" id="rules-copy-all-btn" class="btn btn-secondary">Copy first location to all</button>
-                <button type="button" id="rules-reset-btn" class="btn btn-secondary">Reset to 50%</button>
+                <details class="bulk-alert-menu">
+                  <summary class="btn btn-secondary">Bulk alert actions</summary>
+                  <div class="bulk-alert-menu-panel" role="menu">
+                    <button type="button" id="rules-copy-all-btn" class="btn btn-secondary" role="menuitem">Copy first location's alert rules to all…</button>
+                    <button type="button" id="rules-reset-btn" class="btn btn-secondary" role="menuitem">Set all alert thresholds to 50%…</button>
+                  </div>
+                </details>
               </div>
             </div>
             <div id="location-rules-grid" class="location-rules-list loc-rules-grid" role="region" aria-labelledby="location-rules-title"></div>
@@ -164,8 +169,8 @@
                 </div>
 
                 <div class="drawer-section-heading">
-                  <h4>Notifications</h4>
-                  <p class="pane-subtext">Only this location's thresholds — global channel setup lives in Settings. <span class="autosave-hint">Saved automatically</span></p>
+                  <h4>Quality alerts</h4>
+                  <p class="pane-subtext">Quality alerts are evaluated whenever this location is checked. A channel alerts when sunrise or sunset meets or exceeds its selected threshold. Alerts may repeat on later checks while the forecast remains above the threshold. <span class="autosave-hint">Saved automatically</span></p>
                 </div>
                 <div id="location-drawer-rules-host" class="location-drawer-host">
                   <p class="pane-subtext">Save the location first to configure notification thresholds.</p>
@@ -197,11 +202,11 @@
           <h2>Activity</h2>
           <span id="api-credits-status" class="api-credits-badge">Loading API credits…</span>
         </div>
-        <p class="pane-subtext">Forecast runs and notification delivery history.</p>
+        <p class="pane-subtext">Forecast checks and notification delivery history.</p>
         <p id="activity-selftest-summary" class="pane-subtext" hidden></p>
 
         <div class="activity-filter" role="tablist" aria-label="Activity filter">
-          <button type="button" class="activity-filter-btn active" data-activity-filter="runs" id="activity-filter-runs" role="tab" aria-selected="true" aria-controls="logs-list-container">Runs</button>
+          <button type="button" class="activity-filter-btn active" data-activity-filter="runs" id="activity-filter-runs" role="tab" aria-selected="true" aria-controls="logs-list-container">Forecast checks</button>
           <button type="button" class="activity-filter-btn" data-activity-filter="deliveries" id="activity-filter-deliveries" role="tab" aria-selected="false" aria-controls="logs-list-container">Deliveries</button>
         </div>
 
@@ -218,8 +223,8 @@
         <p class="pane-subtext">Global notification channels, provider credentials, display preferences, and maintenance.</p>
 
         <div class="settings-section-heading">
-          <h3>Notification channels</h3>
-          <p class="pane-subtext">Enable channels globally here. Per-location thresholds live under Locations.</p>
+          <h3>Delivery channels</h3>
+          <p class="pane-subtext">Choose where Sunsethue can send reports and alerts.</p>
         </div>
 
         <section class="form-card settings-card channel-card channel-card-compact" id="channel-card-email" aria-labelledby="channel-email-title">
@@ -417,12 +422,12 @@
           <h3 id="webhook-title" class="visually-hidden">Webhook</h3>
         </section>
 
-        <section class="form-card settings-card" aria-labelledby="general-settings-title">
-          <h3 id="general-settings-title">General</h3>
-          <p class="pane-subtext">Application timezone, default check times, and weekly health-check behavior.</p>
+        <section class="form-card settings-card" aria-labelledby="forecast-checks-title">
+          <h3 id="forecast-checks-title">Forecast checks</h3>
+          <p class="pane-subtext">Forecast checks determine when Sunsethue fetches forecast data. They drive forecast API usage.</p>
           <form id="application-settings-form" novalidate>
             <div class="form-group">
-              <label for="schedule-timezone">Timezone</label>
+              <label for="schedule-timezone">Application timezone</label>
               <select id="schedule-timezone" class="form-input" autocomplete="off">
                 <option value="America/New_York">America/New_York (UTC−05:00)</option>
               </select>
@@ -449,9 +454,37 @@
               <div id="quota-estimator" class="quota-estimator" aria-live="polite"></div>
             </div>
 
-            <details class="settings-details">
-              <summary>Weekly self-test</summary>
+            <div class="form-group scheduled-reports-block" id="scheduled-reports-block">
+              <h4 id="scheduled-reports-title">Scheduled reports</h4>
+              <p class="pane-subtext">Receive routine reports regardless of forecast quality. Scheduled reports reuse existing forecast checks and do not add forecast API calls.</p>
+              <label class="switch-inline">
+                <input id="scheduled-reports-enabled" type="checkbox" role="switch">
+                <span>Enable scheduled reports</span>
+              </label>
+              <div id="scheduled-reports-options" hidden>
+                <fieldset class="form-group" id="scheduled-report-times-fieldset">
+                  <legend>Report times</legend>
+                  <p class="pane-subtext">Reports contain locations checked at that time. Locations using a custom schedule appear only when their check time matches.</p>
+                  <div id="scheduled-report-times" class="checkbox-grid" role="group" aria-label="Scheduled report times"></div>
+                </fieldset>
+                <fieldset class="form-group" id="scheduled-report-channels-fieldset">
+                  <legend>Delivery channels</legend>
+                  <div id="scheduled-report-channels" class="checkbox-grid" role="group" aria-label="Scheduled report channels">
+                    <label><input type="checkbox" data-scheduled-report-channel="email"> Email</label>
+                    <label><input type="checkbox" data-scheduled-report-channel="pushover"> Pushover</label>
+                    <label><input type="checkbox" data-scheduled-report-channel="webpush"> Browser Push</label>
+                    <label><input type="checkbox" data-scheduled-report-channel="webhook"> Webhook</label>
+                  </div>
+                  <p id="scheduled-report-channel-hints" class="pane-subtext" role="status"></p>
+                </fieldset>
+                <p id="scheduled-reports-help" class="pane-subtext" role="status"></p>
+              </div>
+            </div>
+
+            <details class="settings-details" id="automation-details">
+              <summary>Automation</summary>
               <fieldset class="form-group" id="weekly-self-test-fields">
+                <legend class="visually-hidden">Weekly self-test</legend>
                 <label><input id="weekly-self-test-enabled" type="checkbox" checked> Enable weekly self-test</label>
                 <label for="weekly-self-test-mode">Mode</label>
                 <select id="weekly-self-test-mode" class="form-input">
@@ -474,7 +507,7 @@
               </fieldset>
             </details>
             <div class="form-actions">
-              <button type="submit" class="btn btn-primary" id="save-application-settings-btn">Save general settings</button>
+              <button type="submit" class="btn btn-primary" id="save-application-settings-btn">Save settings</button>
             </div>
           </form>
         </section>

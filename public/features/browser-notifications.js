@@ -18,10 +18,10 @@ export function initBrowserNotifications({ api, showSuccess, showError, DEMO_REA
     if (!response.ok) throw new Error("Failed to load browser devices.");
     const data = await response.json();
     const host = document.getElementById("web-push-devices");
-    if (!host) return;
     const devices = data.devices || [];
-    const subtitle = document.getElementById("webpush-channel-subtitle");
     const enabledCount = devices.filter((d) => d.enabled).length;
+    if (!host) return { enabledCount, deviceCount: devices.length };
+    const subtitle = document.getElementById("webpush-channel-subtitle");
     if (subtitle) {
       subtitle.textContent = devices.length
         ? `${enabledCount} device${enabledCount === 1 ? "" : "s"} enabled · ${devices.length} registered`
@@ -36,7 +36,7 @@ export function initBrowserNotifications({ api, showSuccess, showError, DEMO_REA
     }
     if (!devices.length) {
       host.innerHTML = "<p class=\"pane-subtext\">No devices registered yet.</p>";
-      return;
+      return { enabledCount, deviceCount: 0 };
     }
     host.innerHTML = devices.map((device) =>
       `<div class="settings-toggle-row"><span>${device.deviceName} — ${device.enabled ? "Enabled" : "Disabled"}</span>
@@ -67,6 +67,7 @@ export function initBrowserNotifications({ api, showSuccess, showError, DEMO_REA
         await fetchWebPushDevices();
       });
     });
+    return { enabledCount, deviceCount: devices.length };
   }
 
   pushBtn?.addEventListener("click", async () => {

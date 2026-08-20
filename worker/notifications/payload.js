@@ -9,6 +9,12 @@ function isAllowedTriggerType(value) {
   return typeof value === "string" && /^SCHEDULED:\d{2}:00$/.test(value);
 }
 const ALLOWED_ERROR_CODES = new Set(["FORECAST_UNAVAILABLE"]);
+const ALLOWED_DELIVERY_PURPOSES = new Set([
+  "scheduled_report",
+  "quality_alert",
+  "test",
+  "self_test"
+]);
 const MAX_LOCATIONS = 10;
 
 // Names are user-supplied and length-capped by the API, but a legacy row could
@@ -32,6 +38,13 @@ function normalizeLocationName(value) {
   return truncateUtf8(collapseWhitespace(value), MAX_LOCATION_NAME_BYTES);
 }
 
+export function inferDeliveryPurpose(triggerType, explicit = null) {
+  if (explicit && ALLOWED_DELIVERY_PURPOSES.has(explicit)) return explicit;
+  if (triggerType === "WEEKLY_SELF_TEST") return "self_test";
+  if (triggerType === "TEST" || triggerType === "Manual Test") return "test";
+  return "quality_alert";
+}
+
 export function buildNotificationPayload(model) {
   return {
     version: 1,
@@ -39,6 +52,7 @@ export function buildNotificationPayload(model) {
     generatedAt: model.generatedAt,
     displayTimezone: model.displayTimezone || null,
     dashboardUrl: model.dashboardUrl || null,
+    deliveryPurpose: inferDeliveryPurpose(model.triggerType, model.deliveryPurpose || null),
     locations: model.results.map((result) => ({
       id: result.locationId || result.id || null,
       name: normalizeLocationName(result.name),
@@ -123,6 +137,7 @@ export function parseNotificationPayload(payload) {
     generatedAt: parsed.generatedAt,
     displayTimezone,
     dashboardUrl,
+    deliveryPurpose: inferDeliveryPurpose(parsed.triggerType, parsed.deliveryPurpose ?? null),
     locations
   };
 }
@@ -140,8 +155,15 @@ function formatPushQuality(event) {
 }
 
 export function buildPushoverContent(payload) {
-  const rawTitle = `Sunsethue ${payload.triggerType} forecast`;
-  const title = truncateUtf8(rawTitle, PUSHOVER_TITLE_MAX);
+  const purpose = inferDeliveryPurpose(payload.triggerType, payload.deliveryPurpose ?? null);
+  const purposeTitle = purpose === "scheduled_report"
+    ? "Sunsethue scheduled report"
+    : purpose === "quality_alert"
+      ? "Sunsethue quality alert"
+      : purpose === "self_test"
+        ? "Sunsethue self-test"
+        : "Sunsethue test";
+  const title = truncateUtf8(purposeTitle, PUSHOVER_TITLE_MAX);
   
   const displayTimezone = payload.displayTimezone || "America/New_York";
   const lines = [];

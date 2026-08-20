@@ -85,6 +85,9 @@ test.describe("Horizon app smoke", () => {
           weeklySelfTestMode: "passive",
           weeklySelfTestDay: 0,
           weeklySelfTestTime: "10:00",
+          scheduledReportsEnabled: false,
+          scheduledReportTimes: [],
+          scheduledReportChannels: [],
           quota: {
             estimatedRequestsPer30Days: 540,
             scheduledRunsPerDay: 3,
@@ -257,13 +260,13 @@ test.describe("Horizon app smoke", () => {
     await expect(page.locator("#app-container")).toBeVisible({ timeout: 30_000 });
     await page.locator('[data-tab="locations"]:visible').first().click();
     await expect(page.locator(".loc-rule-card").first()).toBeVisible();
-    await expect(page.locator(".loc-rule-threshold-line").first()).toContainText("Email ≥70%");
-    await expect(page.locator(".loc-rule-threshold-line").first()).toContainText("Pushover Always");
+    await expect(page.locator(".loc-rule-threshold-line").first()).toContainText("Alerts: Mixed");
     await expect(page.locator(".loc-rule-threshold-line").first()).not.toContainText("Threshold ≥");
 
     await page.locator(`[data-location-edit="${location.id}"]`).click();
     await expect(page.locator("#location-drawer")).toBeVisible();
     await expect(page.locator("#delete-location-drawer-btn")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Quality alerts" })).toBeVisible();
     await expect(page.locator("#location-drawer-rules-host .rule-control")).toHaveCount(4);
     await expect(page.locator("#location-drawer-rules-host")).not.toContainText("Off globally");
   });
@@ -306,13 +309,111 @@ test.describe("Horizon app smoke", () => {
     await expect(page.locator("#app-container")).toBeVisible({ timeout: 30_000 });
     await page.locator('[data-tab="locations"]:visible').first().click();
     await expect(page.locator(".loc-rule-card").first()).toBeVisible();
-    await expect(page.locator(".loc-rule-threshold-line").first()).toContainText("Email ≥60%");
+    await expect(page.locator(".loc-rule-threshold-line").first()).toContainText("Alerts: Mixed");
     await expect(page.getByText(/Channel enablement status unavailable/i)).toBeVisible();
 
     await page.locator(`[data-location-edit="${location.id}"]`).click();
     await expect(page.locator("#location-drawer")).toBeVisible();
     await expect(page.locator("#location-drawer-rules-host .rule-control")).toHaveCount(4);
     await expect(page.locator("#location-drawer-rules-host")).not.toContainText("Off globally");
+  });
+
+  test("settings exposes forecast checks and scheduled reports controls", async ({ page }) => {
+    let putBody = null;
+    await page.route("**/api/application-settings", async (route) => {
+      if (route.request().method() === "GET") {
+        await fulfillJson(route, {
+          scheduleTimezone: "America/New_York",
+          displayTimezoneMode: "schedule",
+          displayTimezone: null,
+          scheduleTimes: ["06:00", "12:00", "18:00"],
+          weeklySelfTestEnabled: true,
+          weeklySelfTestMode: "passive",
+          weeklySelfTestDay: 0,
+          weeklySelfTestTime: "10:00",
+          scheduledReportsEnabled: false,
+          scheduledReportTimes: [],
+          scheduledReportChannels: [],
+          quota: {
+            estimatedRequestsPer30Days: 90,
+            scheduledRunsPerDay: 3,
+            activeLocations: 1,
+            estimatedRequestsPerDay: 3
+          }
+        });
+        return;
+      }
+      if (route.request().method() === "PUT") {
+        putBody = route.request().postDataJSON();
+        await fulfillJson(route, putBody);
+        return;
+      }
+      await fulfillJson(route, {});
+    });
+    await page.route("**/api/notification-settings", (route) => fulfillJson(route, {
+      emailEnabled: true,
+      emailTo: "owner@example.com",
+      emailConfigured: true,
+      pushoverEnabled: false,
+      pushoverConfigured: true,
+      webhookEnabled: false,
+      webhookConfigured: false
+    }));
+
+    await page.goto("/");
+    await expect(page.locator("#app-container")).toBeVisible({ timeout: 30_000 });
+    await page.locator("#nav-settings").click();
+    await expect(page.getByRole("heading", { name: "Forecast checks" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Scheduled reports" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Delivery channels" })).toBeVisible();
+    await expect(page.locator("#scheduled-reports-options")).toBeHidden();
+
+    await page.locator("#scheduled-reports-enabled").check();
+    await expect(page.locator("#scheduled-reports-options")).toBeVisible();
+    await page.locator("#save-application-settings-btn").click();
+    await expect(page.locator("#db-error-banner")).toBeVisible();
+    expect(putBody).toBeNull();
+
+    await page.locator('[data-scheduled-report-time="06:00"]').check();
+    await page.locator('[data-scheduled-report-channel="email"]').check();
+    await page.locator("#save-application-settings-btn").click();
+    await expect.poll(() => putBody).not.toBeNull();
+    expect(putBody).toMatchObject({
+      scheduledReportsEnabled: true,
+      scheduledReportTimes: ["06:00"],
+      scheduledReportChannels: ["email"]
+    });
+    await expect(page.locator("#scheduled-report-channels")).toContainText("Pushover — enable this channel above first");
+  });
+
+  test("activity shows forecast checks filter and delivery purpose labels", async ({ page }) => {
+    await page.route("**/api/notification-deliveries", (route) => fulfillJson(route, [
+      {
+        id: "d1",
+        channel: "email",
+        status: "sent",
+        attempts: 1,
+        createdAt: "2026-08-01T10:00:05.000Z",
+        deliveryPurpose: "scheduled_report"
+      },
+      {
+        id: "d2",
+        channel: "pushover",
+        status: "skipped",
+        attempts: 0,
+        createdAt: "2026-08-01T12:00:05.000Z",
+        lastErrorCode: "NO_LOCATION_ABOVE_THRESHOLD",
+        deliveryPurpose: "quality_alert"
+      }
+    ]));
+    await page.goto("/");
+    await expect(page.locator("#app-container")).toBeVisible({ timeout: 30_000 });
+    await page.locator('[data-tab="activity"]:visible').first().click();
+    await expect(page.locator("#activity-filter-runs")).toHaveText("Forecast checks");
+    await page.locator("#activity-filter-deliveries").click();
+    await expect(page.locator("#logs-list-container")).toContainText("Scheduled report");
+    await expect(page.locator("#logs-list-container")).toContainText("Quality alert");
+    await expect(page.locator("#logs-list-container")).toContainText("No location met its threshold");
   });
 
   test("settings keeps provider credentials collapsed by default", async ({ page }) => {

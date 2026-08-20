@@ -1,3 +1,5 @@
+import { normalizeDeliveryPurpose } from "../db.js";
+
 export async function countHistoryScope(env, scope) {
   if (scope === "runs") {
     const row = await env.DB.prepare(`SELECT COUNT(*) AS c FROM runs`).first();
@@ -37,19 +39,42 @@ export async function exportHistoryScope(env, scope) {
   }
   if (scope === "deliveries_completed") {
     const { results } = await env.DB.prepare(
-      `SELECT id, runId, channel, status, lastErrorCode, createdAt, sentAt
-       FROM notification_outbox WHERE status IN ('sent', 'skipped')
-       ORDER BY createdAt DESC LIMIT 500`
+      `SELECT o.id, o.runId, o.channel, o.status, o.lastErrorCode, o.createdAt, o.sentAt,
+              o.deliveryPurpose, r.triggerType
+       FROM notification_outbox o
+       LEFT JOIN runs r ON r.id = o.runId
+       WHERE o.status IN ('sent', 'skipped')
+       ORDER BY o.createdAt DESC LIMIT 500`
     ).all();
-    return results || [];
+    return (results || []).map((row) => ({
+      id: row.id,
+      runId: row.runId,
+      channel: row.channel,
+      status: row.status,
+      lastErrorCode: row.lastErrorCode,
+      createdAt: row.createdAt,
+      sentAt: row.sentAt,
+      deliveryPurpose: normalizeDeliveryPurpose(row)
+    }));
   }
   if (scope === "deliveries_failed") {
     const { results } = await env.DB.prepare(
-      `SELECT id, runId, channel, status, lastErrorCode, createdAt
-       FROM notification_outbox WHERE status = 'failed'
-       ORDER BY createdAt DESC LIMIT 500`
+      `SELECT o.id, o.runId, o.channel, o.status, o.lastErrorCode, o.createdAt,
+              o.deliveryPurpose, r.triggerType
+       FROM notification_outbox o
+       LEFT JOIN runs r ON r.id = o.runId
+       WHERE o.status = 'failed'
+       ORDER BY o.createdAt DESC LIMIT 500`
     ).all();
-    return results || [];
+    return (results || []).map((row) => ({
+      id: row.id,
+      runId: row.runId,
+      channel: row.channel,
+      status: row.status,
+      lastErrorCode: row.lastErrorCode,
+      createdAt: row.createdAt,
+      deliveryPurpose: normalizeDeliveryPurpose(row)
+    }));
   }
   if (scope === "self_tests") {
     const { results } = await env.DB.prepare(

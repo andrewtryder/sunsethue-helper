@@ -25,6 +25,9 @@ const CORE_FIXTURES = {
     weeklySelfTestMode: "passive",
     weeklySelfTestDay: 0,
     weeklySelfTestTime: "10:00",
+    scheduledReportsEnabled: false,
+    scheduledReportTimes: [],
+    scheduledReportChannels: [],
     quota: {
       scheduledRunsPerDay: 3,
       activeLocations: 1,

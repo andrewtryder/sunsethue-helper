@@ -59,28 +59,30 @@ function scheduleSummaryLabel(loc) {
     const n = loc.scheduleTimes.length;
     return `Custom · ${n} check${n === 1 ? "" : "s"}/day`;
   }
-  return "Default check times";
+  return "Default checks";
 }
 
 function thresholdSummaryLabel(value) {
   if (value === "off") return "Off";
   if (value === "") return "Always";
-  return `≥${value}%`;
+  return `${value}%+`;
 }
 
-function locationThresholdSummary(locRules) {
-  const values = CHANNELS.map((channel) => {
+function locationThresholdSummary(locRules, isChannelEffective) {
+  const effectiveChannels = CHANNELS.filter((channel) => isChannelEffective(channel));
+  if (effectiveChannels.length === 0) return "Alerts: Off";
+
+  const values = effectiveChannels.map((channel) => {
     const rule = locRules.find((item) => item.channel === channel);
     return ruleValue(rule);
   });
-  const labels = values.map((value) => thresholdSummaryLabel(value));
-  if (labels.every((label) => label === labels[0])) {
-    return `All ${labels[0]}`;
+
+  if (values.every((value) => value === "off")) return "Alerts: Off";
+  if (values.every((value) => value === "")) return "Alerts: Always";
+  if (values.every((value) => value === values[0] && value !== "off")) {
+    return `Alerts: ${thresholdSummaryLabel(values[0])}`;
   }
-  return CHANNELS.map((channel, index) => {
-    const short = channel === "webpush" ? "Browser" : CHANNEL_LABELS[channel];
-    return `${short} ${labels[index]}`;
-  }).join(" · ");
+  return "Alerts: Mixed";
 }
 
 export function initThresholds({
@@ -328,7 +330,7 @@ export function initThresholds({
         </span>`;
       }).join("");
 
-      const thresholdLine = locationThresholdSummary(locRules);
+      const thresholdLine = locationThresholdSummary(locRules, getGlobalChannelEnabled);
       const custom = locationUsesCustomSchedule(loc);
 
       return `<article class="loc-rule-card" data-location-id="${loc.id}">
@@ -552,7 +554,7 @@ export function initThresholds({
       });
       if (!response.ok) throw new Error("Unable to copy rules.");
       await fetchLocationRules();
-      showSuccess("Rules copied to all locations.");
+      showSuccess("Alert rules copied to all locations.");
     } catch (error) {
       showError(error.message);
     }
@@ -565,6 +567,10 @@ export function initThresholds({
   }
   resetBtn?.addEventListener("click", async () => {
     if (!capabilities?.mutations) return;
+    const confirmed = window.confirm(
+      "Set quality-alert rules for all locations to 50%? This replaces existing per-location alert thresholds."
+    );
+    if (!confirmed) return;
     try {
       const response = await api.send("/api/location-notification-rules", {
         method: "POST",
@@ -573,7 +579,7 @@ export function initThresholds({
       });
       if (!response.ok) throw new Error("Unable to reset rules.");
       await fetchLocationRules();
-      showSuccess("Rules reset to 50% defaults.");
+      showSuccess("Alert thresholds set to 50% for all locations.");
     } catch (error) {
       showError(error.message);
     }

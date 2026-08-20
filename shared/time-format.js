@@ -9,6 +9,8 @@ import {
   MAX_SCHEDULE_SLOTS
 } from "./schema-manifest.js";
 
+export { DEFAULT_SCHEDULE_TIMEZONE, DEFAULT_SCHEDULE_TIMES, MAX_SCHEDULE_SLOTS };
+
 const WHOLE_HOUR = /^([01]\d|2[0-3]):00$/;
 
 /**
@@ -203,6 +205,41 @@ export function formatTimeOnlyWithZone(value, timeZone) {
   });
 }
 
+/**
+ * Medium date and short time (e.g. "Oct 16, 2023, 8:12 PM").
+ */
+export function formatDateTimeMediumWithZone(value, timeZone) {
+  return formatInstantWithZone(value, timeZone, {
+    dateStyle: "medium",
+    timeStyle: "short",
+    hour: undefined,
+    minute: undefined,
+    timeZoneName: undefined
+  });
+}
+
+/**
+ * Compact weekday+date for email column headings, e.g. "(Thu, Aug 20)".
+ * Falls back to the application default timezone when the zone is invalid.
+ */
+export function formatColumnDateWithZone(utcString, timeZone) {
+  if (!utcString) return "";
+  const ms = Date.parse(utcString);
+  if (!Number.isFinite(ms)) return "";
+  const tz = isValidIanaTimeZone(timeZone) ? timeZone : DEFAULT_SCHEDULE_TIMEZONE;
+  try {
+    const formatted = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz,
+      weekday: "short",
+      month: "short",
+      day: "numeric"
+    }).format(new Date(ms));
+    return `(${formatted})`;
+  } catch {
+    return "";
+  }
+}
+
 export function defaultApplicationSettings(now = Date.now()) {
   return {
     scheduleTimezone: DEFAULT_SCHEDULE_TIMEZONE,
@@ -213,6 +250,9 @@ export function defaultApplicationSettings(now = Date.now()) {
     weeklySelfTestMode: "passive",
     weeklySelfTestDay: 0,
     weeklySelfTestTime: "10:00",
+    scheduledReportsEnabled: false,
+    scheduledReportTimes: [],
+    scheduledReportChannels: [],
     updatedAt: now
   };
 }

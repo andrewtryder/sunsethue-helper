@@ -1,5 +1,74 @@
 const DEFAULT_SCHEDULE_TIMEZONE = "America/New_York";
 
+const FALLBACK_IANA_TIME_ZONES = [
+  "UTC",
+  "America/New_York",
+  "America/Chicago",
+  "America/Denver",
+  "America/Phoenix",
+  "America/Los_Angeles",
+  "America/Anchorage",
+  "Pacific/Honolulu",
+  "Europe/London",
+  "Europe/Dublin",
+  "Europe/Lisbon",
+  "Europe/Paris",
+  "Europe/Berlin",
+  "Europe/Amsterdam",
+  "Europe/Brussels",
+  "Europe/Madrid",
+  "Europe/Rome",
+  "Europe/Zurich",
+  "Europe/Vienna",
+  "Europe/Prague",
+  "Europe/Warsaw",
+  "Europe/Stockholm",
+  "Europe/Oslo",
+  "Europe/Copenhagen",
+  "Europe/Helsinki",
+  "Europe/Athens",
+  "Europe/Bucharest",
+  "Europe/Kyiv",
+  "Asia/Tokyo",
+  "Asia/Shanghai",
+  "Asia/Kolkata",
+  "Australia/Sydney",
+  "Pacific/Auckland"
+];
+
+const US_PRIORITY = [
+  "America/New_York",
+  "America/Chicago",
+  "America/Denver",
+  "America/Phoenix",
+  "America/Los_Angeles",
+  "America/Anchorage",
+  "Pacific/Honolulu"
+];
+
+const EUROPE_PRIORITY = [
+  "Europe/London",
+  "Europe/Dublin",
+  "Europe/Lisbon",
+  "Europe/Paris",
+  "Europe/Berlin",
+  "Europe/Amsterdam",
+  "Europe/Brussels",
+  "Europe/Madrid",
+  "Europe/Rome",
+  "Europe/Zurich",
+  "Europe/Vienna",
+  "Europe/Prague",
+  "Europe/Warsaw",
+  "Europe/Stockholm",
+  "Europe/Oslo",
+  "Europe/Copenhagen",
+  "Europe/Helsinki",
+  "Europe/Athens",
+  "Europe/Bucharest",
+  "Europe/Kyiv"
+];
+
 /**
  * @param {unknown} value
  * @returns {boolean}
@@ -16,21 +85,100 @@ export function isValidIanaTimeZone(value) {
 
 /**
  * Resolve which IANA zone to use when formatting times for display.
+ * Application timezone (`scheduleTimezone`) is authoritative; legacy
+ * displayTimezoneMode / displayTimezone fields are ignored.
  * @param {{ displayTimezoneMode?: string, displayTimezone?: string|null, scheduleTimezone?: string }} settings
- * @param {string|null|undefined} deviceTimeZone
+ * @param {string|null|undefined} _deviceTimeZone unused compatibility arg
  */
-export function resolveDisplayTimeZone(settings, deviceTimeZone) {
-  const scheduleTz = settings?.scheduleTimezone && isValidIanaTimeZone(settings.scheduleTimezone)
+export function resolveDisplayTimeZone(settings, _deviceTimeZone) {
+  return settings?.scheduleTimezone && isValidIanaTimeZone(settings.scheduleTimezone)
     ? settings.scheduleTimezone
     : DEFAULT_SCHEDULE_TIMEZONE;
-  const mode = settings?.displayTimezoneMode || "schedule";
-  if (mode === "device" && deviceTimeZone && isValidIanaTimeZone(deviceTimeZone)) {
-    return deviceTimeZone;
+}
+
+/**
+ * Current UTC offset label for an IANA zone, e.g. "UTC−04:00".
+ * @param {string} timeZone
+ * @param {Date|number|string} [at=Date.now()]
+ * @returns {string|null}
+ */
+export function formatUtcOffsetLabel(timeZone, at = Date.now()) {
+  if (!isValidIanaTimeZone(timeZone)) return null;
+  const date = at instanceof Date ? at : new Date(at);
+  if (Number.isNaN(date.getTime())) return null;
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      timeZoneName: "longOffset"
+    }).formatToParts(date);
+    const raw = parts.find((part) => part.type === "timeZoneName")?.value || "GMT";
+    let normalized = raw.replace(/^GMT/, "UTC");
+    if (normalized === "UTC" || normalized === "UTC+0" || normalized === "UTC-0") {
+      normalized = "UTC+00:00";
+    }
+    normalized = normalized.replace(/UTC([+-])(\d)(?=:)/, (_, sign, hour) => `UTC${sign}0${hour}`);
+    normalized = normalized.replace(/UTC([+-])(\d{2})$/, (_, sign, hour) => `UTC${sign}${hour}:00`);
+    return normalized.replace(/-/g, "−");
+  } catch {
+    return null;
   }
-  if (mode === "selected" && settings?.displayTimezone && isValidIanaTimeZone(settings.displayTimezone)) {
-    return settings.displayTimezone;
+}
+
+/**
+ * @returns {string[]}
+ */
+export function listSupportedIanaTimeZones() {
+  if (typeof Intl.supportedValuesOf === "function") {
+    try {
+      return Intl.supportedValuesOf("timeZone").filter((tz) => isValidIanaTimeZone(tz));
+    } catch {
+      /* fall through */
+    }
   }
-  return scheduleTz;
+  return FALLBACK_IANA_TIME_ZONES.filter((tz) => isValidIanaTimeZone(tz));
+}
+
+/**
+ * Build optgroup HTML for the timezone select.
+ * @param {string} [selectedValue]
+ * @param {Date|number} [at]
+ * @returns {string}
+ */
+export function buildTimezoneSelectHtml(selectedValue = DEFAULT_SCHEDULE_TIMEZONE, at = Date.now()) {
+  const supported = new Set(listSupportedIanaTimeZones());
+  if (selectedValue && isValidIanaTimeZone(selectedValue)) {
+    supported.add(selectedValue);
+  }
+  const remaining = new Set(supported);
+
+  function optionHtml(tz) {
+    remaining.delete(tz);
+    const offset = formatUtcOffsetLabel(tz, at) || "UTC+00:00";
+    const selected = tz === selectedValue ? " selected" : "";
+    return `<option value="${tz}"${selected}>${tz} (${offset})</option>`;
+  }
+
+  function pickOrdered(priority) {
+    return priority.filter((tz) => supported.has(tz)).map(optionHtml).join("");
+  }
+
+  const us = pickOrdered(US_PRIORITY);
+  const europePriority = pickOrdered(EUROPE_PRIORITY);
+  const otherEurope = [...remaining]
+    .filter((tz) => tz.startsWith("Europe/"))
+    .sort((a, b) => a.localeCompare(b))
+    .map(optionHtml)
+    .join("");
+  const other = [...remaining]
+    .sort((a, b) => a.localeCompare(b))
+    .map(optionHtml)
+    .join("");
+
+  return [
+    us ? `<optgroup label="United States">${us}</optgroup>` : "",
+    (europePriority || otherEurope) ? `<optgroup label="Europe">${europePriority}${otherEurope}</optgroup>` : "",
+    other ? `<optgroup label="Other time zones">${other}</optgroup>` : ""
+  ].join("");
 }
 
 /**
@@ -107,3 +255,5 @@ export function formatTimeShortWithZone(value, timeZone) {
     timeZoneName: undefined
   });
 }
+
+export { DEFAULT_SCHEDULE_TIMEZONE };

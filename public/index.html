@@ -94,43 +94,8 @@
               </div>
             </div>
 
-            <section class="form-card location-default-card" aria-labelledby="check-times-locations-title" id="check-times-locations-section">
-              <div class="location-default-card-header">
-                <div>
-                  <h3 id="check-times-locations-title">Default check times</h3>
-                  <p class="pane-subtext" id="schedule-timezone-label">Timezone: America/New_York</p>
-                </div>
-                <span class="location-default-hint">Used unless a location has a custom schedule</span>
-              </div>
-              <div class="form-group" id="check-times-block">
-                <span class="visually-hidden" id="check-times-heading">Check times</span>
-                <div id="schedule-times-pills" class="time-pills" role="list" aria-labelledby="check-times-heading"></div>
-                <div id="schedule-times-checkboxes" class="visually-hidden" aria-hidden="true"></div>
-                <div class="time-pills-actions">
-                  <label class="visually-hidden" for="add-schedule-time-select">Add check time</label>
-                  <select id="add-schedule-time-select" class="form-input time-pill-add-select" aria-label="Add check time">
-                    <option value="">Add time…</option>
-                  </select>
-                  <div class="form-actions form-actions-compact schedule-presets">
-                    <button type="button" class="btn btn-secondary" data-schedule-preset="once">Once daily</button>
-                    <button type="button" class="btn btn-secondary" data-schedule-preset="twice">Twice daily</button>
-                    <button type="button" class="btn btn-secondary" data-schedule-preset="three">Three times</button>
-                    <button type="button" class="btn btn-secondary" data-schedule-preset="four">Four times</button>
-                  </div>
-                </div>
-                <div class="location-default-footer">
-                  <p class="pane-subtext">Whole-hour slots only, maximum 8. Manual reports are not included in the estimate.</p>
-                  <button type="button" class="btn btn-primary" id="save-check-times-btn">Save default times</button>
-                </div>
-                <div id="quota-estimator" class="quota-estimator" aria-live="polite"></div>
-              </div>
-            </section>
-
             <div class="location-rules-heading">
-              <div>
-                <h3 id="location-rules-title">Your locations</h3>
-                <p class="pane-subtext">Edit a location to set its own schedule and notification thresholds.</p>
-              </div>
+              <h3 id="location-rules-title">Your locations</h3>
               <div class="form-actions form-actions-compact location-rules-bulk-actions">
                 <button type="button" id="rules-copy-all-btn" class="btn btn-secondary">Copy first location to all</button>
                 <button type="button" id="rules-reset-btn" class="btn btn-secondary">Reset to 50%</button>
@@ -454,22 +419,36 @@
 
         <section class="form-card settings-card" aria-labelledby="general-settings-title">
           <h3 id="general-settings-title">General</h3>
-          <p class="pane-subtext">Timezone and weekly health-check behavior. Default check times are configured under Locations.</p>
+          <p class="pane-subtext">Application timezone, default check times, and weekly health-check behavior.</p>
           <form id="application-settings-form" novalidate>
-            <div class="settings-field-grid">
-              <div class="form-group">
-                <label for="schedule-timezone">Application schedule timezone</label>
-                <input id="schedule-timezone" class="form-input" type="text" list="iana-timezone-list" autocomplete="off" value="America/New_York">
-              </div>
-              <fieldset class="form-group compact-fieldset">
-                <legend>Display forecast times in</legend>
-                <label><input type="radio" name="display-timezone-mode" value="schedule" checked> Schedule timezone</label>
-                <label><input type="radio" name="display-timezone-mode" value="device"> This device</label>
-                <label><input type="radio" name="display-timezone-mode" value="selected"> Another timezone</label>
-                <input id="display-timezone" class="form-input" type="text" list="iana-timezone-list" placeholder="IANA timezone" autocomplete="off" hidden>
-              </fieldset>
+            <div class="form-group">
+              <label for="schedule-timezone">Timezone</label>
+              <select id="schedule-timezone" class="form-input" autocomplete="off">
+                <option value="America/New_York">America/New_York (UTC−05:00)</option>
+              </select>
+              <small class="pane-subtext">Used for scheduling, forecasts, Activity times, and notifications.</small>
             </div>
-            <datalist id="iana-timezone-list"></datalist>
+
+            <div class="form-group" id="check-times-block">
+              <span id="check-times-heading">Default check times</span>
+              <p class="pane-subtext">Used unless a location has a custom schedule. Whole-hour slots only, maximum 8.</p>
+              <div id="schedule-times-pills" class="time-pills" role="list" aria-labelledby="check-times-heading"></div>
+              <div id="schedule-times-checkboxes" class="visually-hidden" aria-hidden="true"></div>
+              <div class="time-pills-actions">
+                <label class="visually-hidden" for="add-schedule-time-select">Add check time</label>
+                <select id="add-schedule-time-select" class="form-input time-pill-add-select" aria-label="Add check time">
+                  <option value="">Add time…</option>
+                </select>
+                <div class="form-actions form-actions-compact schedule-presets">
+                  <button type="button" class="btn btn-secondary" data-schedule-preset="once">Once daily</button>
+                  <button type="button" class="btn btn-secondary" data-schedule-preset="twice">Twice daily</button>
+                  <button type="button" class="btn btn-secondary" data-schedule-preset="three">Three times</button>
+                  <button type="button" class="btn btn-secondary" data-schedule-preset="four">Four times</button>
+                </div>
+              </div>
+              <div id="quota-estimator" class="quota-estimator" aria-live="polite"></div>
+            </div>
+
             <details class="settings-details">
               <summary>Weekly self-test</summary>
               <fieldset class="form-group" id="weekly-self-test-fields">
@@ -481,7 +460,7 @@
                 </select>
                 <div class="settings-field-grid">
                   <div class="form-group">
-                    <label for="weekly-self-test-day">Day (schedule timezone)</label>
+                    <label for="weekly-self-test-day">Day (application timezone)</label>
                     <select id="weekly-self-test-day" class="form-input">
                       <option value="0">Sunday</option><option value="1">Monday</option><option value="2">Tuesday</option><option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option>
                     </select>

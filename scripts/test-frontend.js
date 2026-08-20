@@ -106,7 +106,8 @@ test("Frontend File Structure & Integrity Checks", () => {
     "open-location-drawer-btn",
     "location-rules-grid",
     "schedule-times-pills",
-    "check-times-locations-section",
+    "check-times-block",
+    "schedule-timezone",
     "location-rules-title",
     // Activity
     "logs-list-container",
@@ -137,14 +138,25 @@ test("Frontend File Structure & Integrity Checks", () => {
   const locationsStart = htmlContent.indexOf('id="pane-locations"');
   const activityStart = htmlContent.indexOf('id="pane-activity"');
   const settingsStart = htmlContent.indexOf('id="pane-settings"');
-  const checkTimesStart = htmlContent.indexOf('id="check-times-locations-section"');
+  const checkTimesStart = htmlContent.indexOf('id="check-times-block"');
   const rulesStart = htmlContent.indexOf('id="location-rules-grid"');
   const emailCardStart = htmlContent.indexOf('id="channel-card-email"');
+  const scheduleTimezoneStart = htmlContent.indexOf('id="schedule-timezone"');
 
   assert.ok(locationsStart >= 0 && activityStart > locationsStart, "Locations pane should precede Activity");
-  assert.ok(checkTimesStart > locationsStart && checkTimesStart < activityStart, "Default check times should live in Locations");
+  assert.ok(checkTimesStart > settingsStart, "Default check times should live in Settings");
   assert.ok(rulesStart > locationsStart && rulesStart < activityStart, "Per-location notification rules should live in Locations");
+  assert.ok(scheduleTimezoneStart > settingsStart, "Timezone control should live in Settings");
   assert.ok(emailCardStart > settingsStart, "Global provider cards should remain in Settings");
+  assert.ok(!htmlContent.includes('id="check-times-locations-section"'), "Locations must not host the default check times card");
+  assert.ok(!htmlContent.includes('name="display-timezone-mode"'), "Display timezone mode radios must be removed");
+  assert.ok(!htmlContent.includes('id="display-timezone"'), "Secondary display timezone input must be removed");
+  assert.ok(!htmlContent.includes('id="iana-timezone-list"'), "Timezone datalist must be replaced by a select");
+  assert.match(
+    htmlContent,
+    /<select id="schedule-timezone"/,
+    "Timezone control must be a select element"
+  );
   assert.match(
     htmlContent,
     /id="locations-list-container"[^>]*hidden/,
@@ -227,4 +239,20 @@ test("Frontend File Structure & Integrity Checks", () => {
       `frontend styles must define ${selector}`
     );
   });
+
+  assert.match(
+    cssContent,
+    /\.forecast-table-header,\s*\n\s*\.forecast-table-row\s*\{[\s\S]*?column-gap:\s*clamp\(44px,\s*5vw,\s*72px\)/,
+    "Forecast header and rows must share a desktop grid with substantial column-gap"
+  );
+  assert.doesNotMatch(
+    cssContent,
+    /\.forecast-table-row\s*\{[^}]*\bgap:\s*0\b/,
+    "Forecast rows must not reset column-gap with gap: 0"
+  );
+  assert.match(
+    cssContent,
+    /minmax\(220px,\s*1\.3fr\)/,
+    "Desktop location cards should use full-width row columns"
+  );
 });

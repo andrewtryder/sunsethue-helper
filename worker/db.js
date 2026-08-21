@@ -555,16 +555,39 @@ export async function getSetupStatus(env) {
     `SELECT COUNT(*) AS c FROM web_push_subscriptions WHERE enabled = 1`
   ).first().catch(() => ({ c: 0 }));
 
+  const emailConfigured = Number(emailStatus?.configured) === 1;
+  const pushoverConfigured = Number(pushoverStatus?.configured) === 1;
+  const webhookConfigured = Number(webhookStatus?.configured) === 1;
+  const browserPushConfigured = Number(pushCount?.c || 0) > 0;
+
+  const emailEnabled = Number(settings?.emailEnabled) === 1;
+  const pushoverEnabled = Number(settings?.pushoverEnabled) === 1;
+  const webhookEnabled = Number(settings?.webhookEnabled) === 1;
+  // Browser push has no separate global off switch; enabled devices are the usable path.
+  const browserPushEnabled = browserPushConfigured;
+
+  const channelStates = [
+    { configured: emailConfigured, enabled: emailEnabled },
+    { configured: pushoverConfigured, enabled: pushoverEnabled },
+    { configured: browserPushConfigured, enabled: browserPushEnabled },
+    { configured: webhookConfigured, enabled: webhookEnabled }
+  ];
+  const configuredCount = channelStates.filter((channel) => channel.configured).length;
+  const enabledCount = channelStates.filter((channel) => channel.configured && channel.enabled).length;
+
   return {
     accessReady: true,
     databaseTables: REQUIRED_D1_TABLES.every((name) => present.has(name)) ? "ready" : "missing",
     forecastApiKey: "unknown",
-    email: Number(emailStatus?.configured) === 1 ? "ready" : "not_configured",
-    pushover: Number(pushoverStatus?.configured) === 1 ? "ready" : "not_configured",
-    webhook: Number(webhookStatus?.configured) === 1 || Number(settings?.webhookEnabled) === 1
-      ? (Number(webhookStatus?.configured) === 1 ? "ready" : "not_configured")
-      : "not_configured",
-    browserPushDevices: Number(pushCount?.c || 0) > 0 ? "ready" : "not_configured",
-    browserPushDeviceCount: Number(pushCount?.c || 0)
+    email: emailConfigured ? "ready" : "not_configured",
+    pushover: pushoverConfigured ? "ready" : "not_configured",
+    webhook: webhookConfigured ? "ready" : "not_configured",
+    browserPushDevices: browserPushConfigured ? "ready" : "not_configured",
+    browserPushDeviceCount: Number(pushCount?.c || 0),
+    deliveryChannels: {
+      configured: configuredCount,
+      enabled: enabledCount,
+      ready: enabledCount > 0
+    }
   };
 }

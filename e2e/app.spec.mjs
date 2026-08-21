@@ -367,17 +367,21 @@ test.describe("Horizon app smoke", () => {
     await page.locator("#nav-settings").click();
     await expect(page.getByRole("heading", { name: "Forecast checks" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Scheduled reports" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Automation" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Delivery channels" })).toBeVisible();
+    await expect(page.locator("#automation-details")).toHaveCount(0);
+    await expect(page.locator("#save-application-settings-btn")).toBeVisible();
+    await expect(page.locator("#automation-card #save-application-settings-btn")).toHaveCount(0);
     await expect(page.locator("#scheduled-reports-options")).toBeHidden();
 
-    await page.locator("#scheduled-reports-enabled").check();
+    await page.locator("label.switch:has(#scheduled-reports-enabled)").click();
     await expect(page.locator("#scheduled-reports-options")).toBeVisible();
     await page.locator("#save-application-settings-btn").click();
     await expect(page.locator("#db-error-banner")).toBeVisible();
     expect(putBody).toBeNull();
 
-    await page.locator('[data-scheduled-report-time="06:00"]').check();
-    await page.locator('[data-scheduled-report-channel="email"]').check();
+    await page.locator('[data-scheduled-report-time="06:00"]').check({ force: true });
+    await page.locator('[data-scheduled-report-channel="email"]').check({ force: true });
     await page.locator("#save-application-settings-btn").click();
     await expect.poll(() => putBody).not.toBeNull();
     expect(putBody).toMatchObject({
@@ -385,7 +389,115 @@ test.describe("Horizon app smoke", () => {
       scheduledReportTimes: ["06:00"],
       scheduledReportChannels: ["email"]
     });
-    await expect(page.locator("#scheduled-report-channels")).toContainText("Pushover — enable this channel above first");
+    await expect(page.locator(".scheduled-report-channel").filter({ hasText: "Pushover" })).toContainText("Enable this channel above first");
+    await expect(page.locator(".scheduled-report-channel").filter({ hasText: "Email" })).toContainText("Ready");
+  });
+
+  test("settings weekly self-test save persists Passive and Active configurations", async ({ page }) => {
+    let putBodies = [];
+    let current = {
+      scheduleTimezone: "America/New_York",
+      displayTimezoneMode: "schedule",
+      displayTimezone: null,
+      scheduleTimes: ["06:00", "12:00", "18:00"],
+      weeklySelfTestEnabled: true,
+      weeklySelfTestMode: "passive",
+      weeklySelfTestDay: 0,
+      weeklySelfTestTime: "10:00",
+      scheduledReportsEnabled: false,
+      scheduledReportTimes: [],
+      scheduledReportChannels: [],
+      quota: {
+        estimatedRequestsPer30Days: 90,
+        scheduledRunsPerDay: 3,
+        activeLocations: 1,
+        estimatedRequestsPerDay: 3
+      }
+    };
+    await page.route("**/api/application-settings", async (route) => {
+      if (route.request().method() === "GET") {
+        await fulfillJson(route, current);
+        return;
+      }
+      if (route.request().method() === "PUT") {
+        const body = route.request().postDataJSON();
+        putBodies.push(body);
+        current = { ...current, ...body };
+        await fulfillJson(route, current);
+        return;
+      }
+      await fulfillJson(route, {});
+    });
+
+    await page.goto("/");
+    await expect(page.locator("#app-container")).toBeVisible({ timeout: 30_000 });
+    await page.locator("#nav-settings").click();
+    await expect(page.locator("#automation-card")).toBeVisible();
+    await expect(page.locator("#weekly-self-test-enabled")).toBeChecked();
+    await expect(page.locator("#weekly-self-test-mode")).toHaveValue("passive");
+    await expect(page.locator("#weekly-self-test-day")).toHaveValue("0");
+    await expect(page.locator("#weekly-self-test-time")).toHaveValue("10:00");
+
+    await page.locator("#save-application-settings-btn").click();
+    await expect.poll(() => putBodies.length).toBe(1);
+    expect(putBodies[0]).toMatchObject({
+      weeklySelfTestEnabled: true,
+      weeklySelfTestMode: "passive",
+      weeklySelfTestDay: 0,
+      weeklySelfTestTime: "10:00"
+    });
+    await expect(page.locator("#db-success-banner")).toBeVisible();
+
+    await page.locator("#weekly-self-test-mode").selectOption("active");
+    await page.locator("#weekly-self-test-day").selectOption("3");
+    await page.locator("#weekly-self-test-time").selectOption("18:00");
+    await page.locator("#save-application-settings-btn").click();
+    await expect.poll(() => putBodies.length).toBe(2);
+    expect(putBodies[1]).toMatchObject({
+      weeklySelfTestEnabled: true,
+      weeklySelfTestMode: "active",
+      weeklySelfTestDay: 3,
+      weeklySelfTestTime: "18:00"
+    });
+    await expect(page.locator("#weekly-self-test-mode")).toHaveValue("active");
+    await expect(page.locator("#weekly-self-test-day")).toHaveValue("3");
+    await expect(page.locator("#weekly-self-test-time")).toHaveValue("18:00");
+  });
+
+  test("setup status treats unused delivery channels as optional", async ({ page }) => {
+    await page.route("**/api/setup-status", (route) => fulfillJson(route, {
+      accessReady: true,
+      databaseTables: "ready",
+      forecastApiKey: "ready",
+      email: "ready",
+      pushover: "ready",
+      webhook: "not_configured",
+      browserPushDevices: "not_configured",
+      browserPushDeviceCount: 0,
+      deliveryChannels: { configured: 2, enabled: 1, ready: true }
+    }));
+
+    await page.goto("/");
+    await expect(page.locator("#app-container")).toBeVisible({ timeout: 30_000 });
+    await page.locator("#nav-settings").click();
+    await page.locator("#setup-checklist-section > summary").click();
+    await expect(page.locator("#setup-checklist")).toContainText("Delivery channels");
+    await expect(page.locator("#setup-checklist")).toContainText("2 configured · 1 enabled");
+    await expect(page.locator("#setup-checklist")).not.toContainText("Not configured");
+  });
+
+  test("settings mobile stacks application cards without horizontal overflow", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "mobile", "mobile Settings layout only");
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/");
+    await expect(page.locator("#app-container")).toBeVisible({ timeout: 30_000 });
+    await page.locator("#nav-settings").click();
+    await expect(page.locator("#forecast-checks-card")).toBeVisible();
+    await expect(page.locator("#scheduled-reports-card")).toBeVisible();
+    await expect(page.locator("#automation-card")).toBeVisible();
+    const scrollWidth = await page.locator("#pane-settings").evaluate((el) => el.scrollWidth);
+    const clientWidth = await page.locator("#pane-settings").evaluate((el) => el.clientWidth);
+    expect(scrollWidth).toBeLessThanOrEqual(clientWidth + 1);
   });
 
   test("activity shows forecast checks filter and delivery purpose labels", async ({ page }) => {

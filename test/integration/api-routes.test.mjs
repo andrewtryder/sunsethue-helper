@@ -284,6 +284,10 @@ test("GET /api/notification-health and setup-status stay non-sensitive", async (
     const setup = await setupRes.json();
     assert.ok(["ready", "missing", "not_configured", "unknown"].includes(setup.databaseTables) || setup.databaseTables === "ready");
     assert.equal(setup.SUNSETHUE_API_KEY, undefined);
+    assert.ok(setup.deliveryChannels);
+    assert.equal(typeof setup.deliveryChannels.configured, "number");
+    assert.equal(typeof setup.deliveryChannels.enabled, "number");
+    assert.equal(typeof setup.deliveryChannels.ready, "boolean");
   });
 });
 

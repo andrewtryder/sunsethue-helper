@@ -210,6 +210,11 @@ test("setup status and remaining history scopes", async () => {
     const setup = await db.getSetupStatus(env);
     assert.equal(setup.accessReady, true);
     assert.equal(setup.databaseTables, "ready");
+    assert.ok(setup.deliveryChannels);
+    assert.equal(typeof setup.deliveryChannels.configured, "number");
+    assert.equal(typeof setup.deliveryChannels.enabled, "number");
+    assert.equal(typeof setup.deliveryChannels.ready, "boolean");
+    assert.equal(setup.deliveryChannels.ready, setup.deliveryChannels.enabled > 0);
     assert.equal((await exportHistoryScope(env, "credential_audit")).length, 1);
     assert.equal(await countHistoryScope(env, "credential_audit"), 1);
     assert.equal(await countHistoryScope(env, "bogus"), 0);

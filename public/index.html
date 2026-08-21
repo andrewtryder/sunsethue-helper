@@ -429,10 +429,10 @@
           <h3 id="webhook-title" class="visually-hidden">Webhook</h3>
         </section>
 
-        <section class="form-card settings-card" aria-labelledby="forecast-checks-title">
-          <h3 id="forecast-checks-title">Forecast checks</h3>
-          <p class="pane-subtext">Forecast checks determine when Sunsethue fetches forecast data. They drive forecast API usage.</p>
-          <form id="application-settings-form" novalidate>
+        <form id="application-settings-form" class="application-settings-form" novalidate>
+          <section class="form-card settings-card" id="forecast-checks-card" aria-labelledby="forecast-checks-title">
+            <h3 id="forecast-checks-title">Forecast checks</h3>
+            <p class="pane-subtext">Forecast checks determine when Sunsethue fetches forecast data. They drive forecast API usage.</p>
             <div class="form-group">
               <label for="schedule-timezone">Application timezone</label>
               <select id="schedule-timezone" class="form-input" autocomplete="off">
@@ -460,64 +460,90 @@
               </div>
               <div id="quota-estimator" class="quota-estimator" aria-live="polite"></div>
             </div>
+          </section>
 
-            <div class="form-group scheduled-reports-block" id="scheduled-reports-block">
-              <h4 id="scheduled-reports-title">Scheduled reports</h4>
-              <p class="pane-subtext">Receive routine reports regardless of forecast quality. Scheduled reports reuse existing forecast checks and do not add forecast API calls.</p>
-              <label class="switch-inline">
-                <input id="scheduled-reports-enabled" type="checkbox" role="switch">
-                <span>Enable scheduled reports</span>
-              </label>
-              <div id="scheduled-reports-options" hidden>
-                <fieldset class="form-group" id="scheduled-report-times-fieldset">
-                  <legend>Report times</legend>
-                  <p class="pane-subtext">Reports contain locations checked at that time. Locations using a custom schedule appear only when their check time matches.</p>
-                  <div id="scheduled-report-times" class="checkbox-grid" role="group" aria-label="Scheduled report times"></div>
-                </fieldset>
-                <fieldset class="form-group" id="scheduled-report-channels-fieldset">
-                  <legend>Delivery channels</legend>
-                  <div id="scheduled-report-channels" class="checkbox-grid" role="group" aria-label="Scheduled report channels">
-                    <label><input type="checkbox" data-scheduled-report-channel="email"> Email</label>
-                    <label><input type="checkbox" data-scheduled-report-channel="pushover"> Pushover</label>
-                    <label><input type="checkbox" data-scheduled-report-channel="webpush"> Browser Push</label>
-                    <label><input type="checkbox" data-scheduled-report-channel="webhook"> Webhook</label>
-                  </div>
-                  <p id="scheduled-report-channel-hints" class="pane-subtext" role="status"></p>
-                </fieldset>
-                <p id="scheduled-reports-help" class="pane-subtext" role="status"></p>
+          <section class="form-card settings-card" id="scheduled-reports-card" aria-labelledby="scheduled-reports-title">
+            <h3 id="scheduled-reports-title">Scheduled reports</h3>
+            <p class="pane-subtext">Receive routine reports regardless of forecast quality. Scheduled reports reuse existing forecast checks and do not add forecast API calls.</p>
+            <div class="settings-switch-row" id="scheduled-reports-block">
+              <div>
+                <label id="scheduled-reports-enabled-label" for="scheduled-reports-enabled">Enable scheduled reports</label>
               </div>
+              <label class="switch">
+                <input id="scheduled-reports-enabled" type="checkbox" role="switch" aria-labelledby="scheduled-reports-enabled-label">
+                <span class="switch-ui" aria-hidden="true"></span>
+                <span class="visually-hidden">Enable scheduled reports</span>
+              </label>
             </div>
+            <div id="scheduled-reports-options" hidden>
+              <div class="form-group" id="scheduled-report-times-fieldset">
+                <span id="scheduled-report-times-heading" class="settings-field-heading">Report times</span>
+                <p class="pane-subtext">Reports contain locations checked at that time. Locations using a custom schedule appear only when their check time matches.</p>
+                <div id="scheduled-report-times" class="report-time-pills" role="group" aria-labelledby="scheduled-report-times-heading"></div>
+              </div>
+              <div class="form-group" id="scheduled-report-channels-fieldset">
+                <span id="scheduled-report-channels-heading" class="settings-field-heading">Delivery channels</span>
+                <div id="scheduled-report-channels" class="scheduled-report-channel-grid" role="group" aria-labelledby="scheduled-report-channels-heading"></div>
+                <p id="scheduled-report-channel-hints" class="pane-subtext" role="status"></p>
+              </div>
+              <p id="scheduled-reports-help" class="pane-subtext" role="status"></p>
+            </div>
+          </section>
 
-            <details class="settings-details" id="automation-details">
-              <summary>Automation</summary>
-              <fieldset class="form-group" id="weekly-self-test-fields">
-                <legend class="visually-hidden">Weekly self-test</legend>
-                <label><input id="weekly-self-test-enabled" type="checkbox" checked> Enable weekly self-test</label>
+          <section class="form-card settings-card" id="automation-card" aria-labelledby="automation-title">
+            <h3 id="automation-title">Automation</h3>
+            <p class="pane-subtext">Weekly self-test verifies transports and configuration without requiring a forecast run.</p>
+            <div class="form-group" id="weekly-self-test-fields">
+              <div class="settings-switch-row">
+                <div>
+                  <label id="weekly-self-test-enabled-label" for="weekly-self-test-enabled">Weekly self-test</label>
+                </div>
+                <label class="switch">
+                  <input id="weekly-self-test-enabled" type="checkbox" role="switch" checked aria-labelledby="weekly-self-test-enabled-label">
+                  <span class="switch-ui" aria-hidden="true"></span>
+                  <span class="visually-hidden">Enable weekly self-test</span>
+                </label>
+              </div>
+              <div class="form-group">
                 <label for="weekly-self-test-mode">Mode</label>
                 <select id="weekly-self-test-mode" class="form-input">
                   <option value="passive">Passive (no provider sends)</option>
                   <option value="active">Active (send test through enabled channels)</option>
                 </select>
-                <div class="settings-field-grid">
-                  <div class="form-group">
-                    <label for="weekly-self-test-day">Day (application timezone)</label>
-                    <select id="weekly-self-test-day" class="form-input">
-                      <option value="0">Sunday</option><option value="1">Monday</option><option value="2">Tuesday</option><option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option>
-                    </select>
-                  </div>
-                  <div class="form-group">
-                    <label for="weekly-self-test-time">Time (whole hour)</label>
-                    <input id="weekly-self-test-time" class="form-input" type="text" value="10:00" pattern="([01]\d|2[0-3]):00" placeholder="10:00">
-                  </div>
+              </div>
+              <div class="settings-field-grid automation-day-time-grid">
+                <div class="form-group">
+                  <label for="weekly-self-test-day">Day</label>
+                  <select id="weekly-self-test-day" class="form-input">
+                    <option value="0">Sunday</option>
+                    <option value="1">Monday</option>
+                    <option value="2">Tuesday</option>
+                    <option value="3">Wednesday</option>
+                    <option value="4">Thursday</option>
+                    <option value="5">Friday</option>
+                    <option value="6">Saturday</option>
+                  </select>
                 </div>
-                <p id="notification-health-selftest" class="pane-subtext" role="status"></p>
-              </fieldset>
-            </details>
-            <div class="form-actions">
-              <button type="submit" class="btn btn-primary" id="save-application-settings-btn">Save settings</button>
+                <div class="form-group">
+                  <label for="weekly-self-test-time">Time</label>
+                  <select id="weekly-self-test-time" class="form-input" aria-describedby="weekly-self-test-time-help">
+                    <option value="10:00">10:00</option>
+                  </select>
+                  <small id="weekly-self-test-time-help" class="pane-subtext">Whole hours in the application timezone.</small>
+                </div>
+              </div>
+              <div class="form-group">
+                <span class="settings-field-heading">Last self-test</span>
+                <p id="notification-health-selftest" class="pane-subtext" role="status">No self-test runs yet.</p>
+              </div>
             </div>
-          </form>
-        </section>
+          </section>
+
+          <div class="form-actions application-settings-actions">
+            <button type="submit" class="btn btn-primary" id="save-application-settings-btn">Save settings</button>
+            <p class="pane-subtext">Saves forecast checks, scheduled reports, and automation.</p>
+          </div>
+        </form>
 
         <details class="form-card maintenance-details" id="setup-checklist-section">
           <summary><span id="setup-checklist-title">Setup status</span></summary>

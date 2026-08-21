@@ -204,6 +204,46 @@ test("Frontend File Structure & Integrity Checks", () => {
   );
   assert.match(
     htmlContent,
+    /id="forecast-checks-card"/,
+    "Forecast checks should be its own settings card"
+  );
+  assert.match(
+    htmlContent,
+    /id="scheduled-reports-card"/,
+    "Scheduled reports should be its own settings card"
+  );
+  assert.match(
+    htmlContent,
+    /id="automation-card"/,
+    "Automation should be a normal settings card, not an accordion"
+  );
+  assert.doesNotMatch(
+    htmlContent,
+    /id="automation-details"/,
+    "Automation accordion must be removed"
+  );
+  assert.doesNotMatch(
+    htmlContent,
+    /<fieldset[^>]*id="scheduled-report/,
+    "Scheduled report groups must not use native fieldsets"
+  );
+  assert.match(
+    htmlContent,
+    /application-settings-actions[\s\S]*id="save-application-settings-btn"/,
+    "Save settings must sit outside the Automation card"
+  );
+  assert.match(
+    htmlContent,
+    /Saves forecast checks, scheduled reports, and automation/,
+    "Save ownership helper text must be present"
+  );
+  assert.match(
+    htmlContent,
+    /<select id="weekly-self-test-time"/,
+    "Weekly self-test time must be a whole-hour select"
+  );
+  assert.match(
+    htmlContent,
     /class="locations-table-head"/,
     "Locations should expose a desktop column heading row"
   );

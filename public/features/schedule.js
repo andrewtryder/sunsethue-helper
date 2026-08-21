@@ -68,6 +68,12 @@ export function initSchedule({
     scheduledReportTimes = scheduledReportTimes.filter((slot) => allowed.has(slot));
   }
 
+  function channelAvailabilityHint(channel, globallyAvailable) {
+    if (globallyAvailable) return "Ready";
+    if (channel === "webpush") return "Register a device first";
+    return "Enable this channel above first";
+  }
+
   function renderScheduledReportOptions() {
     const options = document.getElementById("scheduled-reports-options");
     const enabledInput = document.getElementById("scheduled-reports-enabled");
@@ -80,9 +86,9 @@ export function initSchedule({
       const selectedSet = new Set(scheduledReportTimes.filter((slot) => checkSet.has(slot)));
       timesHost.innerHTML = selectedTimes.length
         ? selectedTimes.map((slot) => `
-            <label>
+            <label class="report-time-pill">
               <input type="checkbox" data-scheduled-report-time="${slot}" ${selectedSet.has(slot) ? "checked" : ""} ${!capabilities?.mutations ? "disabled" : ""}>
-              ${formatHourLabel(slot)}
+              <span class="report-time-pill-ui">${formatHourLabel(slot)}</span>
             </label>`).join("")
         : "<p class=\"pane-subtext\">Add default forecast check times first.</p>";
 
@@ -100,48 +106,61 @@ export function initSchedule({
       });
     }
 
+    const channelsHost = document.getElementById("scheduled-report-channels");
     const availability = getChannelAvailability() || {};
     const channelHints = [];
-    document.querySelectorAll("[data-scheduled-report-channel]").forEach((input) => {
-      const channel = input.getAttribute("data-scheduled-report-channel");
-      const globallyAvailable = availability[channel] !== false;
-      input.checked = scheduledReportChannels.includes(channel);
-      input.disabled = !capabilities?.mutations;
-      const label = input.closest("label");
-      if (label) {
-        const base = SCHEDULED_REPORT_CHANNELS.find((c) => c.id === channel)?.label || channel;
-        let hintSuffix = "";
+    if (channelsHost) {
+      channelsHost.innerHTML = SCHEDULED_REPORT_CHANNELS.map(({ id, label }) => {
+        const globallyAvailable = availability[id] !== false;
+        const hint = channelAvailabilityHint(id, globallyAvailable);
         if (!globallyAvailable) {
-          hintSuffix = channel === "webpush"
-            ? " — register a device first"
-            : " — enable this channel above first";
+          channelHints.push(
+            id === "webpush"
+              ? "Browser Push has no enabled devices"
+              : `${label} is globally disabled`
+          );
         }
-        label.lastChild.textContent = ` ${base}${hintSuffix}`;
-      }
-      if (!globallyAvailable) {
-        channelHints.push(
-          channel === "webpush"
-            ? "Browser Push has no enabled devices"
-            : `${SCHEDULED_REPORT_CHANNELS.find((c) => c.id === channel)?.label || channel} is globally disabled`
-        );
-      }
-      input.onchange = () => {
-        if (input.checked) {
-          if (!scheduledReportChannels.includes(channel)) scheduledReportChannels.push(channel);
-        } else {
-          scheduledReportChannels = scheduledReportChannels.filter((c) => c !== channel);
-        }
-        updateScheduledReportsHelp();
-      };
-    });
+        return `
+          <label class="scheduled-report-channel${!globallyAvailable ? " is-unavailable" : ""}">
+            <span class="scheduled-report-channel-copy">
+              <span class="scheduled-report-channel-name">${label}</span>
+              <span class="scheduled-report-channel-hint">${hint}</span>
+            </span>
+            <input type="checkbox" data-scheduled-report-channel="${id}" ${scheduledReportChannels.includes(id) ? "checked" : ""} ${!capabilities?.mutations ? "disabled" : ""}>
+            <span class="scheduled-report-channel-check" aria-hidden="true"></span>
+          </label>`;
+      }).join("");
+
+      channelsHost.querySelectorAll("[data-scheduled-report-channel]").forEach((input) => {
+        input.addEventListener("change", () => {
+          const channel = input.getAttribute("data-scheduled-report-channel");
+          if (input.checked) {
+            if (!scheduledReportChannels.includes(channel)) scheduledReportChannels.push(channel);
+          } else {
+            scheduledReportChannels = scheduledReportChannels.filter((c) => c !== channel);
+          }
+          updateScheduledReportsHelp();
+        });
+      });
+    }
 
     const hints = document.getElementById("scheduled-report-channel-hints");
     if (hints) {
       hints.textContent = channelHints.length
-        ? channelHints.join(". ") + ". Selection is kept and used when the channel is re-enabled."
+        ? `${channelHints.join(". ")}. Selection is kept and used when the channel is re-enabled.`
         : "";
     }
     updateScheduledReportsHelp();
+  }
+
+  function populateSelfTestTimeSelect(selectedValue = "10:00") {
+    const select = document.getElementById("weekly-self-test-time");
+    if (!select || select.tagName !== "SELECT") return;
+    const value = HOUR_OPTIONS.includes(selectedValue) ? selectedValue : "10:00";
+    select.innerHTML = HOUR_OPTIONS.map((slot) => (
+      `<option value="${slot}" ${slot === value ? "selected" : ""}>${slot}</option>`
+    )).join("");
+    select.value = value;
   }
 
   function updateScheduledReportsHelp() {
@@ -223,8 +242,7 @@ export function initSchedule({
     if (selfMode) selfMode.value = data.weeklySelfTestMode || "passive";
     const selfDay = document.getElementById("weekly-self-test-day");
     if (selfDay) selfDay.value = String(data.weeklySelfTestDay ?? 0);
-    const selfTime = document.getElementById("weekly-self-test-time");
-    if (selfTime) selfTime.value = data.weeklySelfTestTime || "10:00";
+    populateSelfTestTimeSelect(data.weeklySelfTestTime || "10:00");
     const quota = document.getElementById("quota-estimator");
     if (quota && data.quota) {
       const q = data.quota;
@@ -330,9 +348,19 @@ export function initSchedule({
     }
     const enabledToggle = document.getElementById("scheduled-reports-enabled");
     if (enabledToggle) enabledToggle.disabled = true;
+    for (const id of [
+      "weekly-self-test-enabled",
+      "weekly-self-test-mode",
+      "weekly-self-test-day",
+      "weekly-self-test-time"
+    ]) {
+      const el = document.getElementById(id);
+      if (el) el.disabled = true;
+    }
   }
 
   populateTimezoneSelect(DEFAULT_SCHEDULE_TIMEZONE);
+  populateSelfTestTimeSelect("10:00");
   renderScheduledReportOptions();
 
   return {

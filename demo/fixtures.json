@@ -56,7 +56,7 @@
   "notificationSettings": {
     "emailEnabled": true,
     "emailConfigured": true,
-    "pushoverEnabled": true,
+    "pushoverEnabled": false,
     "pushoverConfigured": true,
     "webhookEnabled": false,
     "webhookConfigured": false
@@ -262,7 +262,12 @@
     "pushover": "ready",
     "webhook": "not_configured",
     "browserPushDevices": "not_configured",
-    "browserPushDeviceCount": 0
+    "browserPushDeviceCount": 0,
+    "deliveryChannels": {
+      "configured": 2,
+      "enabled": 1,
+      "ready": true
+    }
   },
   "webPush": {
     "subscriptions": []

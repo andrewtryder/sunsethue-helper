@@ -29,12 +29,18 @@ test.describe("Static Demo", () => {
   test("settings shows timezone select and default check times", async ({ page, baseURL }) => {
     await page.goto(`${baseURL}${SUBPATH}`);
     await page.locator("#nav-settings").click();
+    await expect(page.locator("#forecast-checks-card")).toBeVisible();
+    await expect(page.locator("#scheduled-reports-card")).toBeVisible();
+    await expect(page.locator("#automation-card")).toBeVisible();
+    await expect(page.locator("#automation-details")).toHaveCount(0);
     await expect(page.locator("#schedule-timezone")).toBeVisible();
     await expect(page.locator("#schedule-timezone")).toHaveJSProperty("tagName", "SELECT");
     await expect(page.locator("#schedule-timezone")).toBeDisabled();
     await expect(page.locator("#check-times-block")).toBeVisible();
     await expect(page.locator("#schedule-times-pills")).toBeVisible();
     await expect(page.locator('input[name="display-timezone-mode"]')).toHaveCount(0);
+    await page.locator("#setup-checklist-section > summary").click();
+    await expect(page.locator("#setup-checklist")).toContainText("2 configured · 1 enabled");
   });
 
   test("locations list is primary content without global schedule editor", async ({ page, baseURL }) => {

@@ -133,6 +133,31 @@ test("only the release job holds write permissions, and only what Release Please
   assert.equal(production.jobs.release.concurrency.group, "sunsethue-release");
 });
 
+test("every Generate Wrangler configuration step passes WEB_PUSH_* vars from production environment", () => {
+  const production = workflow("production.yml");
+  const configSteps = [];
+  for (const [jobName, job] of Object.entries(production.jobs)) {
+    for (const step of job.steps || []) {
+      if (step.run === "npm run config:generate:strict") {
+        configSteps.push({ jobName, env: step.env });
+      }
+    }
+  }
+  assert.ok(configSteps.length > 0, "expected at least one config-generation step");
+  for (const { jobName, env } of configSteps) {
+    assert.equal(
+      env?.WEB_PUSH_VAPID_PUBLIC_KEY,
+      "${{ vars.WEB_PUSH_VAPID_PUBLIC_KEY }}",
+      `${jobName} config-generation must pass WEB_PUSH_VAPID_PUBLIC_KEY`
+    );
+    assert.equal(
+      env?.WEB_PUSH_SUBJECT,
+      "${{ vars.WEB_PUSH_SUBJECT }}",
+      `${jobName} config-generation must pass WEB_PUSH_SUBJECT`
+    );
+  }
+});
+
 test("every production job that touches Cloudflare uses the production environment", () => {
   const production = workflow("production.yml");
   const cloudflareJobs = ["prepare", "schema", "deploy-worker", "deploy-pages", "verify"];

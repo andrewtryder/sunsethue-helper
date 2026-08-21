@@ -69,6 +69,8 @@ jobs:
           ACCESS_HOSTNAME: ${{ vars.ACCESS_HOSTNAME }}
           AUTHORIZED_EMAIL: ${{ secrets.AUTHORIZED_EMAIL }}
           DEPLOY_REPOSITORY: ${{ vars.DEPLOY_REPOSITORY }}
+          WEB_PUSH_VAPID_PUBLIC_KEY: ${{ vars.WEB_PUSH_VAPID_PUBLIC_KEY }}
+          WEB_PUSH_SUBJECT: ${{ vars.WEB_PUSH_SUBJECT }}
         run: npm run config:generate:strict
 
       - name: Record deployment state and validate bindings
@@ -126,6 +128,8 @@ jobs:
           ACCESS_HOSTNAME: ${{ vars.ACCESS_HOSTNAME }}
           AUTHORIZED_EMAIL: ${{ secrets.AUTHORIZED_EMAIL }}
           DEPLOY_REPOSITORY: ${{ vars.DEPLOY_REPOSITORY }}
+          WEB_PUSH_VAPID_PUBLIC_KEY: ${{ vars.WEB_PUSH_VAPID_PUBLIC_KEY }}
+          WEB_PUSH_SUBJECT: ${{ vars.WEB_PUSH_SUBJECT }}
         run: npm run config:generate:strict
 
       - name: Apply D1 schema
@@ -200,6 +204,8 @@ jobs:
           ACCESS_HOSTNAME: ${{ vars.ACCESS_HOSTNAME }}
           AUTHORIZED_EMAIL: ${{ secrets.AUTHORIZED_EMAIL }}
           DEPLOY_REPOSITORY: ${{ vars.DEPLOY_REPOSITORY }}
+          WEB_PUSH_VAPID_PUBLIC_KEY: ${{ vars.WEB_PUSH_VAPID_PUBLIC_KEY }}
+          WEB_PUSH_SUBJECT: ${{ vars.WEB_PUSH_SUBJECT }}
         run: npm run config:generate:strict
 
       - name: Secrets Store preflight
@@ -304,6 +310,8 @@ jobs:
           ACCESS_HOSTNAME: ${{ vars.ACCESS_HOSTNAME }}
           AUTHORIZED_EMAIL: ${{ secrets.AUTHORIZED_EMAIL }}
           DEPLOY_REPOSITORY: ${{ vars.DEPLOY_REPOSITORY }}
+          WEB_PUSH_VAPID_PUBLIC_KEY: ${{ vars.WEB_PUSH_VAPID_PUBLIC_KEY }}
+          WEB_PUSH_SUBJECT: ${{ vars.WEB_PUSH_SUBJECT }}
         run: npm run config:generate:strict
 
       - name: Deploy Pages project
@@ -361,6 +369,8 @@ jobs:
           ACCESS_HOSTNAME: ${{ vars.ACCESS_HOSTNAME }}
           AUTHORIZED_EMAIL: ${{ secrets.AUTHORIZED_EMAIL }}
           DEPLOY_REPOSITORY: ${{ vars.DEPLOY_REPOSITORY }}
+          WEB_PUSH_VAPID_PUBLIC_KEY: ${{ vars.WEB_PUSH_VAPID_PUBLIC_KEY }}
+          WEB_PUSH_SUBJECT: ${{ vars.WEB_PUSH_SUBJECT }}
         run: npm run config:generate:strict
 
       # Unauthenticated negative checks only. CI never presents a human Access

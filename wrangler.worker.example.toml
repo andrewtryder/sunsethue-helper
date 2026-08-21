@@ -53,6 +53,9 @@ secret_name = "SUNSETHUE_WEB_PUSH_VAPID"
 
 # Non-secret Web Push config (set via Wrangler vars / CI):
 # WEB_PUSH_VAPID_PUBLIC_KEY, WEB_PUSH_SUBJECT (mailto: or https URL)
+# Run `npm run webpush:setup -- --subject mailto:ops@example.com` to generate the
+# matching private key in Secrets Store and print the public key/subject to set here.
+{{WEB_PUSH_VARS}}
 
 [observability]
 enabled = true

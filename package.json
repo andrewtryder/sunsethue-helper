@@ -49,6 +49,8 @@
     "secrets:upload:admin": "node scripts/upload-worker-secrets.mjs --target=admin",
     "secrets-store:bootstrap": "node scripts/secrets-store-bootstrap.mjs",
     "secrets-store:preflight": "node scripts/secrets-store-preflight.mjs",
+    "webpush:setup": "node scripts/webpush-setup.mjs",
+    "webpush:verify": "node scripts/webpush-verify.mjs",
     "deploy:prepare": "node scripts/prepare-deployment.mjs",
     "verify:production": "node scripts/verify-production.mjs",
     "rollback:production": "node scripts/rollback-production.mjs",

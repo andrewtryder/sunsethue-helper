@@ -11,6 +11,10 @@ import { readFile, writeFile } from "node:fs/promises";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { resolveTemplateValues } from "./lib/project-config.mjs";
+import {
+  isValidVapidPublicKey,
+  isValidVapidSubject
+} from "./lib/webpush-vapid.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -79,6 +83,7 @@ export async function generateWranglerConfig({
     strict,
     requireSecretsStore: strict || requireSecretsStore
   });
+  values.WEB_PUSH_VARS = renderWebPushVars();
   const written = [];
 
   for (const entry of TEMPLATES) {
@@ -95,9 +100,34 @@ export async function generateWranglerConfig({
       ...values,
       D1_DATABASE_ID: "[redacted]",
       SECRETS_STORE_ID: values.SECRETS_STORE_ID ? "[redacted]" : values.SECRETS_STORE_ID,
-      CLOUDFLARE_ACCOUNT_ID: values.CLOUDFLARE_ACCOUNT_ID ? "[redacted]" : values.CLOUDFLARE_ACCOUNT_ID
+      CLOUDFLARE_ACCOUNT_ID: values.CLOUDFLARE_ACCOUNT_ID ? "[redacted]" : values.CLOUDFLARE_ACCOUNT_ID,
+      WEB_PUSH_VARS: values.WEB_PUSH_VARS ? "[redacted]" : values.WEB_PUSH_VARS
     }
   };
+}
+
+function tomlString(value) {
+  return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+}
+
+function renderWebPushVars() {
+  const publicKey = (process.env.WEB_PUSH_VAPID_PUBLIC_KEY || "").trim();
+  const subject = (process.env.WEB_PUSH_SUBJECT || "").trim();
+  if (!publicKey && !subject) return "";
+  if (!publicKey || !subject) {
+    throw new Error("Both WEB_PUSH_VAPID_PUBLIC_KEY and WEB_PUSH_SUBJECT must be set together");
+  }
+  if (!isValidVapidPublicKey(publicKey)) {
+    throw new Error("WEB_PUSH_VAPID_PUBLIC_KEY is not a valid 65-byte / 0x04 P-256 VAPID public key");
+  }
+  if (!isValidVapidSubject(subject)) {
+    throw new Error("WEB_PUSH_SUBJECT must be a mailto: or https:// URL");
+  }
+  return [
+    "[vars]",
+    `WEB_PUSH_VAPID_PUBLIC_KEY = ${tomlString(publicKey)}`,
+    `WEB_PUSH_SUBJECT = ${tomlString(subject)}`
+  ].join("\n");
 }
 
 async function main() {

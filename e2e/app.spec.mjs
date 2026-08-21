@@ -260,7 +260,8 @@ test.describe("Horizon app smoke", () => {
     await expect(page.locator("#app-container")).toBeVisible({ timeout: 30_000 });
     await page.locator('[data-tab="locations"]:visible').first().click();
     await expect(page.locator(".loc-rule-card").first()).toBeVisible();
-    await expect(page.locator(".loc-rule-threshold-line").first()).toContainText("Alerts: Mixed");
+    await expect(page.locator(".loc-rule-threshold-line").first()).toContainText("Mixed");
+    await expect(page.locator(".loc-rule-threshold-line").first()).not.toContainText("Alerts:");
     await expect(page.locator(".loc-rule-threshold-line").first()).not.toContainText("Threshold ≥");
 
     await page.locator(`[data-location-edit="${location.id}"]`).click();
@@ -309,7 +310,8 @@ test.describe("Horizon app smoke", () => {
     await expect(page.locator("#app-container")).toBeVisible({ timeout: 30_000 });
     await page.locator('[data-tab="locations"]:visible').first().click();
     await expect(page.locator(".loc-rule-card").first()).toBeVisible();
-    await expect(page.locator(".loc-rule-threshold-line").first()).toContainText("Alerts: Mixed");
+    await expect(page.locator(".loc-rule-threshold-line").first()).toContainText("Mixed");
+    await expect(page.locator(".loc-rule-threshold-line").first()).not.toContainText("Alerts:");
     await expect(page.getByText(/Channel enablement status unavailable/i)).toBeVisible();
 
     await page.locator(`[data-location-edit="${location.id}"]`).click();
@@ -447,6 +449,8 @@ test.describe("Horizon app smoke", () => {
     await expect(page.locator("#app-container")).toBeVisible({ timeout: 30_000 });
 
     await page.locator('[data-tab="locations"]:visible').first().click();
+    await expect(page.locator("#pane-locations")).toBeVisible();
+    await expectNoSeriousAxeViolations(page);
     await page.locator("#open-location-drawer-btn").click();
     await expect(page.locator("#location-drawer")).toBeVisible();
     await expectNoSeriousAxeViolations(page);
@@ -455,6 +459,132 @@ test.describe("Horizon app smoke", () => {
     await page.locator("#nav-settings").click();
     await expect(page.locator("#pane-settings")).toBeVisible();
     await expectNoSeriousAxeViolations(page);
+  });
+
+  test("locations table columns and bulk alert popover stay anchored", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "desktop", "desktop alignment coverage");
+    const locations = [
+      {
+        id: "loc-align-1",
+        name: "Sandown",
+        latitude: 42.9287,
+        longitude: -71.187,
+        scheduleTimes: null
+      },
+      {
+        id: "loc-align-2",
+        name: "Portland Head Light",
+        latitude: 43.6231,
+        longitude: -70.2079,
+        scheduleTimes: ["06:00", "18:00"]
+      }
+    ];
+    await page.route("**/api/locations", (route) => fulfillJson(route, locations));
+    await page.route("**/api/location-notification-rules", async (route) => {
+      if (route.request().method() === "GET") {
+        return fulfillJson(route, {
+          rules: locations.flatMap((loc) => [
+            { locationId: loc.id, channel: "email", enabled: true, thresholdPercent: null, eventScope: "either" },
+            { locationId: loc.id, channel: "pushover", enabled: true, thresholdPercent: null, eventScope: "either" },
+            { locationId: loc.id, channel: "webpush", enabled: true, thresholdPercent: null, eventScope: "either" },
+            { locationId: loc.id, channel: "webhook", enabled: true, thresholdPercent: null, eventScope: "either" }
+          ])
+        });
+      }
+      return fulfillJson(route, {});
+    });
+
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/");
+    await expect(page.locator("#app-container")).toBeVisible({ timeout: 30_000 });
+    await page.locator('[data-tab="locations"]:visible').first().click();
+    await expect(page.locator("#pane-locations")).toBeVisible();
+
+    const head = page.locator(".locations-table-head");
+    await expect(head).toBeVisible();
+    await expect(head).toHaveText(/Location\s+Checks\s+Channels\s+Alert rule\s+Action/);
+
+    const cards = page.locator(".loc-rule-card");
+    await expect(cards).toHaveCount(2);
+    await expect(page.locator(".loc-rule-threshold-line").first()).toHaveText("Always");
+    await expect(page.locator(".loc-rule-threshold-line").first()).not.toContainText("Alerts:");
+
+    const firstCard = await cards.first().boundingBox();
+    expect(firstCard).toBeTruthy();
+    const firstListTop = firstCard.y;
+
+    const bulk = page.locator(".bulk-alert-menu");
+    await bulk.locator("summary").click();
+    await expect(bulk).toHaveAttribute("open", "");
+    await expect(page.locator(".bulk-alert-menu-panel")).toBeVisible();
+
+    const afterOpen = await cards.first().boundingBox();
+    expect(Math.abs((afterOpen?.y || 0) - firstListTop)).toBeLessThan(2);
+
+    await expect(page.locator("#pane-locations")).toHaveScreenshot("pane-locations-bulk-open.png", {
+      maxDiffPixelRatio: 0.08
+    });
+
+    await page.keyboard.press("Escape");
+    await expect(bulk).not.toHaveAttribute("open", "");
+
+    await bulk.locator("summary").click();
+    await page.locator("#rules-copy-all-btn").click();
+    await expect(bulk).not.toHaveAttribute("open", "");
+
+    await bulk.locator("summary").click();
+    await page.locator("body").click({ position: { x: 8, y: 8 } });
+    await expect(bulk).not.toHaveAttribute("open", "");
+
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await expect(page.locator(".locations-table-head")).toBeVisible();
+    await expect(page.locator("#pane-locations")).toHaveScreenshot("pane-locations-1920.png", {
+      maxDiffPixelRatio: 0.08
+    });
+  });
+
+  test("locations mobile stacks without horizontal scroll and hides table head", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "mobile", "mobile Locations layout only");
+    await page.route("**/api/locations", (route) => fulfillJson(route, [{
+      id: "loc-mobile-1",
+      name: "Sandown",
+      latitude: 42.9287,
+      longitude: -71.187,
+      scheduleTimes: null
+    }]));
+    await page.route("**/api/location-notification-rules", (route) => {
+      if (route.request().method() === "GET") {
+        return fulfillJson(route, {
+          rules: [
+            { locationId: "loc-mobile-1", channel: "email", enabled: true, thresholdPercent: null, eventScope: "either" },
+            { locationId: "loc-mobile-1", channel: "pushover", enabled: true, thresholdPercent: null, eventScope: "either" },
+            { locationId: "loc-mobile-1", channel: "webpush", enabled: true, thresholdPercent: null, eventScope: "either" },
+            { locationId: "loc-mobile-1", channel: "webhook", enabled: true, thresholdPercent: null, eventScope: "either" }
+          ]
+        });
+      }
+      return fulfillJson(route, {});
+    });
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/");
+    await expect(page.locator("#app-container")).toBeVisible({ timeout: 30_000 });
+    await page.locator('[data-tab="locations"]:visible').first().click();
+    await expect(page.locator("#pane-locations")).toBeVisible();
+    await expect(page.locator(".locations-table-head")).toBeHidden();
+    await expect(page.locator(".loc-rule-field-label").first()).toBeVisible();
+
+    const scrollWidth = await page.locator("#pane-locations").evaluate((el) => el.scrollWidth);
+    const clientWidth = await page.locator("#pane-locations").evaluate((el) => el.clientWidth);
+    expect(scrollWidth).toBeLessThanOrEqual(clientWidth + 1);
+
+    const bulk = page.locator(".bulk-alert-menu");
+    await bulk.locator("summary").click();
+    await expect(page.locator(".bulk-alert-menu-panel")).toBeVisible();
+    const panelBox = await page.locator(".bulk-alert-menu-panel").boundingBox();
+    expect(panelBox).toBeTruthy();
+    expect(panelBox.x).toBeGreaterThanOrEqual(0);
+    expect(panelBox.x + panelBox.width).toBeLessThanOrEqual(390 + 1);
   });
 
   test("screenshot panes", async ({ page }, testInfo) => {

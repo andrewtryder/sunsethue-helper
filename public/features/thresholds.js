@@ -68,21 +68,26 @@ function thresholdSummaryLabel(value) {
   return `${value}%+`;
 }
 
-function locationThresholdSummary(locRules, isChannelEffective) {
+/**
+ * Compact alert-rule summary for the Locations table Alert rule column.
+ * Globally disabled channels are excluded so they cannot force Mixed.
+ * Desktop shows this value alone; mobile prefixes it with a field label in markup.
+ */
+export function locationThresholdSummary(locRules, isChannelEffective) {
   const effectiveChannels = CHANNELS.filter((channel) => isChannelEffective(channel));
-  if (effectiveChannels.length === 0) return "Alerts: Off";
+  if (effectiveChannels.length === 0) return "Off";
 
   const values = effectiveChannels.map((channel) => {
     const rule = locRules.find((item) => item.channel === channel);
     return ruleValue(rule);
   });
 
-  if (values.every((value) => value === "off")) return "Alerts: Off";
-  if (values.every((value) => value === "")) return "Alerts: Always";
+  if (values.every((value) => value === "off")) return "Off";
+  if (values.every((value) => value === "")) return "Always";
   if (values.every((value) => value === values[0] && value !== "off")) {
-    return `Alerts: ${thresholdSummaryLabel(values[0])}`;
+    return thresholdSummaryLabel(values[0]);
   }
-  return "Alerts: Mixed";
+  return "Mixed";
 }
 
 export function initThresholds({
@@ -342,12 +347,19 @@ export function initThresholds({
             </div>
           </div>
         </div>
-        <div class="hint-text loc-rule-schedule-line${custom ? " is-custom" : ""}">
-          <span class="material-symbols-outlined" aria-hidden="true">schedule</span>
-          ${escapeHtml(scheduleSummaryLabel(loc))}
+        <div class="loc-rule-checks">
+          <span class="loc-rule-field-label">Checks</span>
+          <div class="hint-text loc-rule-schedule-line${custom ? " is-custom" : ""}">
+            <span class="material-symbols-outlined" aria-hidden="true">schedule</span>
+            ${escapeHtml(scheduleSummaryLabel(loc))}
+          </div>
         </div>
-        <div class="loc-rule-notify">
+        <div class="loc-rule-channels">
+          <span class="loc-rule-field-label">Channels</span>
           <div class="channel-dots">${channelDots}</div>
+        </div>
+        <div class="loc-rule-alert">
+          <span class="loc-rule-field-label">Alert rule</span>
           <span class="hint-text loc-rule-threshold-line">${escapeHtml(thresholdLine)}</span>
         </div>
         <div class="loc-rule-actions">
@@ -537,12 +549,39 @@ export function initThresholds({
     });
   }
 
+  const bulkMenu = document.querySelector(".bulk-alert-menu");
+
+  function closeBulkMenu({ restoreFocus = false } = {}) {
+    if (!bulkMenu?.open) return;
+    bulkMenu.open = false;
+    if (restoreFocus) {
+      bulkMenu.querySelector("summary")?.focus();
+    }
+  }
+
+  function bindBulkMenuDismiss() {
+    if (!bulkMenu) return;
+    document.addEventListener("pointerdown", (event) => {
+      if (!bulkMenu.open) return;
+      if (bulkMenu.contains(event.target)) return;
+      closeBulkMenu();
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape" || !bulkMenu.open) return;
+      event.preventDefault();
+      closeBulkMenu({ restoreFocus: true });
+    });
+  }
+
+  bindBulkMenuDismiss();
+
   const copyBtn = document.getElementById("rules-copy-all-btn");
   if (copyBtn && !capabilities?.mutations) {
     copyBtn.disabled = true;
     copyBtn.title = "Copying rules is disabled in the static demo.";
   }
   copyBtn?.addEventListener("click", async () => {
+    closeBulkMenu();
     if (!capabilities?.mutations) return;
     const locationsList = getLocationsList();
     if (!locationsList[0]) return;
@@ -566,6 +605,7 @@ export function initThresholds({
     resetBtn.title = "Resetting rules is disabled in the static demo.";
   }
   resetBtn?.addEventListener("click", async () => {
+    closeBulkMenu();
     if (!capabilities?.mutations) return;
     const confirmed = window.confirm(
       "Set quality-alert rules for all locations to 50%? This replaces existing per-location alert thresholds."

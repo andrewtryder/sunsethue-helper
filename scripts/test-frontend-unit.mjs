@@ -15,6 +15,7 @@ import {
   mapGeolocationError
 } from "../public/lib/helpers.js";
 import { initHealth } from "../public/features/health.js";
+import { locationThresholdSummary } from "../public/features/thresholds.js";
 
 test("frontend helpers escape and render forecast badges", () => {
   assert.match(getForecastBadgeHtml(0.85, "Great"), /quality-meter/);
@@ -121,4 +122,45 @@ test("health fetch failure clears stuck Loading… channel subtitles", async () 
     if (previousDocument === undefined) delete globalThis.document;
     else globalThis.document = previousDocument;
   }
+});
+
+test("locationThresholdSummary returns compact desktop values without Alerts: prefix", () => {
+  const always = [
+    { channel: "email", enabled: true, thresholdPercent: null },
+    { channel: "pushover", enabled: true, thresholdPercent: null },
+    { channel: "webpush", enabled: true, thresholdPercent: null },
+    { channel: "webhook", enabled: true, thresholdPercent: null }
+  ];
+  assert.equal(locationThresholdSummary(always, () => true), "Always");
+  assert.doesNotMatch(locationThresholdSummary(always, () => true), /Alerts:/);
+
+  const fifty = always.map((rule) => ({ ...rule, thresholdPercent: 50 }));
+  assert.equal(locationThresholdSummary(fifty, () => true), "50%+");
+
+  const mixed = [
+    { channel: "email", enabled: true, thresholdPercent: 70 },
+    { channel: "pushover", enabled: true, thresholdPercent: null },
+    { channel: "webpush", enabled: true, thresholdPercent: 40 },
+    { channel: "webhook", enabled: false, thresholdPercent: null }
+  ];
+  assert.equal(locationThresholdSummary(mixed, () => true), "Mixed");
+
+  const off = always.map((rule) => ({ ...rule, enabled: false }));
+  assert.equal(locationThresholdSummary(off, () => true), "Off");
+});
+
+test("locationThresholdSummary ignores globally disabled channels when classifying", () => {
+  const rules = [
+    { channel: "email", enabled: true, thresholdPercent: null },
+    { channel: "pushover", enabled: true, thresholdPercent: 50 },
+    { channel: "webpush", enabled: true, thresholdPercent: null },
+    { channel: "webhook", enabled: true, thresholdPercent: null }
+  ];
+  // Pushover differs, but if it is globally disabled the remaining Always channels stay Always.
+  assert.equal(
+    locationThresholdSummary(rules, (channel) => channel !== "pushover"),
+    "Always"
+  );
+  assert.equal(locationThresholdSummary(rules, () => true), "Mixed");
+  assert.equal(locationThresholdSummary(rules, () => false), "Off");
 });

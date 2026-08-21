@@ -202,6 +202,26 @@ test("Frontend File Structure & Integrity Checks", () => {
     /Saved automatically/,
     "Schedule and Notifications should advertise auto-save"
   );
+  assert.match(
+    htmlContent,
+    /class="locations-table-head"/,
+    "Locations should expose a desktop column heading row"
+  );
+  assert.match(
+    htmlContent,
+    /locations-table-head[\s\S]*?>Location<\/span>[\s\S]*?>Checks<\/span>[\s\S]*?>Channels<\/span>[\s\S]*?>Alert rule<\/span>[\s\S]*?>Action<\/span>/,
+    "Locations heading labels must be Location, Checks, Channels, Alert rule, Action"
+  );
+  assert.match(
+    htmlContent,
+    /class="bulk-alert-menu"/,
+    "Locations should expose bulk alert actions"
+  );
+  assert.doesNotMatch(
+    htmlContent,
+    /bulk-alert-menu-panel"[^>]*role="menu"/,
+    "Bulk alert panel must not advertise incomplete ARIA menu semantics"
+  );
 
   // 4. Verify CSS design system tokens and key selectors are defined
   const cssContent = `${fs.readFileSync(cssPath, "utf8")}\n${fs.readFileSync(polishCssPath, "utf8")}`;
@@ -227,6 +247,10 @@ test("Frontend File Structure & Integrity Checks", () => {
     ".quality-indicator",
     ".quality-meter",
     ".loc-rule-card",
+    ".locations-table-head",
+    ".loc-rule-channels",
+    ".loc-rule-alert",
+    ".bulk-alert-menu-panel",
     ".quota-label",
     ".status-pill",
     ".quality-stack",
@@ -252,7 +276,17 @@ test("Frontend File Structure & Integrity Checks", () => {
   );
   assert.match(
     cssContent,
-    /minmax\(220px,\s*1\.3fr\)/,
-    "Desktop location cards should use full-width row columns"
+    /--locations-table-columns:[\s\S]*?minmax\(240px,\s*1\.35fr\)[\s\S]*?minmax\(110px,\s*0\.45fr\)[\s\S]*?72px/,
+    "Desktop location heading and cards must share a five-column grid"
+  );
+  assert.match(
+    cssContent,
+    /\.bulk-alert-menu-panel\s*\{[\s\S]*?position:\s*absolute/,
+    "Bulk alert menu must be an anchored popover, not normal-flow layout"
+  );
+  assert.doesNotMatch(
+    cssContent,
+    /\.loc-rule-notify\s*\{/,
+    "Obsolete stacked notify column styles should be removed"
   );
 });

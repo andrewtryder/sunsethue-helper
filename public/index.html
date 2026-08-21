@@ -99,12 +99,19 @@
               <div class="form-actions form-actions-compact location-rules-bulk-actions">
                 <details class="bulk-alert-menu">
                   <summary class="btn btn-secondary">Bulk alert actions</summary>
-                  <div class="bulk-alert-menu-panel" role="menu">
-                    <button type="button" id="rules-copy-all-btn" class="btn btn-secondary" role="menuitem">Copy first location's alert rules to all…</button>
-                    <button type="button" id="rules-reset-btn" class="btn btn-secondary" role="menuitem">Set all alert thresholds to 50%…</button>
+                  <div class="bulk-alert-menu-panel">
+                    <button type="button" id="rules-copy-all-btn" class="bulk-alert-menu-item">Copy first location's alert rules to all…</button>
+                    <button type="button" id="rules-reset-btn" class="bulk-alert-menu-item bulk-alert-menu-item-emphasis">Set all alert thresholds to 50%…</button>
                   </div>
                 </details>
               </div>
+            </div>
+            <div class="locations-table-head">
+              <span>Location</span>
+              <span>Checks</span>
+              <span>Channels</span>
+              <span>Alert rule</span>
+              <span>Action</span>
             </div>
             <div id="location-rules-grid" class="location-rules-list loc-rules-grid" role="region" aria-labelledby="location-rules-title"></div>
 

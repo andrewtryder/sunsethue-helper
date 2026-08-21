@@ -104,7 +104,7 @@ test("createDemoClient fixture routing", async () => {
     rules: [{ locationId: "1", channel: "email" }],
     credits: { remaining: 500 },
     providerCredentials: { email: { configured: true } },
-    webPush: { subscriptions: [{ id: "s1" }] }
+    webPush: { devices: [{ id: "s1" }] }
   };
 
   const api = createDemoClient(fixtures);
@@ -130,7 +130,7 @@ test("createDemoClient returns empty object for unknown paths", async () => {
 test("createDemoClient defaults webPush when fixture missing", async () => {
   const api = createDemoClient({});
   const data = await api.get("/api/web-push/subscriptions");
-  assert.deepStrictEqual(data, { subscriptions: [] });
+  assert.deepStrictEqual(data, { devices: [] });
 });
 
 test("createDemoClient send throws DEMO_READ_ONLY for non-GET", async () => {

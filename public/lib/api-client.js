@@ -63,7 +63,7 @@ export function createDemoClient(fixtures) {
     if (path.startsWith("/api/location-notification-rules")) return fixtures.rules;
     if (path.startsWith("/api/getApiCredits")) return fixtures.credits;
     if (path.startsWith("/api/provider-credentials")) return fixtures.providerCredentials;
-    if (path.startsWith("/api/web-push")) return fixtures.webPush || { subscriptions: [] };
+    if (path.startsWith("/api/web-push")) return fixtures.webPush || { devices: [] };
     return {};
   }
   return {

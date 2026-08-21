@@ -1,7 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { runSetup, parseArgs, assertNoPrivateMaterial } from "../../scripts/webpush-setup.mjs";
+import { spawn } from "node:child_process";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import { runSetup, parseArgs, assertNoPrivateMaterial, main } from "../../scripts/webpush-setup.mjs";
 import { generateVapidKeyPair } from "../../scripts/lib/webpush-vapid.mjs";
+
+const SETUP_SCRIPT = resolve(dirname(fileURLToPath(import.meta.url)), "../../scripts/webpush-setup.mjs");
 
 function fakeEnv(overrides = {}) {
   return {
@@ -92,9 +97,64 @@ test("runSetup fails with invalid subject", async () => {
   assert.match(result.error, /subject/);
 });
 
-test("runSetup refuses to print a private key", async () => {
+test("runSetup refuses to print a private key", () => {
   assert.throws(
     () => assertNoPrivateMaterial("-----BEGIN PRIVATE KEY-----\nMIIB...\n-----END PRIVATE KEY-----"),
     /Refusing to print/
   );
+});
+
+function runCli(args, env = {}) {
+  return new Promise((resolve) => {
+    const child = spawn("node", [SETUP_SCRIPT, ...args], {
+      env: { ...process.env, ...env },
+      stdio: "pipe"
+    });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (data) => { stdout += data; });
+    child.stderr.on("data", (data) => { stderr += data; });
+    child.on("close", (exitCode) => {
+      resolve({ exitCode, stdout, stderr });
+    });
+  });
+}
+
+test("main() sets exit code 0 for success and 1 for every failure path", async () => {
+  const previousExitCode = process.exitCode;
+  try {
+    process.exitCode = 0;
+    await main(async () => ({ ok: true }));
+    assert.equal(process.exitCode, 0);
+
+    process.exitCode = 0;
+    await main(async () => ({ ok: false, error: "test failure" }));
+    assert.equal(process.exitCode, 1);
+
+    process.exitCode = 0;
+    await main(async () => ({ ok: false, error: "Invalid or missing SECRETS_STORE_ID" }));
+    assert.equal(process.exitCode, 1);
+
+    process.exitCode = 0;
+    await main(async () => ({ ok: false, error: "A VAPID secret already exists..." }));
+    assert.equal(process.exitCode, 1);
+
+    process.exitCode = 0;
+    await main(async () => { throw new Error("boom"); });
+    assert.equal(process.exitCode, 1);
+  } finally {
+    process.exitCode = previousExitCode;
+  }
+});
+
+test("CLI exits 0 for --help", async () => {
+  const { exitCode, stdout } = await runCli(["--help"]);
+  assert.equal(exitCode, 0);
+  assert.match(stdout, /webpush:setup/);
+});
+
+test("CLI exits non-zero for invalid subject", async () => {
+  const { exitCode, stderr } = await runCli(["--subject", "not-a-subject"]);
+  assert.notEqual(exitCode, 0);
+  assert.match(stderr, /subject/);
 });

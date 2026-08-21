@@ -184,9 +184,12 @@ export async function runSetup(deps) {
   return summary;
 }
 
-async function main() {
+export async function main(setup = runSetup) {
   try {
-    await runSetup({});
+    const result = await setup({ argv: process.argv.slice(2) });
+    if (result?.ok === false) {
+      process.exitCode = 1;
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : "WEBPUSH_SETUP_FAILED";
     assertNoPrivateMaterial(message);

@@ -115,7 +115,7 @@ test("health fetch failure clears stuck Loading… channel subtitles", async () 
     assert.equal(elements["notification-health-selftest"].textContent, "Unable to load self-test status.");
     assert.equal(elements["email-channel-subtitle"].textContent, "Status temporarily unavailable");
     assert.equal(elements["pushover-channel-subtitle"].textContent, "Status temporarily unavailable");
-    assert.equal(elements["webpush-channel-subtitle"].textContent, "Status temporarily unavailable");
+    assert.equal(elements["webpush-channel-subtitle"].textContent, "Loading…");
     assert.equal(elements["webhook-channel-subtitle"].textContent, "Status temporarily unavailable");
     assert.equal(elements["notification-health-skips"].innerHTML, "");
   } finally {

@@ -293,6 +293,16 @@ const { fetchSetupChecklist } = initSetupStatus({ api, capabilities });
 let settingsStatePromise = null;
 let activityStatePromise = null;
 
+function applyWebPushAvailability({ enabledCount = 0 } = {}) {
+  channelAvailability = {
+    ...channelAvailability,
+    webpush: Number(enabledCount) > 0
+  };
+  if (typeof refreshScheduledReportChannelHints === "function") {
+    refreshScheduledReportChannelHints();
+  }
+}
+
 async function loadBrowserNotifications() {
   try {
     const { initBrowserNotifications } = await import("./features/browser-notifications.js");
@@ -301,7 +311,8 @@ async function loadBrowserNotifications() {
       showSuccess,
       showError,
       DEMO_READ_ONLY,
-      capabilities
+      capabilities,
+      onDevicesChanged: applyWebPushAvailability
     });
   } catch (error) {
     console.warn("Browser notifications are unavailable.", error);
@@ -314,7 +325,8 @@ async function loadBrowserNotifications() {
       btn.disabled = true;
       btn.title = "Browser notifications unavailable in this browser";
     }
-    return { fetchWebPushDevices: async () => {} };
+    applyWebPushAvailability({ enabledCount: 0 });
+    return { fetchWebPushDevices: async () => ({ enabledCount: 0, deviceCount: 0 }) };
   }
 }
 
@@ -332,17 +344,8 @@ async function loadSettingsState() {
       browserNotifications.fetchWebPushDevices()
     ]);
     const pushOutcome = outcomes[6];
-    if (pushOutcome.status === "fulfilled") {
-      const enabledCount = Number(pushOutcome.value?.enabledCount || 0);
-      channelAvailability = { ...channelAvailability, webpush: enabledCount > 0 };
-      if (typeof refreshScheduledReportChannelHints === "function") {
-        refreshScheduledReportChannelHints();
-      }
-    } else {
-      channelAvailability = { ...channelAvailability, webpush: false };
-      if (typeof refreshScheduledReportChannelHints === "function") {
-        refreshScheduledReportChannelHints();
-      }
+    if (pushOutcome.status === "rejected") {
+      applyWebPushAvailability({ enabledCount: 0 });
     }
     for (const outcome of outcomes) {
       if (outcome.status === "rejected") {

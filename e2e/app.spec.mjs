@@ -322,32 +322,34 @@ test.describe("Horizon app smoke", () => {
 
   test("settings exposes forecast checks and scheduled reports controls", async ({ page }) => {
     let putBody = null;
+    let current = {
+      scheduleTimezone: "America/New_York",
+      displayTimezoneMode: "schedule",
+      displayTimezone: null,
+      scheduleTimes: ["06:00", "12:00", "18:00"],
+      weeklySelfTestEnabled: true,
+      weeklySelfTestMode: "passive",
+      weeklySelfTestDay: 0,
+      weeklySelfTestTime: "10:00",
+      scheduledReportsEnabled: false,
+      scheduledReportTimes: [],
+      scheduledReportChannels: [],
+      quota: {
+        estimatedRequestsPer30Days: 90,
+        scheduledRunsPerDay: 3,
+        activeLocations: 1,
+        estimatedRequestsPerDay: 3
+      }
+    };
     await page.route("**/api/application-settings", async (route) => {
       if (route.request().method() === "GET") {
-        await fulfillJson(route, {
-          scheduleTimezone: "America/New_York",
-          displayTimezoneMode: "schedule",
-          displayTimezone: null,
-          scheduleTimes: ["06:00", "12:00", "18:00"],
-          weeklySelfTestEnabled: true,
-          weeklySelfTestMode: "passive",
-          weeklySelfTestDay: 0,
-          weeklySelfTestTime: "10:00",
-          scheduledReportsEnabled: false,
-          scheduledReportTimes: [],
-          scheduledReportChannels: [],
-          quota: {
-            estimatedRequestsPer30Days: 90,
-            scheduledRunsPerDay: 3,
-            activeLocations: 1,
-            estimatedRequestsPerDay: 3
-          }
-        });
+        await fulfillJson(route, current);
         return;
       }
       if (route.request().method() === "PUT") {
         putBody = route.request().postDataJSON();
-        await fulfillJson(route, putBody);
+        current = { ...current, ...putBody };
+        await fulfillJson(route, current);
         return;
       }
       await fulfillJson(route, {});
@@ -390,7 +392,256 @@ test.describe("Horizon app smoke", () => {
       scheduledReportChannels: ["email"]
     });
     await expect(page.locator(".scheduled-report-channel").filter({ hasText: "Pushover" })).toContainText("Enable this channel above first");
-    await expect(page.locator(".scheduled-report-channel").filter({ hasText: "Email" })).toContainText("Ready");
+    const emailChannel = page.locator(".scheduled-report-channel").filter({ hasText: "Email" });
+    await expect(emailChannel).toContainText("Selected · Ready");
+    await expect(emailChannel).toHaveClass(/is-selected/);
+  });
+
+  test("browser push registration syncs scheduled-report availability and selected channel styling", async ({ page }) => {
+    let devices = [];
+    let testBodies = [];
+
+    await page.addInitScript(() => {
+      window.__notifPermission = "granted";
+      window.__pushSubscription = null;
+      Object.defineProperty(Notification, "permission", {
+        configurable: true,
+        get() {
+          return window.__notifPermission || "default";
+        }
+      });
+      Notification.requestPermission = async () => {
+        window.__notifPermission = "granted";
+        return "granted";
+      };
+
+      const registration = {
+        pushManager: {
+          getSubscription: async () => window.__pushSubscription,
+          subscribe: async () => {
+            window.__pushSubscription = {
+              endpoint: "https://push.example.test/sub-1",
+              toJSON() {
+                return {
+                  endpoint: "https://push.example.test/sub-1",
+                  keys: { p256dh: "dGVzdC1wMjU2", auth: "dGVzdC1hdXRo" }
+                };
+              }
+            };
+            return window.__pushSubscription;
+          }
+        }
+      };
+
+      Object.defineProperty(navigator, "serviceWorker", {
+        configurable: true,
+        value: {
+          register: async () => registration,
+          get ready() {
+            return Promise.resolve(registration);
+          }
+        }
+      });
+    });
+
+    page.on("dialog", async (dialog) => {
+      await dialog.accept("This device");
+    });
+
+    await page.route("**/api/web-push/vapid-public-key", async (route) => {
+      await fulfillJson(route, { publicKey: "BFakeVapidPublicKeyForTests0123456789ABCDE" });
+    });
+    await page.route("**/api/web-push/subscriptions", async (route) => {
+      if (route.request().method() === "GET") {
+        await fulfillJson(route, { devices });
+        return;
+      }
+      if (route.request().method() === "POST") {
+        const body = route.request().postDataJSON();
+        const device = {
+          id: "11111111-1111-4111-8111-111111111111",
+          deviceName: body.deviceName || "This device",
+          enabled: true,
+          createdAt: Date.now(),
+          lastSeenAt: Date.now()
+        };
+        devices = [device];
+        await fulfillJson(route, { device }, 201);
+        return;
+      }
+      await fulfillJson(route, {});
+    });
+    await page.route("**/api/web-push/subscriptions/*", async (route) => {
+      const id = route.request().url().split("/").pop();
+      if (route.request().method() === "PATCH") {
+        const body = route.request().postDataJSON();
+        devices = devices.map((device) => (
+          device.id === id ? { ...device, enabled: body.enabled !== false } : device
+        ));
+        await fulfillJson(route, { devices });
+        return;
+      }
+      if (route.request().method() === "DELETE") {
+        devices = devices.filter((device) => device.id !== id);
+        await fulfillJson(route, { ok: true });
+        return;
+      }
+      await fulfillJson(route, {});
+    });
+    await page.route("**/api/notifications/test", async (route) => {
+      testBodies.push(route.request().postDataJSON());
+      await fulfillJson(route, { id: "test-1", status: "pending" }, 202);
+    });
+    await page.route("**/api/notification-settings", async (route) => {
+      await fulfillJson(route, {
+        emailEnabled: true,
+        emailConfigured: true,
+        pushoverEnabled: false,
+        pushoverConfigured: true,
+        webhookEnabled: false,
+        webhookConfigured: false
+      });
+    });
+    await page.route("**/api/application-settings", async (route) => {
+      if (route.request().method() === "GET") {
+        await fulfillJson(route, {
+          scheduleTimezone: "America/New_York",
+          displayTimezoneMode: "schedule",
+          displayTimezone: null,
+          scheduleTimes: ["06:00", "12:00", "18:00"],
+          weeklySelfTestEnabled: true,
+          weeklySelfTestMode: "passive",
+          weeklySelfTestDay: 0,
+          weeklySelfTestTime: "10:00",
+          scheduledReportsEnabled: true,
+          scheduledReportTimes: ["06:00"],
+          scheduledReportChannels: ["email", "webpush"],
+          quota: {
+            estimatedRequestsPer30Days: 90,
+            scheduledRunsPerDay: 3,
+            activeLocations: 1,
+            estimatedRequestsPerDay: 3
+          }
+        });
+        return;
+      }
+      if (route.request().method() === "PUT") {
+        const body = route.request().postDataJSON();
+        await fulfillJson(route, body || {});
+        return;
+      }
+      await fulfillJson(route, {});
+    });
+
+    await page.goto("/");
+    await expect(page.locator("#app-container")).toBeVisible({ timeout: 30_000 });
+    await page.locator("#nav-settings").click();
+    await expect(page.locator("#channel-card-webpush")).toBeVisible();
+
+    // Permission alone must not imply registration.
+    await expect(page.locator("#webpush-channel-subtitle")).toContainText("Permission granted · Device not registered");
+    await expect(page.locator("#web-push-devices")).toContainText("Permission granted · Device not registered");
+    await expect(page.locator("#retry-web-push-registration-btn")).toBeVisible();
+    await expect(page.locator("#web-push-devices")).not.toContainText("Not configured");
+
+    const webpushChannel = page.locator(".scheduled-report-channel").filter({ hasText: "Browser Push" });
+    await expect(webpushChannel).toContainText("Selected · currently unavailable");
+    await expect(webpushChannel).toHaveClass(/is-selected/);
+    await expect(webpushChannel).toHaveClass(/is-unavailable/);
+
+    const emailChannel = page.locator(".scheduled-report-channel").filter({ hasText: "Email" });
+    await expect(emailChannel).toContainText("Selected · Ready");
+    await expect(emailChannel).toHaveClass(/is-selected/);
+
+    await page.locator("#retry-web-push-registration-btn").click();
+    await expect(page.locator("#webpush-channel-subtitle")).toContainText("1 device enabled · 1 registered");
+    await expect(page.locator("#web-push-devices")).toContainText("This device — Enabled");
+    await expect(page.locator('[data-push-test]')).toBeVisible();
+    await expect(page.locator('[data-push-disable]')).toBeVisible();
+    await expect(page.locator('[data-push-remove]')).toBeVisible();
+
+    // channelAvailability.webpush updates without reload
+    await expect(webpushChannel).toContainText("Selected · Ready");
+    await expect(webpushChannel).toHaveClass(/is-selected/);
+    await expect(webpushChannel).not.toHaveClass(/is-unavailable/);
+
+    await page.locator('[data-push-test]').click();
+    await expect.poll(() => testBodies.length).toBe(1);
+    expect(testBodies[0]).toEqual({ channel: "webpush" });
+    await expect(page.locator("#db-success-banner")).toContainText("Browser push test queued");
+
+    await page.locator('[data-push-disable]').click();
+    await expect(page.locator("#web-push-devices")).toContainText("This device — Disabled");
+    await expect(webpushChannel).toContainText("Selected · currently unavailable");
+    await expect(webpushChannel).toHaveClass(/is-unavailable/);
+
+    await page.locator('[data-push-enable]').click();
+    await expect(webpushChannel).toContainText("Selected · Ready");
+    await expect(webpushChannel).not.toHaveClass(/is-unavailable/);
+
+    await page.locator('[data-push-remove]').click();
+    await expect(page.locator("#webpush-channel-subtitle")).toContainText("Permission granted · Device not registered");
+    await expect(webpushChannel).toContainText("Selected · currently unavailable");
+    await expect(webpushChannel).toHaveClass(/is-unavailable/);
+    expect(devices).toEqual([]);
+  });
+
+  test("scheduled report selected states remain usable on mobile viewport", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.route("**/api/notification-settings", async (route) => {
+      await fulfillJson(route, {
+        emailEnabled: true,
+        emailConfigured: true,
+        pushoverEnabled: false,
+        pushoverConfigured: true,
+        webhookEnabled: false,
+        webhookConfigured: false
+      });
+    });
+    await page.route("**/api/application-settings", async (route) => {
+      await fulfillJson(route, {
+        scheduleTimezone: "America/New_York",
+        displayTimezoneMode: "schedule",
+        displayTimezone: null,
+        scheduleTimes: ["06:00", "12:00", "18:00"],
+        weeklySelfTestEnabled: true,
+        weeklySelfTestMode: "passive",
+        weeklySelfTestDay: 0,
+        weeklySelfTestTime: "10:00",
+        scheduledReportsEnabled: true,
+        scheduledReportTimes: ["06:00", "18:00"],
+        scheduledReportChannels: ["email", "pushover"],
+        quota: {
+          estimatedRequestsPer30Days: 90,
+          scheduledRunsPerDay: 3,
+          activeLocations: 1,
+          estimatedRequestsPerDay: 3
+        }
+      });
+    });
+    await page.route("**/api/web-push/subscriptions", async (route) => {
+      await fulfillJson(route, { devices: [] });
+    });
+
+    await page.goto("/");
+    await expect(page.locator("#app-container")).toBeVisible({ timeout: 30_000 });
+    await page.locator("#nav-settings").click();
+    await expect(page.locator("#scheduled-reports-card")).toBeVisible();
+
+    const emailChannel = page.locator(".scheduled-report-channel").filter({ hasText: "Email" });
+    const pushoverChannel = page.locator(".scheduled-report-channel").filter({ hasText: "Pushover" });
+    await expect(emailChannel).toHaveClass(/is-selected/);
+    await expect(emailChannel).toContainText("Selected · Ready");
+    await expect(pushoverChannel).toHaveClass(/is-selected/);
+    await expect(pushoverChannel).toHaveClass(/is-unavailable/);
+    await expect(pushoverChannel).toContainText("Selected · currently unavailable");
+
+    const emailBox = await emailChannel.boundingBox();
+    expect(emailBox?.width).toBeGreaterThan(200);
+    expect(emailBox?.height).toBeGreaterThan(48);
+
+    await expect(page.locator(".report-time-pill.is-selected")).toHaveCount(2);
+    await expect(page.locator("#save-application-settings-btn")).toBeVisible();
   });
 
   test("settings weekly self-test save persists Passive and Active configurations", async ({ page }) => {

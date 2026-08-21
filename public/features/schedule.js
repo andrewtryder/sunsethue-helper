@@ -68,8 +68,9 @@ export function initSchedule({
     scheduledReportTimes = scheduledReportTimes.filter((slot) => allowed.has(slot));
   }
 
-  function channelAvailabilityHint(channel, globallyAvailable) {
-    if (globallyAvailable) return "Ready";
+  function channelAvailabilityHint(channel, globallyAvailable, selected) {
+    if (globallyAvailable) return selected ? "Selected · Ready" : "Ready";
+    if (selected) return "Selected · currently unavailable";
     if (channel === "webpush") return "Register a device first";
     return "Enable this channel above first";
   }
@@ -85,11 +86,14 @@ export function initSchedule({
       const checkSet = new Set(selectedTimes);
       const selectedSet = new Set(scheduledReportTimes.filter((slot) => checkSet.has(slot)));
       timesHost.innerHTML = selectedTimes.length
-        ? selectedTimes.map((slot) => `
-            <label class="report-time-pill">
-              <input type="checkbox" data-scheduled-report-time="${slot}" ${selectedSet.has(slot) ? "checked" : ""} ${!capabilities?.mutations ? "disabled" : ""}>
+        ? selectedTimes.map((slot) => {
+          const selected = selectedSet.has(slot);
+          return `
+            <label class="report-time-pill${selected ? " is-selected" : ""}">
+              <input type="checkbox" data-scheduled-report-time="${slot}" ${selected ? "checked" : ""} ${!capabilities?.mutations ? "disabled" : ""}>
               <span class="report-time-pill-ui">${formatHourLabel(slot)}</span>
-            </label>`).join("")
+            </label>`;
+        }).join("")
         : "<p class=\"pane-subtext\">Add default forecast check times first.</p>";
 
       timesHost.querySelectorAll("[data-scheduled-report-time]").forEach((input) => {
@@ -101,6 +105,7 @@ export function initSchedule({
             scheduledReportTimes = scheduledReportTimes.filter((t) => t !== slot);
           }
           scheduledReportTimes.sort();
+          input.closest(".report-time-pill")?.classList.toggle("is-selected", input.checked);
           updateScheduledReportsHelp();
         });
       });
@@ -112,7 +117,8 @@ export function initSchedule({
     if (channelsHost) {
       channelsHost.innerHTML = SCHEDULED_REPORT_CHANNELS.map(({ id, label }) => {
         const globallyAvailable = availability[id] !== false;
-        const hint = channelAvailabilityHint(id, globallyAvailable);
+        const selected = scheduledReportChannels.includes(id);
+        const hint = channelAvailabilityHint(id, globallyAvailable, selected);
         if (!globallyAvailable) {
           channelHints.push(
             id === "webpush"
@@ -120,13 +126,17 @@ export function initSchedule({
               : `${label} is globally disabled`
           );
         }
+        const stateClass = [
+          !globallyAvailable ? "is-unavailable" : "",
+          selected ? "is-selected" : ""
+        ].filter(Boolean).join(" ");
         return `
-          <label class="scheduled-report-channel${!globallyAvailable ? " is-unavailable" : ""}">
+          <label class="scheduled-report-channel${stateClass ? ` ${stateClass}` : ""}">
             <span class="scheduled-report-channel-copy">
               <span class="scheduled-report-channel-name">${label}</span>
               <span class="scheduled-report-channel-hint">${hint}</span>
             </span>
-            <input type="checkbox" data-scheduled-report-channel="${id}" ${scheduledReportChannels.includes(id) ? "checked" : ""} ${!capabilities?.mutations ? "disabled" : ""}>
+            <input type="checkbox" data-scheduled-report-channel="${id}" ${selected ? "checked" : ""} ${!capabilities?.mutations ? "disabled" : ""}>
             <span class="scheduled-report-channel-check" aria-hidden="true"></span>
           </label>`;
       }).join("");
@@ -138,6 +148,13 @@ export function initSchedule({
             if (!scheduledReportChannels.includes(channel)) scheduledReportChannels.push(channel);
           } else {
             scheduledReportChannels = scheduledReportChannels.filter((c) => c !== channel);
+          }
+          const label = input.closest(".scheduled-report-channel");
+          if (label) {
+            label.classList.toggle("is-selected", input.checked);
+            const globallyAvailable = (getChannelAvailability() || {})[channel] !== false;
+            const hint = label.querySelector(".scheduled-report-channel-hint");
+            if (hint) hint.textContent = channelAvailabilityHint(channel, globallyAvailable, input.checked);
           }
           updateScheduledReportsHelp();
         });

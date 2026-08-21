@@ -50,6 +50,9 @@ export function initHealth({ api, formatDateTime = (v) => v, capabilities }) {
 
       for (const ch of health.channels || []) {
         const key = channelKey(ch.channel);
+        // Browser Push subtitle is owned by device registration state in
+        // browser-notifications.js (permission vs registered vs enabled).
+        if (key === "webpush" || key === "web_push" || key === "browser_push") continue;
         const subtitleId = CHANNEL_SUBTITLE_IDS[key] || CHANNEL_SUBTITLE_IDS[key.replace(/_/g, "")];
         const el = subtitleId ? document.getElementById(subtitleId) : null;
         if (el) el.textContent = formatChannelSubtitle(ch, formatDateTime);
@@ -71,6 +74,7 @@ export function initHealth({ api, formatDateTime = (v) => v, capabilities }) {
       if (summary) summary.textContent = "Unable to load notification health.";
       if (selfTestHost) selfTestHost.textContent = "Unable to load self-test status.";
       for (const id of new Set(Object.values(CHANNEL_SUBTITLE_IDS))) {
+        if (id === "webpush-channel-subtitle") continue;
         const el = document.getElementById(id);
         if (el) el.textContent = "Status temporarily unavailable";
       }

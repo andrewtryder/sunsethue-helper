@@ -151,7 +151,7 @@ test.describe("Horizon app smoke", () => {
     const card = page.locator(".loc-rule-card").first();
     await expect(card).toBeVisible();
     const gridCols = await card.evaluate((el) => getComputedStyle(el).gridTemplateColumns);
-    expect(gridCols.split(" ").length).toBeGreaterThanOrEqual(4);
+    expect(gridCols.split(/\s+/).filter(Boolean).length).toBe(5);
     await expect(card.locator(".loc-rule-edit-btn")).toBeVisible();
   });
 

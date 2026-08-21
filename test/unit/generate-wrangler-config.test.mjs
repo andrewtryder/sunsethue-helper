@@ -144,3 +144,51 @@ test("strict generation fails closed when D1_DATABASE_ID is missing", async () =
     await rm(temp, { recursive: true, force: true });
   }
 });
+
+test("generateWranglerConfig emits WEB_PUSH [vars] only when both env vars are set", async () => {
+  const temp = await mkdtemp(join(tmpdir(), "sunsethue-webpush-"));
+  const previous = { ...process.env };
+  try {
+    clearProjectEnv();
+    await writeFile(join(temp, "wrangler.example.toml"), 'name = "{{PAGES_PROJECT_NAME}}"\n');
+    await writeFile(
+      join(temp, "wrangler.worker.example.toml"),
+      'name = "{{WORKER_NAME}}"\n{{WEB_PUSH_VARS}}\n'
+    );
+    await writeFile(
+      join(temp, "wrangler.credential-admin.example.toml"),
+      'name = "{{CREDENTIAL_ADMIN_WORKER_NAME}}"\n'
+    );
+
+    // No WEB_PUSH env vars -> no [vars] block, no leftover token
+    delete process.env.WEB_PUSH_VAPID_PUBLIC_KEY;
+    delete process.env.WEB_PUSH_SUBJECT;
+    const without = await generateWranglerConfig({ strict: false, root: temp });
+    const workerWithout = await readFile(join(temp, "wrangler.worker.toml"), "utf8");
+    assert.doesNotMatch(workerWithout, /WEB_PUSH_VAPID_PUBLIC_KEY/);
+    assert.doesNotMatch(workerWithout, /\{\{WEB_PUSH_VARS\}\}/);
+    assert.equal(without.values.WEB_PUSH_VARS, "");
+
+    // Both set -> [vars] block emitted
+    process.env.WEB_PUSH_VAPID_PUBLIC_KEY = "BExamplePublicKeyForTestOnly";
+    process.env.WEB_PUSH_SUBJECT = "mailto:ops@example.com";
+    const withVars = await generateWranglerConfig({ strict: false, root: temp });
+    const workerWith = await readFile(join(temp, "wrangler.worker.toml"), "utf8");
+    assert.match(workerWith, /\[vars\]/);
+    assert.match(workerWith, /WEB_PUSH_VAPID_PUBLIC_KEY = "BExamplePublicKeyForTestOnly"/);
+    assert.match(workerWith, /WEB_PUSH_SUBJECT = "mailto:ops@example.com"/);
+    assert.equal(withVars.values.WEB_PUSH_VARS, "[redacted]");
+
+    // Only one set -> fail closed
+    delete process.env.WEB_PUSH_SUBJECT;
+    await assert.rejects(
+      () => generateWranglerConfig({ strict: false, root: temp }),
+      /Both WEB_PUSH_VAPID_PUBLIC_KEY and WEB_PUSH_SUBJECT must be set together/
+    );
+  } finally {
+    delete process.env.WEB_PUSH_VAPID_PUBLIC_KEY;
+    delete process.env.WEB_PUSH_SUBJECT;
+    restoreEnv(previous);
+    await rm(temp, { recursive: true, force: true });
+  }
+});

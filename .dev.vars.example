@@ -19,3 +19,11 @@ WEBAPP_URL=http://127.0.0.1:5010
 
 # Optional Sunsethue API key for local manual triggers:
 # SUNSETHUE_API_KEY=
+
+# Web Push VAPID (optional). Local Wrangler cannot bind Secrets Store secrets,
+# so the Worker falls back to WEB_PUSH_VAPID_PRIVATE_KEY when present (see
+# resolveWebPushConfig). Generate a keypair with `npm run webpush:setup` and
+# copy the printed public key + subject here; keep the private key local only.
+# WEB_PUSH_VAPID_PUBLIC_KEY=
+# WEB_PUSH_SUBJECT=mailto:owner@example.com
+# WEB_PUSH_VAPID_PRIVATE_KEY=

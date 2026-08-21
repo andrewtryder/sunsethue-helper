@@ -79,6 +79,7 @@ export async function generateWranglerConfig({
     strict,
     requireSecretsStore: strict || requireSecretsStore
   });
+  values.WEB_PUSH_VARS = renderWebPushVars();
   const written = [];
 
   for (const entry of TEMPLATES) {
@@ -95,9 +96,24 @@ export async function generateWranglerConfig({
       ...values,
       D1_DATABASE_ID: "[redacted]",
       SECRETS_STORE_ID: values.SECRETS_STORE_ID ? "[redacted]" : values.SECRETS_STORE_ID,
-      CLOUDFLARE_ACCOUNT_ID: values.CLOUDFLARE_ACCOUNT_ID ? "[redacted]" : values.CLOUDFLARE_ACCOUNT_ID
+      CLOUDFLARE_ACCOUNT_ID: values.CLOUDFLARE_ACCOUNT_ID ? "[redacted]" : values.CLOUDFLARE_ACCOUNT_ID,
+      WEB_PUSH_VARS: values.WEB_PUSH_VARS ? "[redacted]" : values.WEB_PUSH_VARS
     }
   };
+}
+
+function renderWebPushVars() {
+  const publicKey = (process.env.WEB_PUSH_VAPID_PUBLIC_KEY || "").trim();
+  const subject = (process.env.WEB_PUSH_SUBJECT || "").trim();
+  if (!publicKey && !subject) return "";
+  if (!publicKey || !subject) {
+    throw new Error("Both WEB_PUSH_VAPID_PUBLIC_KEY and WEB_PUSH_SUBJECT must be set together");
+  }
+  return [
+    "[vars]",
+    `WEB_PUSH_VAPID_PUBLIC_KEY = "${publicKey.replace(/"/g, "")}"`,
+    `WEB_PUSH_SUBJECT = "${subject.replace(/"/g, "")}"`
+  ].join("\n");
 }
 
 async function main() {

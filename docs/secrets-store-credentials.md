@@ -36,7 +36,7 @@ Unconfigured sentinel:
 
 Recipient email, Pushover device/priority/sound, webhook enable/masked hostname, and browser subscription metadata remain in D1 — never inside these secrets.
 
-Non-secret Web Push config on the Worker: `WEB_PUSH_VAPID_PUBLIC_KEY` and `WEB_PUSH_SUBJECT` (mailto: or https URL).
+Non-secret Web Push config on the Worker: `WEB_PUSH_VAPID_PUBLIC_KEY` and `WEB_PUSH_SUBJECT` (mailto: or https URL). The private key lives only in Secrets Store; the public key and subject are non-secret and are emitted into `wrangler.worker.toml` `[vars]` by `npm run config:generate` when `WEB_PUSH_VAPID_PUBLIC_KEY` and `WEB_PUSH_SUBJECT` are present in the environment.
 
 
 ## One-time bootstrap
@@ -54,6 +54,31 @@ Also apply D1 schema (adds metadata tables only):
 ```bash
 npm run db:schema:remote
 ```
+
+## Web Push VAPID setup
+
+After bootstrap, generate and install the VAPID keypair:
+
+```bash
+export CLOUDFLARE_API_TOKEN=...        # scoped, Secrets Store Edit
+export CLOUDFLARE_ACCOUNT_ID=...
+export SECRETS_STORE_ID=...            # from secrets-store:bootstrap
+npm run webpush:setup -- --subject mailto:ops@example.com
+```
+
+The script:
+
+1. Generates one P-256 (ES256) VAPID keypair.
+2. Writes the PKCS8 private key into `SUNSETHUE_WEB_PUSH_VAPID` in Secrets Store as `{ "version": 1, "configured": true, "privateKey": "..." }`.
+3. Waits for the secret to become `active`.
+4. Prints the **non-secret** public key and subject to set as GitHub production **variables**:
+   - `WEB_PUSH_VAPID_PUBLIC_KEY`
+   - `WEB_PUSH_SUBJECT`
+5. Never prints the private key and refuses to log any string containing PEM markers.
+
+Then set those two variables in the GitHub production environment and redeploy the Worker (production workflow, or `wrangler deploy --keep-vars --config wrangler.worker.toml` after `npm run config:generate` with both env vars present). Verify with `GET /api/web-push/vapid-public-key` → `{ configured: true, publicKey: "B..." }`; the public key decodes to 65 bytes with prefix `0x04`. Retry Browser Push registration in Settings — expect `POST /api/web-push/subscriptions`.
+
+Optional: `--verify-url https://production.example.com` fetches the VAPID endpoint after deploy and asserts `configured:true` with a valid 65-byte / `0x04` public key.
 
 ## Single token permissions
 

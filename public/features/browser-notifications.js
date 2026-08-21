@@ -13,6 +13,16 @@ export function initBrowserNotifications({
     return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
   }
 
+  function isValidVapidPublicKey(base64Url) {
+    if (typeof base64Url !== "string" || !base64Url) return false;
+    try {
+      const bytes = urlBase64ToUint8Array(base64Url);
+      return bytes.length === 65 && bytes[0] === 4;
+    } catch {
+      return false;
+    }
+  }
+
   function reportDevicesChanged(counts) {
     if (typeof onDevicesChanged === "function") {
       onDevicesChanged(counts);
@@ -237,15 +247,22 @@ export function initBrowserNotifications({
         } catch {
           throw new Error("Could not load the Web Push public key from the server.");
         }
-        if (!vapid?.publicKey) {
+        if (!vapid?.configured || !vapid?.publicKey) {
           throw new Error("Web Push is not configured on the server.");
+        }
+        if (!isValidVapidPublicKey(vapid.publicKey)) {
+          throw new Error("Web Push public key is invalid. Ask the operator to run npm run webpush:setup.");
         }
         try {
           subscription = await registration.pushManager.subscribe({
             userVisibleOnly: true,
             applicationServerKey: urlBase64ToUint8Array(vapid.publicKey)
           });
-        } catch {
+        } catch (error) {
+          console.warn("Browser Push subscribe failed", {
+            name: error?.name,
+            message: error?.message
+          });
           throw new Error("Could not create a browser push subscription.");
         }
       }

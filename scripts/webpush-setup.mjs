@@ -14,7 +14,14 @@
  *   --subject mailto:ops@example.com  (or WEB_PUSH_SUBJECT env var)
  *
  * Never prints the private key. Refuses to log any string containing PEM markers.
+ * Refuses to overwrite an existing secret unless --rotate is supplied, because
+ * rotating the application-server key can require existing Browser Push devices
+ * to register again. The sentinel secret created by `secrets-store:bootstrap` is
+ * still an existing secret, so the first real provisioning run must use --rotate
+ * to replace it.
  */
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   assertScopedApiToken,
   createSecret,
@@ -27,20 +34,21 @@ import { verifyToken } from "./lib/cloudflare.mjs";
 import {
   buildVapidSecretDocument,
   generateVapidKeyPair,
-  isValidVapidSubject,
-  isValidVapidPublicKey
+  isValidVapidSubject
 } from "./lib/webpush-vapid.mjs";
 
-function parseArgs(argv) {
-  const args = { subject: process.env.WEB_PUSH_SUBJECT || "", verifyUrl: process.env.WEBPUSH_VERIFY_URL || "" };
+export function parseArgs(argv) {
+  const args = {
+    subject: process.env.WEB_PUSH_SUBJECT || "",
+    rotate: false
+  };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === "--subject") {
       args.subject = argv[i + 1] || "";
       i += 1;
-    } else if (arg === "--verify-url") {
-      args.verifyUrl = argv[i + 1] || "";
-      i += 1;
+    } else if (arg === "--rotate") {
+      args.rotate = true;
     } else if (arg === "--help" || arg === "-h") {
       args.help = true;
     }
@@ -50,7 +58,8 @@ function parseArgs(argv) {
 
 function printHelp() {
   console.log(`Usage:
-  npm run webpush:setup -- --subject mailto:ops@example.com [--verify-url https://production.example.com]
+  npm run webpush:setup -- --subject mailto:ops@example.com
+  npm run webpush:setup -- --subject mailto:ops@example.com --rotate
 
 Required:
   --subject      mailto: or https:// URL used as VAPID JWT subject
@@ -61,81 +70,94 @@ Environment:
   CLOUDFLARE_ACCOUNT_ID  32-hex account id
   SECRETS_STORE_ID       existing Secrets Store id (from secrets-store:bootstrap)
 
-Optional:
-  --verify-url  production base URL; after deploy, fetch /api/web-push/vapid-public-key
-                and assert configured:true with a 65-byte / 0x04 public key.
+Options:
+  --rotate     Overwrite an existing VAPID secret. Browser Push
+               devices may need to register again after rotation.
+
+Next steps:
+  1. Set GitHub production environment variables from the printed output.
+  2. Redeploy the Worker.
+  3. Run npm run webpush:verify -- --url https://production.example.com
 `);
 }
 
-function assertNoPrivateMaterial(text) {
+export function assertNoPrivateMaterial(text) {
   if (typeof text === "string" && /BEGIN PRIVATE KEY|BEGIN EC PRIVATE KEY|BEGIN RSA PRIVATE KEY/.test(text)) {
     throw new Error("Refusing to print output that contains a private key");
   }
 }
 
-async function verifyRemote(url) {
-  const endpoint = `${url.replace(/\/$/, "")}/api/web-push/vapid-public-key`;
-  const response = await fetch(endpoint);
-  if (!response.ok) {
-    throw new Error(`VERIFY_HTTP_${response.status}`);
-  }
-  const body = await response.json().catch(() => ({}));
-  if (!body?.configured || !body?.publicKey) {
-    throw new Error("VERIFY_NOT_CONFIGURED");
-  }
-  if (!isValidVapidPublicKey(body.publicKey)) {
-    throw new Error("VERIFY_INVALID_PUBLIC_KEY");
-  }
-  return { endpoint, configured: body.configured };
-}
+/**
+ * Run the setup with injectable dependencies so unit tests can mock the
+ * Cloudflare API and the keypair generator.
+ */
+export async function runSetup(deps) {
+  const {
+    argv = [],
+    env = process.env,
+    generate = generateVapidKeyPair,
+    findSecret = findSecretByName,
+    create = createSecret,
+    patch = patchSecret,
+    waitActive = waitForSecretActive,
+    assertToken = assertScopedApiToken,
+    verify = verifyToken,
+    log = console.log,
+    error = console.error
+  } = deps;
 
-async function main() {
-  const args = parseArgs(process.argv.slice(2));
+  const args = parseArgs(argv);
   if (args.help) {
     printHelp();
-    return;
+    return { ok: true, help: true };
   }
 
   const subject = (args.subject || "").trim();
   if (!isValidVapidSubject(subject)) {
-    console.error(JSON.stringify({
+    error(JSON.stringify({
       ok: false,
       error: "Missing or invalid --subject. Provide a mailto: or https:// URL."
     }));
-    process.exitCode = 1;
-    return;
+    return { ok: false, error: "Missing or invalid --subject. Provide a mailto: or https:// URL." };
   }
 
-  assertScopedApiToken();
-  await verifyToken();
+  assertToken();
+  await verify();
 
-  const storeId = process.env.SECRETS_STORE_ID;
+  const storeId = env.SECRETS_STORE_ID;
   if (typeof storeId !== "string" || !/^[a-f0-9-]{16,64}$/i.test(storeId.trim())) {
-    console.error(JSON.stringify({ ok: false, error: "Invalid or missing SECRETS_STORE_ID" }));
-    process.exitCode = 1;
-    return;
+    error(JSON.stringify({ ok: false, error: "Invalid or missing SECRETS_STORE_ID" }));
+    return { ok: false, error: "Invalid or missing SECRETS_STORE_ID" };
   }
 
-  const { publicKeyBase64Url, privateKeyPem } = await generateVapidKeyPair();
+  const existing = await findSecret(storeId, WEB_PUSH_VAPID_SECRET_NAME);
+  if (existing && !args.rotate) {
+    error(JSON.stringify({
+      ok: false,
+      error: "A VAPID secret already exists. To replace it, run again with --rotate. Existing Browser Push devices may need to register again after rotation."
+    }));
+    return { ok: false, error: "A VAPID secret already exists. To replace it, run again with --rotate." };
+  }
+
+  const { publicKeyBase64Url, privateKeyPem } = await generate();
   const document = buildVapidSecretDocument(privateKeyPem);
 
-  const existing = await findSecretByName(storeId, WEB_PUSH_VAPID_SECRET_NAME);
   let secretResult;
   if (existing?.id) {
-    secretResult = await patchSecret(storeId, existing.id, {
+    secretResult = await patch(storeId, existing.id, {
       value: document,
       comment: "sunsethue-helper web push vapid keys",
       scopes: ["workers"]
     });
   } else {
-    secretResult = await createSecret(storeId, {
+    secretResult = await create(storeId, {
       name: WEB_PUSH_VAPID_SECRET_NAME,
       value: document,
       comment: "sunsethue-helper web push vapid keys",
       scopes: ["workers"]
     });
   }
-  const activated = await waitForSecretActive(storeId, secretResult.id);
+  const activated = await waitActive(storeId, secretResult.id);
 
   const summary = {
     ok: true,
@@ -143,7 +165,8 @@ async function main() {
       name: WEB_PUSH_VAPID_SECRET_NAME,
       id: activated.id,
       status: activated.status,
-      action: existing?.id ? "updated" : "created"
+      action: existing?.id ? "rotated" : "created",
+      rotation: args.rotate || false
     },
     publicKey: publicKeyBase64Url,
     subject,
@@ -152,27 +175,27 @@ async function main() {
       `  WEB_PUSH_VAPID_PUBLIC_KEY=${publicKeyBase64Url}`,
       `  WEB_PUSH_SUBJECT=${subject}`,
       "Redeploy the Worker (production workflow or `wrangler deploy --keep-vars --config wrangler.worker.toml`).",
+      "Run `npm run webpush:verify -- --url https://<production-host>` to confirm the endpoint.",
       "Retry Browser Push registration in Settings; expect POST /api/web-push/subscriptions."
     ]
   };
   assertNoPrivateMaterial(JSON.stringify(summary));
-  console.log(JSON.stringify(summary, null, 2));
+  log(JSON.stringify(summary, null, 2));
+  return summary;
+}
 
-  if (args.verifyUrl) {
-    try {
-      const result = await verifyRemote(args.verifyUrl);
-      console.log(JSON.stringify({ verify: { ok: true, ...result } }, null, 2));
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "VERIFY_FAILED";
-      console.error(JSON.stringify({ verify: { ok: false, error: message } }));
-      process.exitCode = 1;
-    }
+async function main() {
+  try {
+    await runSetup({});
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "WEBPUSH_SETUP_FAILED";
+    assertNoPrivateMaterial(message);
+    console.error(JSON.stringify({ ok: false, error: message }));
+    process.exitCode = 1;
   }
 }
 
-main().catch((error) => {
-  const message = error instanceof Error ? error.message : "WEBPUSH_SETUP_FAILED";
-  assertNoPrivateMaterial(message);
-  console.error(JSON.stringify({ ok: false, error: message }));
-  process.exitCode = 1;
-});
+const isMain = process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1]);
+if (isMain) {
+  main();
+}

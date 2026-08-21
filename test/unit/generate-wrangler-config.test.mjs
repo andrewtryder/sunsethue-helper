@@ -12,6 +12,7 @@ import {
   missingRequired,
   resolveProject
 } from "../../scripts/lib/project-config.mjs";
+import { generateVapidKeyPair } from "../../scripts/lib/webpush-vapid.mjs";
 
 function clearProjectEnv() {
   // Ensure .env has been consumed once so later deletes are not overwritten by
@@ -148,6 +149,7 @@ test("strict generation fails closed when D1_DATABASE_ID is missing", async () =
 test("generateWranglerConfig emits WEB_PUSH [vars] only when both env vars are set", async () => {
   const temp = await mkdtemp(join(tmpdir(), "sunsethue-webpush-"));
   const previous = { ...process.env };
+  const { publicKeyBase64Url } = await generateVapidKeyPair();
   try {
     clearProjectEnv();
     await writeFile(join(temp, "wrangler.example.toml"), 'name = "{{PAGES_PROJECT_NAME}}"\n');
@@ -170,17 +172,78 @@ test("generateWranglerConfig emits WEB_PUSH [vars] only when both env vars are s
     assert.equal(without.values.WEB_PUSH_VARS, "");
 
     // Both set -> [vars] block emitted
-    process.env.WEB_PUSH_VAPID_PUBLIC_KEY = "BExamplePublicKeyForTestOnly";
+    process.env.WEB_PUSH_VAPID_PUBLIC_KEY = publicKeyBase64Url;
     process.env.WEB_PUSH_SUBJECT = "mailto:ops@example.com";
     const withVars = await generateWranglerConfig({ strict: false, root: temp });
     const workerWith = await readFile(join(temp, "wrangler.worker.toml"), "utf8");
     assert.match(workerWith, /\[vars\]/);
-    assert.match(workerWith, /WEB_PUSH_VAPID_PUBLIC_KEY = "BExamplePublicKeyForTestOnly"/);
+    assert.match(workerWith, new RegExp(`WEB_PUSH_VAPID_PUBLIC_KEY = "${publicKeyBase64Url}"`));
     assert.match(workerWith, /WEB_PUSH_SUBJECT = "mailto:ops@example.com"/);
     assert.equal(withVars.values.WEB_PUSH_VARS, "[redacted]");
 
     // Only one set -> fail closed
     delete process.env.WEB_PUSH_SUBJECT;
+    await assert.rejects(
+      () => generateWranglerConfig({ strict: false, root: temp }),
+      /Both WEB_PUSH_VAPID_PUBLIC_KEY and WEB_PUSH_SUBJECT must be set together/
+    );
+  } finally {
+    delete process.env.WEB_PUSH_VAPID_PUBLIC_KEY;
+    delete process.env.WEB_PUSH_SUBJECT;
+    restoreEnv(previous);
+    await rm(temp, { recursive: true, force: true });
+  }
+});
+
+test("generateWranglerConfig rejects malformed WEB_PUSH values before emitting TOML", async () => {
+  const temp = await mkdtemp(join(tmpdir(), "sunsethue-webpush-bad-"));
+  const previous = { ...process.env };
+  const { publicKeyBase64Url } = await generateVapidKeyPair();
+  try {
+    clearProjectEnv();
+    await writeFile(join(temp, "wrangler.example.toml"), 'name = "{{PAGES_PROJECT_NAME}}"\n');
+    await writeFile(
+      join(temp, "wrangler.worker.example.toml"),
+      'name = "{{WORKER_NAME}}"\n{{WEB_PUSH_VARS}}\n'
+    );
+    await writeFile(
+      join(temp, "wrangler.credential-admin.example.toml"),
+      'name = "{{CREDENTIAL_ADMIN_WORKER_NAME}}"\n'
+    );
+
+    // Bad public key
+    process.env.WEB_PUSH_VAPID_PUBLIC_KEY = "not-a-valid-key";
+    process.env.WEB_PUSH_SUBJECT = "mailto:ops@example.com";
+    await assert.rejects(
+      () => generateWranglerConfig({ strict: false, root: temp }),
+      /WEB_PUSH_VAPID_PUBLIC_KEY is not a valid 65-byte \/ 0x04 P-256 VAPID public key/
+    );
+
+    // Bad subject with trailing junk
+    process.env.WEB_PUSH_VAPID_PUBLIC_KEY = publicKeyBase64Url;
+    process.env.WEB_PUSH_SUBJECT = "mailto:ops@example.com extra-junk";
+    await assert.rejects(
+      () => generateWranglerConfig({ strict: false, root: temp }),
+      /WEB_PUSH_SUBJECT must be a mailto: or https:\/\/ URL/
+    );
+
+    // http subject rejected
+    process.env.WEB_PUSH_SUBJECT = "http://example.com";
+    await assert.rejects(
+      () => generateWranglerConfig({ strict: false, root: temp }),
+      /WEB_PUSH_SUBJECT must be a mailto: or https:\/\/ URL/
+    );
+
+    // Valid https subject accepted
+    process.env.WEB_PUSH_SUBJECT = "https://example.com/push";
+    const withHttps = await generateWranglerConfig({ strict: false, root: temp });
+    const workerHttps = await readFile(join(temp, "wrangler.worker.toml"), "utf8");
+    assert.match(workerHttps, /WEB_PUSH_SUBJECT = "https:\/\/example.com\/push"/);
+    assert.equal(withHttps.values.WEB_PUSH_VARS, "[redacted]");
+
+    // Partial: only subject set
+    delete process.env.WEB_PUSH_VAPID_PUBLIC_KEY;
+    process.env.WEB_PUSH_SUBJECT = "mailto:ops@example.com";
     await assert.rejects(
       () => generateWranglerConfig({ strict: false, root: temp }),
       /Both WEB_PUSH_VAPID_PUBLIC_KEY and WEB_PUSH_SUBJECT must be set together/

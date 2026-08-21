@@ -100,7 +100,7 @@ export function buildVapidSecretDocument(privateKeyPem) {
 export function isValidVapidSubject(subject) {
   if (typeof subject !== "string" || !subject) return false;
   const trimmed = subject.trim();
-  if (/^mailto:[^\s@]+@[^\s@]+/.test(trimmed)) return true;
+  if (/^mailto:[^\s@]+@[^\s@]+$/.test(trimmed)) return true;
   if (/^https:\/\/[^\s]+$/.test(trimmed)) return true;
   return false;
 }

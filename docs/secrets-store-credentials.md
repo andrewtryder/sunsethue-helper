@@ -57,28 +57,33 @@ npm run db:schema:remote
 
 ## Web Push VAPID setup
 
-After bootstrap, generate and install the VAPID keypair:
+After bootstrap, generate and install the VAPID keypair. The bootstrap created an unconfigured sentinel for this secret, so the first provisioning run must replace it with `--rotate`:
 
 ```bash
 export CLOUDFLARE_API_TOKEN=...        # scoped, Secrets Store Edit
 export CLOUDFLARE_ACCOUNT_ID=...
 export SECRETS_STORE_ID=...            # from secrets-store:bootstrap
-npm run webpush:setup -- --subject mailto:ops@example.com
+npm run webpush:setup -- --subject mailto:ops@example.com --rotate
 ```
 
 The script:
 
-1. Generates one P-256 (ES256) VAPID keypair.
-2. Writes the PKCS8 private key into `SUNSETHUE_WEB_PUSH_VAPID` in Secrets Store as `{ "version": 1, "configured": true, "privateKey": "..." }`.
-3. Waits for the secret to become `active`.
-4. Prints the **non-secret** public key and subject to set as GitHub production **variables**:
+1. Refuses to overwrite an existing secret unless `--rotate` is supplied, to prevent accidental keypair rotation.
+2. Generates one P-256 (ES256) VAPID keypair.
+3. Writes the PKCS8 private key into `SUNSETHUE_WEB_PUSH_VAPID` in Secrets Store as `{ "version": 1, "configured": true, "privateKey": "..." }`.
+4. Waits for the secret to become `active`.
+5. Prints the **non-secret** public key and subject to set as GitHub production **variables**:
    - `WEB_PUSH_VAPID_PUBLIC_KEY`
    - `WEB_PUSH_SUBJECT`
-5. Never prints the private key and refuses to log any string containing PEM markers.
+6. Never prints the private key and refuses to log any string containing PEM markers.
 
-Then set those two variables in the GitHub production environment and redeploy the Worker (production workflow, or `wrangler deploy --keep-vars --config wrangler.worker.toml` after `npm run config:generate` with both env vars present). Verify with `GET /api/web-push/vapid-public-key` → `{ configured: true, publicKey: "B..." }`; the public key decodes to 65 bytes with prefix `0x04`. Retry Browser Push registration in Settings — expect `POST /api/web-push/subscriptions`.
+Then set those two variables in the GitHub production environment and redeploy the Worker (production workflow, or `wrangler deploy --keep-vars --config wrangler.worker.toml` after `npm run config:generate` with both env vars present). After deploy, verify the endpoint:
 
-Optional: `--verify-url https://production.example.com` fetches the VAPID endpoint after deploy and asserts `configured:true` with a valid 65-byte / `0x04` public key.
+```bash
+npm run webpush:verify -- --url https://production.example.com
+```
+
+`webpush:verify` checks `GET /api/web-push/vapid-public-key` returns `configured: true` and a valid 65-byte / `0x04` public key. If `WEB_PUSH_VAPID_PUBLIC_KEY` is set in the environment, it also checks the returned key matches the expected value. Retry Browser Push registration in Settings — expect `POST /api/web-push/subscriptions`.
 
 ## Single token permissions
 

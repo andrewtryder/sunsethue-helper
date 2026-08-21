@@ -11,6 +11,10 @@ import { readFile, writeFile } from "node:fs/promises";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { resolveTemplateValues } from "./lib/project-config.mjs";
+import {
+  isValidVapidPublicKey,
+  isValidVapidSubject
+} from "./lib/webpush-vapid.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -102,6 +106,10 @@ export async function generateWranglerConfig({
   };
 }
 
+function tomlString(value) {
+  return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+}
+
 function renderWebPushVars() {
   const publicKey = (process.env.WEB_PUSH_VAPID_PUBLIC_KEY || "").trim();
   const subject = (process.env.WEB_PUSH_SUBJECT || "").trim();
@@ -109,10 +117,16 @@ function renderWebPushVars() {
   if (!publicKey || !subject) {
     throw new Error("Both WEB_PUSH_VAPID_PUBLIC_KEY and WEB_PUSH_SUBJECT must be set together");
   }
+  if (!isValidVapidPublicKey(publicKey)) {
+    throw new Error("WEB_PUSH_VAPID_PUBLIC_KEY is not a valid 65-byte / 0x04 P-256 VAPID public key");
+  }
+  if (!isValidVapidSubject(subject)) {
+    throw new Error("WEB_PUSH_SUBJECT must be a mailto: or https:// URL");
+  }
   return [
     "[vars]",
-    `WEB_PUSH_VAPID_PUBLIC_KEY = "${publicKey.replace(/"/g, "")}"`,
-    `WEB_PUSH_SUBJECT = "${subject.replace(/"/g, "")}"`
+    `WEB_PUSH_VAPID_PUBLIC_KEY = ${tomlString(publicKey)}`,
+    `WEB_PUSH_SUBJECT = ${tomlString(subject)}`
   ].join("\n");
 }
 

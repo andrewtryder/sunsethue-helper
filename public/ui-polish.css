@@ -63,14 +63,50 @@
 }
 
 .bulk-alert-menu-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 30;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
-  padding: 0.5rem;
-  border: 1px solid rgba(245, 241, 234, 0.15);
+  gap: 2px;
+  min-width: 280px;
+  max-width: calc(100vw - 32px);
+  padding: 6px;
+  border: 1px solid var(--border);
   border-radius: var(--radius-card);
   background: var(--surface-raised);
+  box-shadow: var(--shadow-md);
+}
+
+.bulk-alert-menu-item {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.bulk-alert-menu-item:hover,
+.bulk-alert-menu-item:focus-visible {
+  background: var(--surface-hover);
+  outline: none;
+}
+
+.bulk-alert-menu-item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.bulk-alert-menu-item-emphasis {
+  color: var(--text-secondary);
 }
 
 .checkbox-grid {
@@ -203,6 +239,21 @@
   gap: var(--space-sm);
 }
 
+/* Shared five-column Locations table track for heading + rows. */
+.locations-table-head,
+.loc-rule-card {
+  --locations-table-columns:
+    minmax(240px, 1.35fr)
+    minmax(160px, 0.75fr)
+    minmax(220px, 1fr)
+    minmax(110px, 0.45fr)
+    72px;
+}
+
+.locations-table-head {
+  display: none;
+}
+
 .loc-rule-card {
   display: grid;
   grid-template-columns: 1fr;
@@ -216,16 +267,34 @@
 }
 
 @media (min-width: 768px) {
+  .locations-table-head,
   .loc-rule-card {
-    grid-template-columns:
-      minmax(220px, 1.3fr)
-      minmax(170px, 0.8fr)
-      minmax(280px, 1.2fr)
-      auto;
+    display: grid;
+    grid-template-columns: var(--locations-table-columns);
     align-items: center;
     column-gap: var(--space-md);
     row-gap: 0;
+  }
+
+  .locations-table-head {
+    padding: 0 var(--space-lg) 6px;
+    margin: 0 0 2px;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .loc-rule-card {
     padding: var(--space-sm) var(--space-lg);
+  }
+
+  .loc-rule-field-label {
+    display: none;
   }
 }
 
@@ -236,7 +305,9 @@
 }
 
 .loc-rule-identity,
-.loc-rule-notify,
+.loc-rule-checks,
+.loc-rule-channels,
+.loc-rule-alert,
 .loc-rule-actions {
   min-width: 0;
 }
@@ -267,6 +338,7 @@
 .loc-rule-title {
   display: block;
   color: var(--text-primary);
+  overflow-wrap: anywhere;
 }
 
 .loc-rule-name .coords {
@@ -278,11 +350,29 @@
   color: var(--text-tertiary);
 }
 
-.loc-rule-notify {
+.loc-rule-checks,
+.loc-rule-channels,
+.loc-rule-alert {
   display: flex;
   flex-direction: column;
   gap: 4px;
   min-width: 0;
+}
+
+@media (min-width: 768px) {
+  .loc-rule-checks,
+  .loc-rule-channels,
+  .loc-rule-alert {
+    display: block;
+  }
+}
+
+.loc-rule-field-label {
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .loc-rule-meta-row {
@@ -295,6 +385,7 @@
 
 .channel-dots {
   display: inline-flex;
+  flex-wrap: wrap;
   gap: 6px;
 }
 
@@ -500,8 +591,13 @@
 
 .loc-rule-threshold-line {
   max-width: 100%;
-  text-align: right;
   line-height: 1.35;
+}
+
+@media (min-width: 768px) {
+  .loc-rule-threshold-line {
+    text-align: left;
+  }
 }
 
 .quota-label {
@@ -746,6 +842,15 @@
 
   .location-rules-bulk-actions {
     justify-content: flex-start;
+  }
+
+  .locations-table-head {
+    display: none !important;
+  }
+
+  .bulk-alert-menu-panel {
+    left: 0;
+    right: auto;
   }
 
   #pane-locations .location-rule-summary {

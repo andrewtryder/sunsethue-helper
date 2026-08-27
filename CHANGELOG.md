@@ -4,6 +4,23 @@ All notable changes to this project are documented in this file.
 
 This changelog follows [Conventional Commits](https://www.conventionalcommits.org/) and is maintained by [release-please](https://github.com/googleapis/release-please). Release sections group changes by commit type (`feat`, `fix`, etc.). Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.25.0](https://github.com/andrewtryder/sunsethue-helper/compare/v1.24.0...v1.25.0) (2026-08-27)
+
+
+### Features
+
+* **notifications:** separate scheduled reports from quality alerts ([#112](https://github.com/andrewtryder/sunsethue-helper/issues/112)) ([7b70313](https://github.com/andrewtryder/sunsethue-helper/commit/7b703134215497a95d00bf623620da02b0ffbf93))
+
+
+### Bug Fixes
+
+* **ci:** apply and verify D1 schema before Worker deploy ([#114](https://github.com/andrewtryder/sunsethue-helper/issues/114)) ([ed0fb87](https://github.com/andrewtryder/sunsethue-helper/commit/ed0fb87a017dd3f53955362a22d0c3a11705ff10))
+* **frontend:** align location rows and bulk alert menu ([#115](https://github.com/andrewtryder/sunsethue-helper/issues/115)) ([efd1578](https://github.com/andrewtryder/sunsethue-helper/commit/efd1578403dba1bcf0c0996331548b7deb9c547b))
+* **frontend:** clarify setup status and application settings ([#116](https://github.com/andrewtryder/sunsethue-helper/issues/116)) ([dd5a7c9](https://github.com/andrewtryder/sunsethue-helper/commit/dd5a7c9361d359c79feeed989eee4b81f23708de))
+* **frontend:** sync browser push registration with scheduled reports ([#117](https://github.com/andrewtryder/sunsethue-helper/issues/117)) ([c369c9c](https://github.com/andrewtryder/sunsethue-helper/commit/c369c9c8bcb5c88c2962438ad4bc2ff3b2c1d79a))
+* **test:** avoid CodeQL bad-tag-filter false positive ([#120](https://github.com/andrewtryder/sunsethue-helper/issues/120)) ([c2358a0](https://github.com/andrewtryder/sunsethue-helper/commit/c2358a0070e738e29c304cc94c3e3b6fa2c6da9e))
+* **webpush:** provision VAPID keypair and harden subscribe diagnostics ([17a4728](https://github.com/andrewtryder/sunsethue-helper/commit/17a4728932d454fbd2b0ce4a5e663d783bf2c68c))
+
 ## [1.24.0](https://github.com/andrewtryder/sunsethue-helper/compare/v1.23.1...v1.24.0) (2026-08-20)
 
 

@@ -77,8 +77,8 @@ test("an unusable quality renders N/A rather than a broken badge", () => {
 
 test("badge labels are HTML escaped", () => {
   const badge = getQualityBadge(0.5, '<script>alert("x")</script>');
-  assert.doesNotMatch(badge, /<script>/);
-  assert.match(badge, /&lt;script&gt;/);
+  assert.equal(badge.includes("<script>"), false);
+  assert.equal(badge.includes("&lt;script&gt;"), true);
 });
 
 test("escapeHtml handles every replaced character and empty input", () => {

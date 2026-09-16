@@ -7,6 +7,13 @@ title = "sunsethue-helper"
 useDefault = true
 
 [[allowlists]]
+description = "Environment variable reference, not a credential value"
+regexTarget = "secret"
+regexes = [
+  '''^env\.SUNSETHUE_API_KEY$'''
+]
+
+[[allowlists]]
 description = "Local secrets, generated configs, dependencies, and tooling state"
 paths = [
   '''(^|/)\.env($|\.)''',

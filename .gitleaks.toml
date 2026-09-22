@@ -39,3 +39,14 @@ regexes = [
   '''fake[-_]?secret''',
   '''owner@example\.com'''
 ]
+
+[[allowlists]]
+description = "Web Push auth/p256dh length validation is not a credential"
+condition = "AND"
+regexTarget = "line"
+paths = [
+  '''(^|/)worker/notifications/webpush\.js$'''
+]
+regexes = [
+  '''if \(!p256dh \|\| !auth \|\| p256dh\.length > 256 \|\| auth\.length > 256\)'''
+]

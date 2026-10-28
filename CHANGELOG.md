@@ -4,6 +4,13 @@ All notable changes to this project are documented in this file.
 
 This changelog follows [Conventional Commits](https://www.conventionalcommits.org/) and is maintained by [release-please](https://github.com/googleapis/release-please). Release sections group changes by commit type (`feat`, `fix`, etc.). Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.25.2](https://github.com/andrewtryder/sunsethue-helper/compare/v1.25.1...v1.25.2) (2026-10-28)
+
+
+### Bug Fixes
+
+* **deps:** update dependencies and resolve security advisories ([#140](https://github.com/andrewtryder/sunsethue-helper/issues/140)) ([b50e0e1](https://github.com/andrewtryder/sunsethue-helper/commit/b50e0e18ac8c3f6f1706037e9edddba2fa8c2dd4))
+
 ## [1.25.1](https://github.com/andrewtryder/sunsethue-helper/compare/v1.25.0...v1.25.1) (2026-09-17)
 
 

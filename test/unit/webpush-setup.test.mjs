@@ -35,9 +35,15 @@ function fakeDeps(overrides = {}) {
 }
 
 test("parseArgs reads --subject and --rotate", () => {
-  assert.deepEqual(parseArgs(["--subject", "mailto:a@example.com"]), { subject: "mailto:a@example.com", rotate: false });
-  assert.deepEqual(parseArgs(["--subject", "https://example.com", "--rotate"]), { subject: "https://example.com", rotate: true });
-  assert.deepEqual(parseArgs(["--help"]), { subject: "", rotate: false, help: true });
+  const prev = process.env.WEB_PUSH_SUBJECT;
+  delete process.env.WEB_PUSH_SUBJECT;
+  try {
+    assert.deepEqual(parseArgs(["--subject", "mailto:a@example.com"]), { subject: "mailto:a@example.com", rotate: false });
+    assert.deepEqual(parseArgs(["--subject", "https://example.com", "--rotate"]), { subject: "https://example.com", rotate: true });
+    assert.deepEqual(parseArgs(["--help"]), { subject: "", rotate: false, help: true });
+  } finally {
+    if (prev !== undefined) process.env.WEB_PUSH_SUBJECT = prev;
+  }
 });
 
 test("assertNoPrivateMaterial throws when a PEM marker appears in text", () => {

@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS locations (
   latestSunsetQuality REAL,
   latestSunsetText TEXT,
   lastForecastUpdate INTEGER,
+  forecastModelRunId TEXT,
   forecastError TEXT,
   createdAt INTEGER NOT NULL
 );

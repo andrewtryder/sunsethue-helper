@@ -23,7 +23,7 @@ export const REQUIRED_D1_TABLES = Object.freeze([
  * Keys are table names; values are required column names.
  */
 export const REQUIRED_D1_COLUMNS = Object.freeze({
-  locations: Object.freeze(["scheduleTimes"]),
+  locations: Object.freeze(["scheduleTimes", "forecastModelRunId"]),
   application_settings: Object.freeze([
     "scheduledReportsEnabled",
     "scheduledReportTimes",

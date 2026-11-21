@@ -56,7 +56,7 @@ export async function addLocation(env, loc) {
  */
 export async function updateLocation(env, id, loc) {
   const result = await env.DB.prepare(
-    "UPDATE locations SET name = ?, latitude = ?, longitude = ? WHERE id = ?"
+    "UPDATE locations SET name = ?, latitude = ?, longitude = ?, forecastModelRunId = NULL WHERE id = ?"
   ).bind(loc.name, loc.latitude, loc.longitude, id).run();
   return result.meta?.changes === 1;
 }
@@ -92,6 +92,7 @@ export async function updateLocationForecast(env, id, data) {
       latestSunsetQuality = ?, 
       latestSunsetText = ?, 
       lastForecastUpdate = ?, 
+      forecastModelRunId = ?, 
       forecastError = ? 
      WHERE id = ?`
   ).bind(
@@ -102,6 +103,7 @@ export async function updateLocationForecast(env, id, data) {
     data.latestSunsetQuality ?? null,
     data.latestSunsetText ?? null,
     data.lastForecastUpdate,
+    data.forecastModelRunId ?? null,
     data.forecastError ?? null,
     id
   ).run();

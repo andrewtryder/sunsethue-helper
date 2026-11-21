@@ -29,7 +29,7 @@ test("deployment preflight uses the shared D1 table manifest", () => {
 
 test("deployment preflight requires additive D1 columns from the schema manifest", () => {
   assert.equal(PROJECT.requiredD1Columns, REQUIRED_D1_COLUMNS);
-  assert.deepEqual(REQUIRED_D1_COLUMNS.locations, ["scheduleTimes"]);
+  assert.deepEqual(REQUIRED_D1_COLUMNS.locations, ["scheduleTimes", "forecastModelRunId"]);
   assert.deepEqual(REQUIRED_D1_COLUMNS.application_settings, [
     "scheduledReportsEnabled",
     "scheduledReportTimes",

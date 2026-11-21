@@ -56,6 +56,7 @@ test("verifyD1ColumnsSync reports missing columns from PRAGMA JSON", () => {
 
   assert.equal(result.skipped, false);
   assert.deepEqual(result.missing, [
+    "locations.forecastModelRunId",
     "application_settings.scheduledReportChannels",
     "notification_outbox.deliveryPurpose"
   ]);

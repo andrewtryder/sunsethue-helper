@@ -4,6 +4,13 @@ All notable changes to this project are documented in this file.
 
 This changelog follows [Conventional Commits](https://www.conventionalcommits.org/) and is maintained by [release-please](https://github.com/googleapis/release-please). Release sections group changes by commit type (`feat`, `fix`, etc.). Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.26.0](https://github.com/andrewtryder/sunsethue-helper/compare/v1.25.2...v1.26.0) (2026-11-21)
+
+
+### Features
+
+* **worker:** skip forecast fetch when model run unchanged ([d990424](https://github.com/andrewtryder/sunsethue-helper/commit/d990424423c64f154c9c1573b8330eed155642d4))
+
 ## [1.25.2](https://github.com/andrewtryder/sunsethue-helper/compare/v1.25.1...v1.25.2) (2026-10-28)
 
 

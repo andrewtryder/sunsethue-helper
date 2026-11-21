@@ -29,6 +29,13 @@ function idFrom(value, nested = false) {
   return null;
 }
 
+/** Live /run-info exposes ISO timestamps on last_run before next_run. */
+function flatRunTimestamps(part) {
+  const item = object(part);
+  if (!item) return null;
+  return validId(item.last_run) ?? validId(item.next_run) ?? validId(item.run_id) ?? null;
+}
+
 /** Return the current model run from a recognized response shape, or null. */
 export function parseModelRunId(payload) {
   const root = object(payload);
@@ -39,8 +46,15 @@ export function parseModelRunId(payload) {
     for (const part of [node, runInfo].filter(Boolean)) {
       const direct = idFrom(part);
       if (direct) return direct;
+      const flat = flatRunTimestamps(part);
+      if (flat) return flat;
       const runs = object(part.runs);
       for (const current of [part.current_run, part.current, part.run, part.last_run, runs?.current]) {
+        if (typeof current === "string") {
+          const fromString = validId(current);
+          if (fromString) return fromString;
+          continue;
+        }
         const nested = idFrom(current, true);
         if (nested) return nested;
       }

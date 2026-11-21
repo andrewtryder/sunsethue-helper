@@ -9,6 +9,52 @@ import {
 import { createFetchFake, jsonOk } from "../support/fakes.mjs";
 
 const NOW = Date.parse("2026-11-20T18:00:00Z");
+const LIVE_RUN = "2026-11-21T18:00:00.000Z";
+
+const liveForecastFixture = {
+  time: "2026-11-21T23:00:00.000Z",
+  run: LIVE_RUN,
+  next_expected_update: "2026-11-22T00:00:00.000Z",
+  location: { latitude: 42.9286, longitude: -71.187 },
+  data: [
+    {
+      type: "sunrise",
+      quality: 0.35,
+      quality_text: "Fair",
+      time: "2026-11-22T11:23:00.000Z"
+    },
+    {
+      type: "sunset",
+      quality: 0.17,
+      quality_text: "Poor",
+      time: "2026-11-21T21:45:00.000Z"
+    }
+  ]
+};
+
+const liveRunInfoFixture = {
+  last_run: LIVE_RUN,
+  next_run: "2026-11-22T00:00:00.000Z",
+  last_run_time: "2026-11-21T18:00:00.000Z",
+  next_run_time: "2026-11-22T00:00:00.000Z",
+  last_run_status: 0,
+  next_run_status: 0
+};
+
+test("live bulk forecast and flat run-info share the same model run identifier", () => {
+  const forecastId = forecastRunId(liveForecastFixture);
+  const runInfoId = parseModelRunId(liveRunInfoFixture);
+  assert.equal(forecastId, LIVE_RUN);
+  assert.equal(runInfoId, LIVE_RUN);
+  assert.equal(forecastId, runInfoId);
+});
+
+test("run-info prefers last_run over next_run when both are present", () => {
+  assert.equal(
+    parseModelRunId({ last_run: " run-a ", next_run: "run-b" }),
+    "run-a"
+  );
+});
 
 test("run metadata parser recognizes optional direct and nested model IDs", () => {
   assert.equal(parseModelRunId({ run_id: " model-1 " }), "model-1");

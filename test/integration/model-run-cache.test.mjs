@@ -42,6 +42,36 @@ function forecastAndRunInfo({ currentRun = "m-1", forecastRun = currentRun, base
   return { fetchFake, calls };
 }
 
+function liveContractFetch({ run = "2026-11-21T18:00:00.000Z", baseTime = NOW } = {}) {
+  const calls = { forecast: 0, runInfo: 0 };
+  const fetchFake = createFetchFake({
+    "api.sunsethue.com": (url) => {
+      if (url.pathname === "/run-info") {
+        calls.runInfo++;
+        return jsonOk({ last_run: run, next_run: "2026-11-22T00:00:00.000Z" });
+      }
+      if (url.pathname === "/forecast") {
+        calls.forecast++;
+        return jsonOk({ run, ...sunsethueForecast({ baseTime }) });
+      }
+      throw new Error(`Unexpected Sunsethue path ${url.pathname}`);
+    }
+  });
+  return { fetchFake, calls };
+}
+
+test("scheduled report reuses forecasts with live run and last_run timestamps", async () => {
+  const liveRun = "2026-11-21T18:00:00.000Z";
+  await withLocations(async (env) => {
+    const { fetchFake, calls } = liveContractFetch({ run: liveRun });
+    await generateReport("SCHEDULED:06:00", env, { fetch: fetchFake, now: NOW });
+    await generateReport("SCHEDULED:12:00", env, { fetch: fetchFake, now: NOW + HOUR });
+    assert.equal(calls.forecast, 1);
+    assert.equal(calls.runInfo, 1);
+    assert.equal((await db.getLocations(env))[0].forecastModelRunId, liveRun);
+  });
+});
+
 test("scheduled report reuses D1 forecasts when the provider run is unchanged", async () => {
   await withLocations(async (env) => {
     const { fetchFake, calls } = forecastAndRunInfo();

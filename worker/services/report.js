@@ -44,7 +44,7 @@ export async function generateReport(triggerType, env, deps = {}) {
     locations = locations.filter((loc) => idSet.has(loc.id));
   }
   const activeLocations = locations.slice(0, 10);
-  const isScheduled = typeof triggerType === "string" && /^SCHEDULED:\\d{2}:00$/.test(triggerType);
+  const isScheduled = typeof triggerType === "string" && /^SCHEDULED:\d{2}:00$/.test(triggerType);
 
   // Check /run-info once for the entire scheduled batch, and only when there
   // is a usable cached event pair. Manual and test runs always fetch normally.

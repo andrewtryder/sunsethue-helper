@@ -16,7 +16,7 @@ Sunsethue Helper checks sunrise and sunset photo-quality forecasts for the place
 
 ### Forecast checks, scheduled reports, and quality alerts
 
-**Forecast checks** determine when Sunsethue fetches forecasts and therefore drive API quota. Global default check times (and optional per-location custom schedules) remain the source of truth.
+**Forecast checks** determine when Sunsethue fetches forecasts and therefore drive API quota. Global default check times (and optional per-location custom schedules) remain the source of truth. A proposed run-aware optimization may reuse a D1-cached next sunrise/sunset pair on scheduled checks when the bulk forecast response included a model run ID and `/run-info` confirms it remains current. Manual checks still fetch normally, and unknown metadata or passed events force the original request.
 
 **Scheduled reports** are routine digests sent at selected forecast-check times regardless of quality. They reuse the forecast already fetched for that check and never create extra Sunsethue API calls. Scheduled report times must be a subset of the default forecast-check schedule.
 

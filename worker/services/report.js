@@ -15,6 +15,7 @@ import { hasWebhookTransportAsync } from "../notifications/webhook.js";
 import { listLocationNotificationRules } from "../repositories/notification-rules.js";
 import { listWebPushSubscriptions } from "../repositories/webpush.js";
 import { resolveDisplayTimeZone } from "../../shared/time-format.js";
+import { cachedUpcomingEvents, fetchCurrentRunId, forecastRunId } from "../model-run.js";
 
 export { buildHtmlEmail } from "../notifications/email.js";
 
@@ -43,21 +44,53 @@ export async function generateReport(triggerType, env, deps = {}) {
     locations = locations.filter((loc) => idSet.has(loc.id));
   }
   const activeLocations = locations.slice(0, 10);
-  const results = await Promise.all(activeLocations.map(async (loc) => {
+  const isScheduled = typeof triggerType === "string" && /^SCHEDULED:\\d{2}:00$/.test(triggerType);
+
+  // Check /run-info once for the entire scheduled batch, and only when there
+  // is a usable cached event pair. Manual and test runs always fetch normally.
+  const eligible = isScheduled
+    ? activeLocations.map((loc) => cachedUpcomingEvents(loc, now))
+    : [];
+  const currentRunId = eligible.some(Boolean)
+    ? await fetchCurrentRunId({ fetch: fetchImpl, apiKey: env.SUNSETHUE_API_KEY })
+    : null;
+
+  const results = await Promise.all(activeLocations.map(async (loc, index) => {
+    const cached = eligible[index];
+    if (currentRunId && cached?.runId === currentRunId) {
+      return {
+        loc, sunrise: cached.sunrise, sunset: cached.sunset,
+        error: null, reused: true, modelRunId: cached.runId
+      };
+    }
     try {
+      // Legacy bulk endpoint remains unchanged until its compatibility with the
+      // provider's documented /event endpoint has been verified.
       const response = await fetchImpl(`https://api.sunsethue.com/forecast?latitude=${loc.latitude}&longitude=${loc.longitude}&days=2&key=${String(env.SUNSETHUE_API_KEY).trim()}`);
       if (!response.ok) throw new Error("FORECAST_UPSTREAM_ERROR");
       const json = await response.json();
-      if (!json?.data) throw new Error("FORECAST_INVALID_RESPONSE");
+      if (!Array.isArray(json?.data)) throw new Error("FORECAST_INVALID_RESPONSE");
       const selected = selectNextSunEvents(json.data, now);
-      return { loc, sunrise: normalizeForecastEvent(selected.nextSunrise), sunset: normalizeForecastEvent(selected.nextSunset), error: null };
+      return {
+        loc,
+        sunrise: normalizeForecastEvent(selected.nextSunrise),
+        sunset: normalizeForecastEvent(selected.nextSunset),
+        error: null, reused: false,
+        // Never attach a /run-info ID to a response that did not identify
+        // its own model run. This avoids false freshness from a legacy API.
+        modelRunId: forecastRunId(json)
+      };
     } catch {
-      return { loc, sunrise: null, sunset: null, error: "FORECAST_UNAVAILABLE" };
+      return {
+        loc, sunrise: null, sunset: null,
+        error: "FORECAST_UNAVAILABLE", reused: false, modelRunId: null
+      };
     }
   }));
   for (const result of results) {
+    if (result.reused) continue;
     await db.updateLocationForecast(env, result.loc.id, result.error ? {
-      lastForecastUpdate: now, forecastError: result.error
+      lastForecastUpdate: now, forecastModelRunId: null, forecastError: result.error
     } : {
       latestSunriseTime: result.sunrise?.time || null,
       latestSunriseQuality: result.sunrise?.quality ?? null,
@@ -65,7 +98,9 @@ export async function generateReport(triggerType, env, deps = {}) {
       latestSunsetTime: result.sunset?.time || null,
       latestSunsetQuality: result.sunset?.quality ?? null,
       latestSunsetText: result.sunset?.quality_text || null,
-      lastForecastUpdate: now, forecastError: null
+      lastForecastUpdate: now,
+      forecastModelRunId: result.modelRunId,
+      forecastError: null
     });
   }
   return {

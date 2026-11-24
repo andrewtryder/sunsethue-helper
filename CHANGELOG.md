@@ -4,6 +4,13 @@ All notable changes to this project are documented in this file.
 
 This changelog follows [Conventional Commits](https://www.conventionalcommits.org/) and is maintained by [release-please](https://github.com/googleapis/release-please). Release sections group changes by commit type (`feat`, `fix`, etc.). Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.26.1](https://github.com/andrewtryder/sunsethue-helper/compare/v1.26.0...v1.26.1) (2026-11-24)
+
+
+### Bug Fixes
+
+* **deps:** update jose to 6.2.18 and lint-staged to 17.6.1 ([#148](https://github.com/andrewtryder/sunsethue-helper/issues/148)) ([a718fa3](https://github.com/andrewtryder/sunsethue-helper/commit/a718fa3e6fa2c5d1af3bd959865e137247f5294d))
+
 ## [1.26.0](https://github.com/andrewtryder/sunsethue-helper/compare/v1.25.2...v1.26.0) (2026-11-21)
 
 
